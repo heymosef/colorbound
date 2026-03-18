@@ -1,0 +1,707 @@
+/**
+ * Palette Workspace — main content area showing palette swatches,
+ * token table, and UI preview.
+ *
+ * The toolbar shows the palette name, a More menu (⋮) with contextual
+ * actions (save/reset when dirty, duplicate, share, delete), and a
+ * ViewModeToggle (Light | Dark | Both). The toolbar layout is the same
+ * regardless of dirty/clean state.
+ *
+ * On mobile, the toolbar is hidden (hideToolbar) and actions are handled
+ * by EditPalettePage's top bar and More menu.
+ */
+
+import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Separator } from './ui/separator';
+import {
+  Moon, Sun, Save, MoreVertical,
+  CopyPlus, RotateCcw, Trash2, Share2, FolderInput, FolderOutput,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import type { Palette } from '../lib/color-utils';
+import { oklchToRgb } from '../lib/color-utils';
+import { copyToClipboard } from '../lib/clipboard';
+import { serializePaletteConfig } from '../lib/share-serialization';
+import { createSharedPalette, buildShareUrl } from '../lib/share-api';
+import { UIPreview } from './ui-preview';
+import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
+import { DuplicateDialog } from './duplicate-dialog';
+import { SharePaletteButton } from './share-dialog';
+import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from './ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import { cn } from './ui/utils';
+import { usePaletteContext } from '../lib/palette-context';
+import { MoveToCollectionDialog } from './move-to-collection-dialog';
+import { PopoverMenuItem } from './popover-menu-item';
+import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
+import { CopyableTokenSwatch } from './copyable-token-swatch';
+
+interface PaletteWorkspaceProps {
+  palette: Palette | null;
+  darkPalette: Palette | null;
+  /** Whether the palette is linked to a saved collection entry */
+  isEditingCollection?: boolean;
+  isDirty?: boolean;
+  onRevert?: () => void;
+  onSave?: () => void;
+  onAddToCollection?: () => void;
+  onDuplicate?: (name: string) => void;
+  onDelete?: () => void;
+  /** Mobile: hide the built-in toolbar (handled externally by EditPalettePage) */
+  hideToolbar?: boolean;
+  /** Controlled view mode (for mobile, where toggle lives outside the workspace) */
+  viewMode?: ViewMode;
+  onViewModeChange?: (v: ViewMode) => void;
+}
+
+function PaletteRow({
+  palette,
+  label,
+}: {
+  palette: Palette;
+  label?: string;
+}) {
+  const isDarkMode = label === 'Dark Palette';
+  return (
+    <div className="space-y-1.5">
+      {label && (
+        <div className="flex items-center gap-2">
+          {label === 'Light Palette' ? (
+            <Sun className="w-3.5 h-3.5 text-muted-foreground" />
+          ) : (
+            <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+          <p className="text-[12px] text-muted-foreground">{label}</p>
+        </div>
+      )}
+      {/* Desktop/tablet: flex row. Mobile: horizontal scroll */}
+      <div
+        className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory"
+      >
+        <div className="space-y-1.5 min-w-max">
+          <div
+            className="flex gap-1.5"
+            role="list"
+            aria-label={`${label ?? 'Palette'} token swatches`}
+          >
+            {palette.tokens.map((token) => (
+              <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
+                <CopyableTokenSwatch
+                  token={token}
+                  paletteName={palette.name}
+                  variant="workspace"
+                  preferBestAvailableColor
+                />
+              </div>
+            ))}
+          </div>
+          {/* WCAG contrast indicators */}
+          <ContrastRow tokens={palette.tokens} isDarkMode={isDarkMode} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Async share helper (used by overflow menus) ───
+// Generates a share link, copies it to clipboard, and shows a toast.
+async function handleShareFromMenu(palette: Palette) {
+  try {
+    const sanitized = serializePaletteConfig(palette, palette.group);
+    const result = await createSharedPalette(sanitized);
+    const url = buildShareUrl('palette', result.id);
+    await copyToClipboard(url);
+    toast.success('Share link copied to clipboard', {
+      description: url,
+      duration: 3000,
+    });
+  } catch (err) {
+    console.error('Failed to create share link from menu:', err);
+    toast.error('Failed to create share link', {
+      description: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+}
+
+// ─── Inline AlertDialog for delete confirmation ───
+
+function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  paletteName,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: () => void;
+  paletteName: string;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete palette?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove &ldquo;{paletteName}&rdquo; from your collection. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="text-[13px]">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className="text-[13px] bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// Inline reset confirmation (used from overflow menu)
+
+function ResetConfirmInline({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will revert the palette to the last saved version. Any unsaved changes will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="text-[13px]">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} className="text-[13px]">
+            Discard Changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ─── More menu for desktop + mobile ───
+
+function DesktopMoreMenu({
+  isDirty,
+  isEditingCollection,
+  onSave,
+  onRevert,
+  onDuplicate,
+  onDelete,
+  palette,
+}: {
+  isDirty?: boolean;
+  isEditingCollection?: boolean;
+  onSave?: () => void;
+  onRevert?: () => void;
+  onDuplicate?: (name: string) => void;
+  onDelete?: () => void;
+  palette: Palette;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [copyToOpen, setCopyToOpen] = useState(false);
+
+  const { collections, activePaletteId, activeCollectionId } = usePaletteContext();
+  const hasMultipleCollections = collections.length > 1;
+  const paletteId = activePaletteId ?? palette.id;
+
+  const handleAction = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          aria-label="More actions"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-[210px] p-1">
+          {/* Duplicate */}
+          <PopoverMenuItem onClick={() => handleAction(() => setDupOpen(true))}>
+            <CopyPlus className="w-3.5 h-3.5" />
+            Duplicate palette
+          </PopoverMenuItem>
+          {/* Share — opens share dialog, disabled when dirty */}
+          <PopoverMenuItem
+            onClick={() => handleAction(() => setShareOpen(true))}
+            disabled={isDirty}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Share palette
+          </PopoverMenuItem>
+
+          {/* Move / Copy to collection */}
+          {isEditingCollection && (
+            <>
+              <Separator className="my-1" />
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setMoveOpen(true))}
+                disabled={!hasMultipleCollections}
+              >
+                <FolderOutput className="w-3.5 h-3.5" />
+                Move to collection…
+              </PopoverMenuItem>
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setCopyToOpen(true))}
+                disabled={!hasMultipleCollections}
+              >
+                <FolderInput className="w-3.5 h-3.5" />
+                Duplicate to collection…
+              </PopoverMenuItem>
+            </>
+          )}
+
+          {/* Delete */}
+          {isEditingCollection && onDelete && (
+            <>
+              <Separator className="my-1" />
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setDeleteOpen(true))}
+                variant="destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete palette
+              </PopoverMenuItem>
+            </>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {/* Duplicate dialog */}
+      {onDuplicate && (
+        <DuplicateDialog
+          currentName={palette.name}
+          onDuplicate={onDuplicate}
+          open={dupOpen}
+          onOpenChange={setDupOpen}
+          hideTrigger
+        />
+      )}
+
+      {/* Share dialog */}
+      <SharePaletteButton
+        palette={palette}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        hideTrigger
+      />
+
+      {/* Move to collection dialog */}
+      <MoveToCollectionDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        sourceCollectionId={activeCollectionId ?? ''}
+        paletteId={paletteId}
+        paletteName={palette.name}
+        mode="move"
+      />
+
+      {/* Copy to collection dialog */}
+      <MoveToCollectionDialog
+        open={copyToOpen}
+        onOpenChange={setCopyToOpen}
+        sourceCollectionId={activeCollectionId ?? ''}
+        paletteId={paletteId}
+        paletteName={palette.name}
+        mode="copy"
+      />
+
+      {/* Reset confirmation */}
+      {resetOpen && onRevert && (
+        <ResetConfirmInline
+          open={resetOpen}
+          onOpenChange={setResetOpen}
+          onConfirm={() => { onRevert(); setResetOpen(false); }}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deleteOpen && onDelete && (
+        <DeleteConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onConfirm={() => { onDelete(); setDeleteOpen(false); }}
+          paletteName={palette.name}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Mobile More Menu ───
+// Used in the mobile top bar (EditPalettePage handles placement).
+
+export function MobileMoreMenu({
+  isDirty,
+  isEditingCollection,
+  onRevert,
+  onDuplicate,
+  onDelete,
+  palette,
+}: {
+  isDirty?: boolean;
+  isEditingCollection?: boolean;
+  onRevert?: () => void;
+  onDuplicate?: (name: string) => void;
+  onDelete?: () => void;
+  palette: Palette;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [copyToOpen, setCopyToOpen] = useState(false);
+
+  const { collections, activePaletteId, activeCollectionId } = usePaletteContext();
+  const hasMultipleCollections = collections.length > 1;
+  const paletteId = activePaletteId ?? palette.id;
+
+  const handleAction = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          aria-label="More actions"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-[210px] p-1">
+          {/* Duplicate */}
+          <PopoverMenuItem onClick={() => handleAction(() => setDupOpen(true))}>
+            <CopyPlus className="w-3.5 h-3.5" />
+            Duplicate palette
+          </PopoverMenuItem>
+          {/* Share */}
+          <PopoverMenuItem
+            onClick={() => handleAction(() => setShareOpen(true))}
+            disabled={isDirty}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Share palette
+          </PopoverMenuItem>
+
+          {/* Move / Copy to collection */}
+          {isEditingCollection && (
+            <>
+              <Separator className="my-1" />
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setMoveOpen(true))}
+                disabled={!hasMultipleCollections}
+              >
+                <FolderOutput className="w-3.5 h-3.5" />
+                Move to collection…
+              </PopoverMenuItem>
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setCopyToOpen(true))}
+                disabled={!hasMultipleCollections}
+              >
+                <FolderInput className="w-3.5 h-3.5" />
+                Duplicate to collection…
+              </PopoverMenuItem>
+            </>
+          )}
+
+          {/* Delete */}
+          {isEditingCollection && onDelete && (
+            <>
+              <Separator className="my-1" />
+              <PopoverMenuItem
+                onClick={() => handleAction(() => setDeleteOpen(true))}
+                variant="destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete palette
+              </PopoverMenuItem>
+            </>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {/* Duplicate dialog */}
+      {onDuplicate && (
+        <DuplicateDialog
+          currentName={palette.name}
+          onDuplicate={onDuplicate}
+          open={dupOpen}
+          onOpenChange={setDupOpen}
+          hideTrigger
+        />
+      )}
+
+      {/* Share dialog */}
+      <SharePaletteButton
+        palette={palette}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        hideTrigger
+      />
+
+      {/* Move to collection dialog */}
+      <MoveToCollectionDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        sourceCollectionId={activeCollectionId ?? ''}
+        paletteId={paletteId}
+        paletteName={palette.name}
+        mode="move"
+      />
+
+      {/* Copy to collection dialog */}
+      <MoveToCollectionDialog
+        open={copyToOpen}
+        onOpenChange={setCopyToOpen}
+        sourceCollectionId={activeCollectionId ?? ''}
+        paletteId={paletteId}
+        paletteName={palette.name}
+        mode="copy"
+      />
+
+      {/* Reset confirmation */}
+      {resetOpen && onRevert && (
+        <ResetConfirmInline
+          open={resetOpen}
+          onOpenChange={setResetOpen}
+          onConfirm={() => { onRevert(); setResetOpen(false); }}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deleteOpen && onDelete && (
+        <DeleteConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onConfirm={() => { onDelete(); setDeleteOpen(false); }}
+          paletteName={palette.name}
+        />
+      )}
+    </>
+  );
+}
+
+export function PaletteWorkspace({
+  palette,
+  darkPalette,
+  isEditingCollection,
+  isDirty,
+  onRevert,
+  onSave,
+  onAddToCollection,
+  onDuplicate,
+  onDelete,
+  hideToolbar = false,
+  viewMode: controlledViewMode,
+  onViewModeChange,
+}: PaletteWorkspaceProps) {
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('light');
+
+  const viewMode = controlledViewMode ?? internalViewMode;
+  const setViewMode = onViewModeChange ?? setInternalViewMode;
+  const { contrastAlgorithm, setContrastAlgorithm } = usePaletteContext();
+  const supportsP3 = useSupportsP3();
+
+  if (!palette) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
+            <Sun className="w-5 h-5" />
+          </div>
+          <p className="text-[14px]">Generate a palette to get started</p>
+          <p className="text-[12px]">Use the controls on the left to configure your color ramp</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activePalette = viewMode === 'dark' && darkPalette ? darkPalette : palette;
+
+  return (
+    <div className="h-full flex flex-col overflow-auto">
+      {/* ─── Desktop/Tablet Toolbar ─── */}
+      {!hideToolbar && (
+        <div className="px-3 sm:px-5 py-3 border-b border-border bg-card sticky top-0 z-10">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-1 min-w-0">
+              <h2 className="text-[14px] sm:text-[15px] font-medium truncate min-w-0">{palette.name}</h2>
+              <DesktopMoreMenu
+                isDirty={isDirty}
+                isEditingCollection={isEditingCollection}
+                onSave={onSave}
+                onRevert={onRevert}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+                palette={palette}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <AlgorithmToggle value={contrastAlgorithm} onChange={setContrastAlgorithm} />
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="p-3 sm:p-5 space-y-6 flex-1">
+        {/* Palette swatches */}
+        {viewMode === 'both' ? (
+          <div className="space-y-5">
+            <PaletteRow palette={palette} label="Light Palette" />
+            {darkPalette && <PaletteRow palette={darkPalette} label="Dark Palette" />}
+          </div>
+        ) : viewMode === 'dark' ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-[12px] text-muted-foreground">Dark-mode optimized palette</p>
+            </div>
+            {darkPalette && (
+              <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+                <div className="space-y-1.5 min-w-max">
+                  <div className="flex gap-1.5" role="list" aria-label="Dark palette token swatches">
+                    {darkPalette.tokens.map((token) => (
+                      <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
+                        <CopyableTokenSwatch
+                          token={token}
+                          paletteName={darkPalette.name}
+                          variant="workspace"
+                          preferBestAvailableColor
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <ContrastRow tokens={darkPalette.tokens} isDarkMode />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Sun className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-[12px] text-muted-foreground">Light-mode optimized palette</p>
+            </div>
+            <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+              <div className="space-y-1.5 min-w-max">
+                <div className="flex gap-1.5" role="list" aria-label="Color token swatches">
+                  {palette.tokens.map((token) => (
+                    <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
+                      <CopyableTokenSwatch
+                        token={token}
+                        paletteName={palette.name}
+                        variant="workspace"
+                        preferBestAvailableColor
+                      />
+                    </div>
+                  ))}
+                </div>
+                <ContrastRow tokens={palette.tokens} isDarkMode={false} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Token Table */}
+        <Tabs defaultValue="preview" className="w-full">
+          <TabsList className="h-8">
+            <TabsTrigger value="preview" className="text-[12px] h-6">
+              UI Preview
+            </TabsTrigger>
+            <TabsTrigger value="values" className="text-[12px] h-6">
+              Token Values
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preview" className="mt-4">
+            <UIPreview palette={activePalette} />
+          </TabsContent>
+
+          <TabsContent value="values" className="mt-4">
+            <div className="rounded-md border border-border overflow-hidden overflow-x-auto">
+              <Table className="text-[12px]" aria-label="Token values table">
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Step</TableHead>
+                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">OKLCH</TableHead>
+                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Hex</TableHead>
+                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px] hidden sm:table-cell" scope="col">RGB</TableHead>
+                    <TableHead className="px-3 py-2 h-auto text-center text-[12px]" scope="col">Gamut</TableHead>
+                    <TableHead className="px-3 py-2 h-auto text-center text-[12px]" scope="col">Swatch</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activePalette.tokens.map((token) => {
+                    const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
+                    return (
+                      <TableRow key={token.step}>
+                        <TableCell className="px-3 py-1.5 font-mono">{token.step}</TableCell>
+                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.css}</TableCell>
+                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.hex}</TableCell>
+                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground hidden sm:table-cell">{token.rgb}</TableCell>
+                        <TableCell className="px-3 py-1.5 text-center">
+                          {token.gamut === 'srgb' ? (
+                            <span className="text-[9px] text-muted-foreground/60">sRGB</span>
+                          ) : token.gamut === 'p3' ? (
+                            <span className="inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[9px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">P3</span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[9px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">OOG</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-3 py-1.5 text-center">
+                          <div
+                            className="w-6 h-4 rounded-sm mx-auto border border-border"
+                            style={{ backgroundColor: getTokenDisplayColor(token, supportsP3) }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
