@@ -26,6 +26,10 @@ export type AddPaletteToCollectionResult =
   | { ok: true; paletteId: string; collectionId: string }
   | { ok: false };
 
+export interface CreateCollectionOptions {
+  activate?: boolean;
+}
+
 export interface PaletteContextValue {
   config: PaletteConfig;
   /** Palettes in the active collection (backward-compat alias) */
@@ -61,7 +65,7 @@ export interface PaletteContextValue {
   handleDuplicatePalette: (name: string) => string;
   handleApplyHex: (hue: number, chroma: number) => void;
   activeCollection: Collection | null;
-  handleCreateCollection: (name?: string) => { id: string; slug: string };
+  handleCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };
   handleRenameCollection: (collectionId: string, name: string) => CollectionRenameResult;
   handleDeleteCollection: (collectionId: string) => boolean;
   handleSelectCollection: (collectionId: string) => void;
@@ -77,7 +81,7 @@ export interface CollectionsContextValue {
   activeCollection: Collection | null;
   collectionSortBy: CollectionSortBy;
   setCollectionSortBy: (sort: CollectionSortBy) => void;
-  handleCreateCollection: (name?: string) => { id: string; slug: string };
+  handleCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };
   handleRenameCollection: (collectionId: string, name: string) => CollectionRenameResult;
   handleDeleteCollection: (collectionId: string) => boolean;
   handleSelectCollection: (collectionId: string) => void;

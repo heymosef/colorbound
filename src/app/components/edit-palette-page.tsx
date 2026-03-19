@@ -43,6 +43,7 @@ import { ThemeSwitcher, useThemeContext } from './root-layout';
 import { CollectionSwitcher } from './root-layout';
 import { useDocumentTitle } from '../lib/use-document-title';
 import { toast } from 'sonner';
+import type { Palette } from '../lib/color-utils';
 import { findPaletteLocation } from '../lib/collection-operations';
 import {
   buildCollectionDraftEditorPath,
@@ -59,6 +60,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import { MoveToCollectionDialog } from './move-to-collection-dialog';
+
+interface PendingCollectionAction {
+  mode: 'move' | 'copy';
+  sourceCollectionId: string;
+  paletteId: string;
+  paletteName: string;
+}
 
 // ─── Desktop Layout ───
 function DesktopLayout({
@@ -72,6 +81,7 @@ function DesktopLayout({
   onAddToCollection,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   collection,
 }: {
   controlsNode: (onClose?: () => void) => React.ReactNode;
@@ -84,6 +94,7 @@ function DesktopLayout({
   onAddToCollection: () => void;
   onDuplicate: (name: string) => void;
   onDelete: () => void;
+  onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
 }) {
   return (
@@ -108,6 +119,7 @@ function DesktopLayout({
             onAddToCollection={onAddToCollection}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onCollectionAction={onCollectionAction}
           />
         </div>
       </main>
@@ -135,6 +147,7 @@ function TabletLayout({
   onAddToCollection,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   collection,
 }: {
   controlsNode: (onClose?: () => void) => React.ReactNode;
@@ -147,6 +160,7 @@ function TabletLayout({
   onAddToCollection: () => void;
   onDuplicate: (name: string) => void;
   onDelete: () => void;
+  onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
 }) {
   return (
@@ -188,6 +202,7 @@ function TabletLayout({
               onAddToCollection={onAddToCollection}
               onDuplicate={onDuplicate}
               onDelete={onDelete}
+              onCollectionAction={onCollectionAction}
             />
           </TabsContent>
           <TabsContent value="accessibility" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
@@ -228,6 +243,7 @@ function MobileLayout({
   onAddToCollection,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   collection,
   onSelectPalette,
   onSaveAndSwitch,
@@ -247,6 +263,7 @@ function MobileLayout({
   onAddToCollection: () => void;
   onDuplicate: (name: string) => void;
   onDelete: () => void;
+  onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
   onSelectPalette: (id: string) => void;
   onSaveAndSwitch: (targetId: string) => void;
@@ -310,6 +327,7 @@ function MobileLayout({
             onRevert={onRevert}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onCollectionAction={onCollectionAction}
             palette={currentPalette}
           />
           <Button
@@ -377,6 +395,7 @@ function MobileLayout({
             onAddToCollection={onAddToCollection}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onCollectionAction={onCollectionAction}
             hideToolbar
             viewMode={mobileViewMode}
             onViewModeChange={setMobileViewMode}
@@ -431,7 +450,9 @@ export function EditPalettePage() {
     handleApplyHex,
     startDraftPalette,
     selectPaletteInCollection,
+    handleCreateCollection,
   } = usePaletteContext();
+  const [pendingCollectionAction, setPendingCollectionAction] = useState<PendingCollectionAction | null>(null);
 
   // Set document title: "PaletteName — CollectionName — Colorbound"
   const titleParts = [config.name];
@@ -589,6 +610,17 @@ export function EditPalettePage() {
     navigate(basePath);
   }, [navigate, basePath]);
 
+  const handleCollectionAction = useCallback((mode: 'move' | 'copy', palette: Palette) => {
+    if (!activeCollectionId) return;
+
+    setPendingCollectionAction({
+      mode,
+      sourceCollectionId: activeCollectionId,
+      paletteId: activePaletteId ?? palette.id,
+      paletteName: palette.name,
+    });
+  }, [activeCollectionId, activePaletteId]);
+
   const controlsNode = (onClose?: () => void) => (
     <PaletteControls
       config={config}
@@ -618,6 +650,7 @@ export function EditPalettePage() {
     onAddToCollection: handleSaveDraftPalette,
     onDuplicate: handleDuplicatePalette,
     onDelete: handleDeletePalette,
+    onCollectionAction: handleCollectionAction,
     collection,
   };
 
@@ -658,17 +691,34 @@ export function EditPalettePage() {
     </AlertDialog>
   );
 
+  const collectionActionDialog = pendingCollectionAction ? (
+    <MoveToCollectionDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) {
+          setPendingCollectionAction(null);
+        }
+      }}
+      sourceCollectionId={pendingCollectionAction.sourceCollectionId}
+      paletteId={pendingCollectionAction.paletteId}
+      paletteName={pendingCollectionAction.paletteName}
+      mode={pendingCollectionAction.mode}
+      onCreateCollection={handleCreateCollection}
+    />
+  ) : null;
+
   if (breakpoint === 'desktop') {
-    return <>{unsavedChangesDialog}<DesktopLayout {...layoutProps} /></>;
+    return <>{unsavedChangesDialog}{collectionActionDialog}<DesktopLayout {...layoutProps} /></>;
   }
 
   if (breakpoint === 'tablet') {
-    return <>{unsavedChangesDialog}<TabletLayout {...layoutProps} /></>;
+    return <>{unsavedChangesDialog}{collectionActionDialog}<TabletLayout {...layoutProps} /></>;
   }
 
   return (
     <>
       {unsavedChangesDialog}
+      {collectionActionDialog}
       <MobileLayout
         {...layoutProps}
         config={config}

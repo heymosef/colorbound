@@ -11,7 +11,7 @@
  * by EditPalettePage's top bar and More menu.
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
@@ -45,7 +45,6 @@ import {
 } from './ui/alert-dialog';
 import { cn } from './ui/utils';
 import { usePaletteContext } from '../lib/palette-context';
-import { MoveToCollectionDialog } from './move-to-collection-dialog';
 import { PopoverMenuItem } from './popover-menu-item';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
@@ -61,6 +60,7 @@ interface PaletteWorkspaceProps {
   onAddToCollection?: () => void;
   onDuplicate?: (name: string) => void;
   onDelete?: () => void;
+  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   /** Mobile: hide the built-in toolbar (handled externally by EditPalettePage) */
   hideToolbar?: boolean;
   /** Controlled view mode (for mobile, where toggle lives outside the workspace) */
@@ -213,6 +213,7 @@ function DesktopMoreMenu({
   onRevert,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   palette,
 }: {
   isDirty?: boolean;
@@ -221,6 +222,7 @@ function DesktopMoreMenu({
   onRevert?: () => void;
   onDuplicate?: (name: string) => void;
   onDelete?: () => void;
+  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;
 }) {
   const [open, setOpen] = useState(false);
@@ -228,12 +230,6 @@ function DesktopMoreMenu({
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [copyToOpen, setCopyToOpen] = useState(false);
-
-  const { collections, activePaletteId, activeCollectionId } = usePaletteContext();
-  const hasMultipleCollections = collections.length > 1;
-  const paletteId = activePaletteId ?? palette.id;
 
   const handleAction = (action: () => void) => {
     setOpen(false);
@@ -269,15 +265,13 @@ function DesktopMoreMenu({
             <>
               <Separator className="my-1" />
               <PopoverMenuItem
-                onClick={() => handleAction(() => setMoveOpen(true))}
-                disabled={!hasMultipleCollections}
+                onClick={() => handleAction(() => onCollectionAction?.('move', palette))}
               >
                 <FolderOutput className="w-3.5 h-3.5" />
                 Move to collection…
               </PopoverMenuItem>
               <PopoverMenuItem
-                onClick={() => handleAction(() => setCopyToOpen(true))}
-                disabled={!hasMultipleCollections}
+                onClick={() => handleAction(() => onCollectionAction?.('copy', palette))}
               >
                 <FolderInput className="w-3.5 h-3.5" />
                 Duplicate to collection…
@@ -320,26 +314,6 @@ function DesktopMoreMenu({
         hideTrigger
       />
 
-      {/* Move to collection dialog */}
-      <MoveToCollectionDialog
-        open={moveOpen}
-        onOpenChange={setMoveOpen}
-        sourceCollectionId={activeCollectionId ?? ''}
-        paletteId={paletteId}
-        paletteName={palette.name}
-        mode="move"
-      />
-
-      {/* Copy to collection dialog */}
-      <MoveToCollectionDialog
-        open={copyToOpen}
-        onOpenChange={setCopyToOpen}
-        sourceCollectionId={activeCollectionId ?? ''}
-        paletteId={paletteId}
-        paletteName={palette.name}
-        mode="copy"
-      />
-
       {/* Reset confirmation */}
       {resetOpen && onRevert && (
         <ResetConfirmInline
@@ -371,6 +345,7 @@ export function MobileMoreMenu({
   onRevert,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   palette,
 }: {
   isDirty?: boolean;
@@ -378,6 +353,7 @@ export function MobileMoreMenu({
   onRevert?: () => void;
   onDuplicate?: (name: string) => void;
   onDelete?: () => void;
+  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;
 }) {
   const [open, setOpen] = useState(false);
@@ -385,12 +361,6 @@ export function MobileMoreMenu({
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [copyToOpen, setCopyToOpen] = useState(false);
-
-  const { collections, activePaletteId, activeCollectionId } = usePaletteContext();
-  const hasMultipleCollections = collections.length > 1;
-  const paletteId = activePaletteId ?? palette.id;
 
   const handleAction = (action: () => void) => {
     setOpen(false);
@@ -426,15 +396,13 @@ export function MobileMoreMenu({
             <>
               <Separator className="my-1" />
               <PopoverMenuItem
-                onClick={() => handleAction(() => setMoveOpen(true))}
-                disabled={!hasMultipleCollections}
+                onClick={() => handleAction(() => onCollectionAction?.('move', palette))}
               >
                 <FolderOutput className="w-3.5 h-3.5" />
                 Move to collection…
               </PopoverMenuItem>
               <PopoverMenuItem
-                onClick={() => handleAction(() => setCopyToOpen(true))}
-                disabled={!hasMultipleCollections}
+                onClick={() => handleAction(() => onCollectionAction?.('copy', palette))}
               >
                 <FolderInput className="w-3.5 h-3.5" />
                 Duplicate to collection…
@@ -477,26 +445,6 @@ export function MobileMoreMenu({
         hideTrigger
       />
 
-      {/* Move to collection dialog */}
-      <MoveToCollectionDialog
-        open={moveOpen}
-        onOpenChange={setMoveOpen}
-        sourceCollectionId={activeCollectionId ?? ''}
-        paletteId={paletteId}
-        paletteName={palette.name}
-        mode="move"
-      />
-
-      {/* Copy to collection dialog */}
-      <MoveToCollectionDialog
-        open={copyToOpen}
-        onOpenChange={setCopyToOpen}
-        sourceCollectionId={activeCollectionId ?? ''}
-        paletteId={paletteId}
-        paletteName={palette.name}
-        mode="copy"
-      />
-
       {/* Reset confirmation */}
       {resetOpen && onRevert && (
         <ResetConfirmInline
@@ -529,6 +477,7 @@ export function PaletteWorkspace({
   onAddToCollection,
   onDuplicate,
   onDelete,
+  onCollectionAction,
   hideToolbar = false,
   viewMode: controlledViewMode,
   onViewModeChange,
@@ -571,6 +520,7 @@ export function PaletteWorkspace({
                 onRevert={onRevert}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
+                onCollectionAction={onCollectionAction}
                 palette={palette}
               />
             </div>

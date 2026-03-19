@@ -5,7 +5,7 @@
  * Each row is a button that triggers the move/copy action.
  */
 import React from 'react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   AlertDialog,
@@ -16,14 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Plus } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import { cn } from './ui/utils';
 import { toast } from 'sonner';
+import { Button } from './ui/button';
 import {
   buildCollectionSavedEditorPath,
   getEditorNavigationMode,
 } from '../lib/editor-routes';
+import type { CreateCollectionOptions } from '../lib/palette-context-types';
 
 interface MoveToCollectionDialogProps {
   open: boolean;
@@ -33,6 +35,7 @@ interface MoveToCollectionDialogProps {
   paletteName: string;
   /** 'move' removes from source, 'copy' duplicates */
   mode: 'move' | 'copy';
+  onCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };
 }
 
 export function MoveToCollectionDialog({
@@ -42,19 +45,36 @@ export function MoveToCollectionDialog({
   paletteId,
   paletteName,
   mode,
+  onCreateCollection,
 }: MoveToCollectionDialogProps) {
   const navigate = useNavigate();
   const {
     collections,
-    activeCollectionId,
     handleMovePalette,
     handleCopyPalette,
   } = usePaletteContext();
+  const [createdCollectionId, setCreatedCollectionId] = useState<string | null>(null);
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const destinationRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const otherCollections = useMemo(
+  const eligibleDestinations = useMemo(
     () => collections.filter((c) => c.id !== sourceCollectionId),
     [collections, sourceCollectionId],
   );
+
+  useEffect(() => {
+    if (!open) {
+      setCreatedCollectionId(null);
+      setIsCreatingCollection(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!createdCollectionId) return;
+    if (!eligibleDestinations.some((collection) => collection.id === createdCollectionId)) return;
+
+    destinationRefs.current[createdCollectionId]?.focus();
+  }, [createdCollectionId, eligibleDestinations]);
 
   const handleSelect = (targetCollectionId: string) => {
     if (mode === 'move') {
@@ -82,6 +102,16 @@ export function MoveToCollectionDialog({
     }
   };
 
+  const handleCreateDestination = () => {
+    setIsCreatingCollection(true);
+    try {
+      const { id } = onCreateCollection(undefined, { activate: false });
+      setCreatedCollectionId(id);
+    } finally {
+      setIsCreatingCollection(false);
+    }
+  };
+
   const title = mode === 'move'
     ? `Move "${paletteName}"`
     : `Duplicate "${paletteName}"`;
@@ -101,19 +131,40 @@ export function MoveToCollectionDialog({
         </AlertDialogHeader>
 
         <div className="space-y-1 max-h-[240px] overflow-y-auto py-1">
-          {otherCollections.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground text-center py-4">
-              No other collections available. Create another collection first.
-            </p>
+          {eligibleDestinations.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
+                <FolderOpen className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[13px] font-medium">No destination collections yet</p>
+                <p className="text-[12px] text-muted-foreground">
+                  Create a collection to continue this {mode === 'move' ? 'move' : 'duplicate'} flow.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleCreateDestination}
+                disabled={isCreatingCollection}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {isCreatingCollection ? 'Creating…' : 'Create collection'}
+              </Button>
+            </div>
           ) : (
-            otherCollections.map((col) => (
+            eligibleDestinations.map((col) => (
               <button
                 key={col.id}
                 type="button"
                 onClick={() => handleSelect(col.id)}
+                ref={(node) => {
+                  destinationRefs.current[col.id] = node;
+                }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors cursor-pointer outline-none',
                   'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+                  createdCollectionId === col.id && 'bg-accent/50 text-accent-foreground ring-1 ring-ring/20',
                 )}
               >
                 <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">

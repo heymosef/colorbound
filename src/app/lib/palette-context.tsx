@@ -16,6 +16,7 @@ import type {
   CollectionSortBy,
   CollectionsContextValue,
   ContrastAlgorithm,
+  CreateCollectionOptions,
   PaletteConfig,
   PaletteContextValue,
 } from './palette-context-types';
@@ -417,7 +418,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
   // ─── Collection Management ───
 
-  const handleCreateCollection = useCallback((name?: string): { id: string; slug: string } => {
+  const handleCreateCollection = useCallback((name?: string, options?: CreateCollectionOptions): { id: string; slug: string } => {
+    const activate = options?.activate ?? true;
     const baseName = name || 'Untitled Collection';
     const existingNames = new Set(collections.map((c) => c.name));
     const finalName = deduplicateName(baseName, existingNames);
@@ -437,9 +439,11 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     };
 
     setCollections((prev) => [...prev, newCollection]);
-    setActiveCollectionId(newCollection.id);
-    setActivePaletteId(null);
-    setIsDirty(false);
+    if (activate) {
+      setActiveCollectionId(newCollection.id);
+      setActivePaletteId(null);
+      setIsDirty(false);
+    }
     setHasCompletedFirstRun(true);
     toast.success(`Created "${finalName}"`, { duration: 2000 });
     announcePolite(`Created collection ${finalName}`);

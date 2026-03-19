@@ -1,0 +1,126 @@
+import React from 'react';
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { MobileMoreMenu, PaletteWorkspace } from './palette-workspace';
+
+let paletteContextValue: any;
+
+function makePalette() {
+  return {
+    id: 'palette-1',
+    name: 'Ocean',
+    hue: 210,
+    chroma: 0.12,
+    lightness50: 0.985,
+    lightness950: 0.025,
+    tokens: [
+      {
+        step: 500,
+        css: 'oklch(0.6 0.12 210)',
+        hex: '#00aac8',
+        rgb: 'rgb(0, 170, 200)',
+        gamut: 'srgb',
+        oklch: { l: 0.6, c: 0.12, h: 210 },
+      },
+    ],
+  };
+}
+
+vi.mock('../lib/palette-context', () => ({
+  usePaletteContext: () => paletteContextValue,
+}));
+
+vi.mock('./copyable-token-swatch', () => ({
+  CopyableTokenSwatch: () => <div>Token swatch</div>,
+}));
+
+vi.mock('./contrast-indicator', () => ({
+  ContrastRow: () => <div>Contrast row</div>,
+  AlgorithmToggle: () => <div>Algorithm toggle</div>,
+}));
+
+vi.mock('./ui-preview', () => ({
+  UIPreview: () => <div>UI preview</div>,
+}));
+
+vi.mock('./share-dialog', () => ({
+  SharePaletteButton: () => null,
+}));
+
+vi.mock('./duplicate-dialog', () => ({
+  DuplicateDialog: () => null,
+}));
+
+vi.mock('../lib/use-supports-p3', () => ({
+  useSupportsP3: () => false,
+  getTokenDisplayColor: () => '#00aac8',
+}));
+
+vi.mock('./palette-view-mode-toggle', () => ({
+  ViewModeToggle: () => <div>View mode toggle</div>,
+}));
+
+describe('Palette workspace collection actions', () => {
+  beforeEach(() => {
+    paletteContextValue = {
+      contrastAlgorithm: 'wcag',
+      setContrastAlgorithm: vi.fn(),
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [makePalette()],
+        },
+      ],
+      activeCollectionId: 'collection-1',
+      activePaletteId: 'palette-1',
+    };
+  });
+
+  it('keeps move to collection enabled in the desktop workspace when only one collection exists', async () => {
+    const palette = makePalette();
+    const onCollectionAction = vi.fn();
+
+    render(
+      <PaletteWorkspace
+        palette={palette}
+        darkPalette={palette}
+        isEditingCollection
+        onCollectionAction={onCollectionAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('More actions'));
+
+    const moveButton = await screen.findByRole('button', { name: /move to collection/i });
+    expect(moveButton).toBeEnabled();
+
+    fireEvent.click(moveButton);
+
+    expect(onCollectionAction).toHaveBeenCalledWith('move', palette);
+  });
+
+  it('keeps duplicate to collection enabled in the mobile menu when only one collection exists', async () => {
+    const palette = makePalette();
+    const onCollectionAction = vi.fn();
+
+    render(
+      <MobileMoreMenu
+        isEditingCollection
+        onCollectionAction={onCollectionAction}
+        palette={palette}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('More actions'));
+
+    const duplicateButton = await screen.findByRole('button', { name: /duplicate to collection/i });
+    expect(duplicateButton).toBeEnabled();
+
+    fireEvent.click(duplicateButton);
+
+    expect(onCollectionAction).toHaveBeenCalledWith('copy', palette);
+  });
+});
