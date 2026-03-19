@@ -8,17 +8,15 @@ import {
 } from './collection-operations';
 
 function makePalette(name: string, hue = 200): Palette {
-  const tokens = generatePalette(hue, 0.18, 0.985, 0.025, false);
+  const tokens = generatePalette(hue, 0.18, 0.985, 0.025);
   return {
     id: generateId(),
     name,
-    group: 'Custom',
     tokens,
     hue,
     chroma: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
   };
 }
 

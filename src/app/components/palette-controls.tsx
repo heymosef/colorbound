@@ -5,14 +5,13 @@
  * is dirty or unsaved, providing a consistent save experience across all
  * breakpoints (mobile drawer, tablet sidebar, desktop sidebar).
  */
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
 import { Separator } from "./ui/separator";
-import { Switch } from "./ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -159,19 +158,16 @@ export function PaletteControls({
   const midpointGamut = useMemo((): GamutFlag => {
     const t = (500 - 50) / 900;
     const l = config.lightness50 - t * (config.lightness50 - config.lightness950);
-    const effectiveChroma = config.isNeutral
-      ? config.chroma * 0.05
-      : config.chroma;
-    return classifyGamut(l, Math.min(0.4, effectiveChroma), config.hue);
-  }, [config.hue, config.chroma, config.lightness50, config.lightness950, config.isNeutral]);
+    return classifyGamut(l, Math.min(0.4, config.chroma), config.hue);
+  }, [config.hue, config.chroma, config.lightness50, config.lightness950]);
 
   // Dynamic chroma cap: max slider value that keeps the anchor step (500) within target gamut.
   // Other steps use proportional C/L scaling and are individually gamut-mapped.
   const chromaCap = useMemo(
     () => gamutTarget === 'p3'
-      ? maxP3ChromaForHue(config.hue, config.lightness50, config.lightness950, 0, config.isNeutral)
-      : maxSrgbChromaForHue(config.hue, config.lightness50, config.lightness950, 0, config.isNeutral),
-    [config.hue, config.lightness50, config.lightness950, config.isNeutral, gamutTarget],
+      ? maxP3ChromaForHue(config.hue, config.lightness50, config.lightness950, 0)
+      : maxSrgbChromaForHue(config.hue, config.lightness50, config.lightness950, 0),
+    [config.hue, config.lightness50, config.lightness950, gamutTarget],
   );
 
   // Auto-clamp chroma when the cap shrinks below current value
@@ -201,7 +197,7 @@ export function PaletteControls({
     } else {
       onConfigChange({ hue, chroma });
     }
-    const name = suggestPaletteName(hue, chroma, config.isNeutral);
+    const name = suggestPaletteName(hue, chroma, config.lightness50, config.lightness950);
     toast.success(`Applied hex #${raw.replace('#', '').toUpperCase()}`, {
       description: `Hue ${hue}°, Chroma ${chroma.toFixed(3)} — "${name}"`,
       duration: 2500,
@@ -228,31 +224,6 @@ export function PaletteControls({
           </p>
           <GamutBadge gamut={midpointGamut} />
         </div>
-
-        {/* Palette Type */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label
-              htmlFor="neutral-toggle"
-              className="text-[13px]"
-            >
-              Neutral Palette
-            </Label>
-            <p className="text-[11px] text-muted-foreground">
-              Low chroma, grayscale-like
-            </p>
-          </div>
-          <Switch
-            id="neutral-toggle"
-            checked={config.isNeutral}
-            onCheckedChange={(v) =>
-              onConfigChange({ isNeutral: v })
-            }
-            aria-label="Toggle neutral palette mode"
-          />
-        </div>
-
-        <Separator />
 
         {/* Hex value */}
         <div className="space-y-2">
@@ -366,7 +337,7 @@ export function PaletteControls({
           <div className="md:hidden">
             <HuePreview
               hue={config.hue}
-              chroma={config.isNeutral ? 0.01 : config.chroma}
+              chroma={config.chroma}
             />
           </div>
           <div className="flex items-center justify-between">

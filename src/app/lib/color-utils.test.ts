@@ -326,7 +326,7 @@ describe('oklchToP3', () => {
 // ─── Palette Generation ───
 
 describe('generatePalette', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025, false);
+  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
 
   it('generates exactly 11 tokens', () => {
     expect(tokens).toHaveLength(11);
@@ -376,13 +376,6 @@ describe('generatePalette', () => {
     }
   });
 
-  it('neutral palette has very low chroma', () => {
-    const neutralTokens = generatePalette(210, 0.18, 0.985, 0.025, true);
-    for (const t of neutralTokens) {
-      expect(t.oklch.c).toBeLessThan(0.02);
-    }
-  });
-
   it('step 50 lightness matches lightness50 parameter', () => {
     const t50 = tokens.find(t => t.step === 50)!;
     expect(t50.oklch.l).toBeCloseTo(0.985, 2);
@@ -396,13 +389,13 @@ describe('generatePalette', () => {
 
 describe('generateDarkPalette', () => {
   it('generates same number of tokens as light palette', () => {
-    const light = generatePalette(210, 0.18, 0.985, 0.025, false);
-    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025, false);
+    const light = generatePalette(210, 0.18, 0.985, 0.025);
+    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025);
     expect(dark).toHaveLength(light.length);
   });
 
   it('has the same steps as light palette', () => {
-    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025, false);
+    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025);
     expect(dark.map(t => t.step)).toEqual(SCALE_STEPS);
   });
 });
@@ -425,7 +418,7 @@ describe('generateId', () => {
 
 describe('get500Oklch', () => {
   it('returns an object with l, c, h properties', () => {
-    const swatch = get500Oklch(210, 0.18, false);
+    const swatch = get500Oklch(210, 0.18);
     expect(swatch).toHaveProperty('l');
     expect(swatch).toHaveProperty('c');
     expect(swatch).toHaveProperty('h');
@@ -433,42 +426,47 @@ describe('get500Oklch', () => {
   });
 
   it('matches the 500 token from generatePalette', () => {
-    const tokens = generatePalette(210, 0.18, 0.985, 0.025, false);
+    const tokens = generatePalette(210, 0.18, 0.985, 0.025);
     const token500 = tokens.find((t) => t.step === 500)!;
-    const swatch = get500Oklch(210, 0.18, false);
+    const swatch = get500Oklch(210, 0.18, 0.985, 0.025);
     expect(swatch.l).toBeCloseTo(token500.oklch.l, 5);
     expect(swatch.c).toBeCloseTo(token500.oklch.c, 5);
     expect(swatch.h).toBe(token500.oklch.h);
   });
 
-  it('returns near-zero chroma when isNeutral is true', () => {
-    const swatch = get500Oklch(210, 0.18, true);
-    expect(swatch.c).toBeLessThan(0.01);
+  it('drops to zero chroma when the 500-step lightness collapses to zero', () => {
+    const swatch = get500Oklch(210, 0.18, 0, 0);
+    expect(swatch.c).toBe(0);
   });
 });
 
 describe('suggestPaletteName', () => {
   it('returns a non-empty string for any hue at default chroma', () => {
     for (let h = 0; h < 360; h += 15) {
-      const name = suggestPaletteName(h, 0.18, false);
+      const name = suggestPaletteName(h, 0.18);
       expect(typeof name).toBe('string');
       expect(name.length).toBeGreaterThan(0);
     }
   });
 
   it('returns different names for the same hue at different chromas', () => {
-    const achromatic = suggestPaletteName(250, 0.01, false);
-    const vivid = suggestPaletteName(250, 0.25, false);
+    const achromatic = suggestPaletteName(250, 0.01);
+    const vivid = suggestPaletteName(250, 0.25);
     expect(achromatic).not.toBe(vivid);
   });
 
-  it('returns achromatic-band names when isNeutral is true', () => {
-    const name = suggestPaletteName(250, 0.18, true);
+  it('returns achromatic-band names when the actual 500-step chroma is below threshold', () => {
+    const name = suggestPaletteName(250, 0.01);
+    expect(name).toBe('Slate');
+  });
+
+  it('uses the actual 500-step chroma, including lightness inputs', () => {
+    const name = suggestPaletteName(250, 0.18, 0, 0);
     expect(name).toBe('Slate');
   });
 
   it('returns vivid-band names for high chroma', () => {
-    const name = suggestPaletteName(250, 0.25, false);
+    const name = suggestPaletteName(250, 0.25);
     expect(name).toBe('Sapphire');
   });
 
@@ -479,7 +477,7 @@ describe('suggestPaletteName', () => {
 
     for (const hue of hues) {
       for (const chroma of chromas) {
-        const name = suggestPaletteName(hue, chroma, false);
+        const name = suggestPaletteName(hue, chroma);
         names.add(name);
       }
     }
@@ -488,13 +486,13 @@ describe('suggestPaletteName', () => {
   });
 
   it('handles hue wrap-around (360° maps to red region)', () => {
-    const at0 = suggestPaletteName(0, 0.18, false);
-    const at360 = suggestPaletteName(360, 0.18, false);
+    const at0 = suggestPaletteName(0, 0.18);
+    const at360 = suggestPaletteName(360, 0.18);
     expect(at0).toBe(at360);
   });
 
   it('handles negative hue values', () => {
-    const name = suggestPaletteName(-10, 0.18, false);
+    const name = suggestPaletteName(-10, 0.18);
     expect(typeof name).toBe('string');
     expect(name.length).toBeGreaterThan(0);
   });
@@ -503,17 +501,15 @@ describe('suggestPaletteName', () => {
 // ─── Export Functions ───
 
 describe('exportAsCSS', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025, false);
+  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
   const palette = {
     id: 'test',
     name: 'Blue',
-    group: 'Primary',
     tokens,
     hue: 210,
     chroma: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
   };
 
   it('outputs a :root block with CSS custom properties', () => {
@@ -547,17 +543,15 @@ describe('exportAsCSS', () => {
 });
 
 describe('exportAsJSON', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025, false);
+  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
   const palette = {
     id: 'test',
     name: 'Blue',
-    group: 'Primary',
     tokens,
     hue: 210,
     chroma: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
   };
 
   it('produces valid JSON', () => {

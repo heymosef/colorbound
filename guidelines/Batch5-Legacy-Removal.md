@@ -69,12 +69,10 @@ When the checklist is green, Batch 5 should:
 4. Delete tests that only cover legacy compatibility.
 5. Keep only the canonical palette shape:
    - `name`
-   - `group`
    - `hue`
    - `chroma`
    - `lightness50`
    - `lightness950`
-   - `isNeutral`
 
 ## Owner Checklist For The Follow-Up PR
 

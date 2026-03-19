@@ -121,7 +121,7 @@ function PaletteRow({
 // Generates a share link, copies it to clipboard, and shows a toast.
 async function handleShareFromMenu(palette: Palette) {
   try {
-    const sanitized = serializePaletteConfig(palette, palette.group);
+    const sanitized = serializePaletteConfig(palette);
     const result = await createSharedPalette(sanitized);
     const url = buildShareUrl('palette', result.id);
     await copyToClipboard(url);

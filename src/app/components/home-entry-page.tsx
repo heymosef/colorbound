@@ -14,6 +14,7 @@ export function HomeEntryPage() {
     startDraftPalette(activeCollection.id);
     navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
       replace: getEditorNavigationMode('firstRun') === 'replace',
+      state: { createDraft: true },
     });
   }, [isFirstRunSession, activeCollection, navigate, startDraftPalette]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLoaderData, Link } from 'react-router';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -88,11 +88,10 @@ function ConfigSpec({ entry }: { entry: SharedPaletteEntry }) {
     { label: 'Chroma', value: entry.chroma.toFixed(3) },
     { label: 'Lightness 50', value: entry.lightness50.toFixed(3) },
     { label: 'Lightness 950', value: entry.lightness950.toFixed(3) },
-    { label: 'Type', value: entry.isNeutral ? 'Neutral' : 'Chromatic' },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {specs.map((s) => (
         <div key={s.label} className="space-y-0.5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
@@ -121,14 +120,12 @@ export function SharedPalettePage() {
 
   // Deserialize through the trust boundary, then build light + dark palettes
   const deserialized = useMemo(() => {
-    const result = deserializePaletteEntry(entry);
-    if (!result) return null;
-    const { config, group } = result;
+    const config = deserializePaletteEntry(entry);
+    if (!config) return null;
     return {
       config,
-      group,
-      palette: configToPalette(config, 'shared', group),
-      darkPalette: configToDarkPalette(config, 'shared-dark', group),
+      palette: configToPalette(config, 'shared'),
+      darkPalette: configToDarkPalette(config, 'shared-dark'),
     };
   }, [entry]);
 
@@ -164,7 +161,7 @@ export function SharedPalettePage() {
 
   const handleImport = () => {
     if (!deserialized) return;
-    handleImportPalette(deserialized.config, deserialized.group);
+    handleImportPalette(deserialized.config);
     const basePath = activeCollection?.slug ? `/${activeCollection.slug}` : '';
     navigate(`${basePath}/edit`);
   };

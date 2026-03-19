@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLoaderData, Link } from 'react-router';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -43,10 +43,9 @@ function InlineConfigSpec({ config }: { config: PaletteConfig }) {
     { label: 'Chroma', value: config.chroma.toFixed(3) },
     { label: 'L 950', value: config.lightness950.toFixed(3) },
     { label: 'L 50', value: config.lightness50.toFixed(3) },
-    { label: 'Type', value: config.isNeutral ? 'Neutral' : 'Chromatic' },
   ];
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
       {specs.map((s) => (
         <div key={s.label} className="space-y-0.5">
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
@@ -61,7 +60,6 @@ function InlineConfigSpec({ config }: { config: PaletteConfig }) {
 
 interface DeserializedEntry {
   config: PaletteConfig;
-  group: string;
   palette: Palette;
 }
 
@@ -110,7 +108,7 @@ function SharedPaletteCard({
               </button>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="font-mono">{entry.config.isNeutral ? 'Neutral' : `${entry.config.hue.toFixed(0)}°`}</span>
+              <span className="font-mono">{entry.config.hue.toFixed(0)}°</span>
               <span>·</span>
               <span className="tabular-nums">11 tokens</span>
             </div>
@@ -131,7 +129,7 @@ function SharedPaletteCard({
               </div>
               <div className="flex items-center justify-between pl-6">
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="font-mono">{entry.config.isNeutral ? 'Neutral' : `${entry.config.hue.toFixed(0)}°`}</span>
+                  <span className="font-mono">{entry.config.hue.toFixed(0)}°</span>
                   <span>·</span>
                   <span className="tabular-nums">11 tokens</span>
                 </div>
@@ -200,10 +198,9 @@ export function SharedCollectionPage() {
   // Build full palette objects from deserialized entries
   const entries: DeserializedEntry[] = useMemo(() => {
     if (!deserialized) return [];
-    return deserialized.entries.map((e, i) => ({
-      config: e.config,
-      group: e.group,
-      palette: configToPalette(e.config, `shared-${i}`, e.group),
+    return deserialized.entries.map((config, i) => ({
+      config,
+      palette: configToPalette(config, `shared-${i}`),
     }));
   }, [deserialized]);
 
@@ -253,15 +250,12 @@ export function SharedCollectionPage() {
     if (selected.size === 1) {
       const idx = Array.from(selected)[0];
       const entry = entries[idx];
-      handleImportPalette(entry.config, entry.group);
+      handleImportPalette(entry.config);
       navigate('/edit');
     } else {
       const importEntries = Array.from(selected)
         .sort((a, b) => a - b)
-        .map((idx) => {
-          const entry = entries[idx];
-          return { config: entry.config, group: entry.group };
-        });
+        .map((idx) => entries[idx].config);
       const { collectionSlug } = handleImportCollection(importEntries, collectionName);
       navigate(collectionSlug ? `/${collectionSlug}` : '/');
     }

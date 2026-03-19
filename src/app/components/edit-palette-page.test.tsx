@@ -9,6 +9,7 @@ const startDraftPalette = vi.fn();
 const handleAddToCollection = vi.fn();
 const handleUpdateInCollection = vi.fn();
 const selectPaletteInCollection = vi.fn();
+let breakpoint: 'mobile' | 'tablet' | 'desktop' = 'desktop';
 
 let paletteContextValue: any;
 
@@ -30,13 +31,11 @@ function makePalette(id: string, name = 'Cyan') {
   return {
     id,
     name,
-    group: 'Primary',
     tokens: [makeToken()],
     hue: 210,
     chroma: 0.12,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
   };
 }
 
@@ -50,7 +49,6 @@ function buildContext(overrides: Record<string, unknown> = {}) {
       chroma: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
-      isNeutral: false,
     },
     collection: [],
     collections: [
@@ -110,7 +108,7 @@ vi.mock('../lib/palette-context', () => ({
 }));
 
 vi.mock('../lib/use-breakpoint', () => ({
-  useBreakpoint: () => 'desktop',
+  useBreakpoint: () => breakpoint,
 }));
 
 vi.mock('../lib/use-document-title', () => ({
@@ -134,12 +132,22 @@ vi.mock('./palette-workspace', () => ({
   MobileMoreMenu: () => null,
 }));
 
+vi.mock('./palette-switcher', () => ({
+  PaletteSwitcher: ({ onNewPalette }: any) => (
+    <button onClick={onNewPalette}>New palette</button>
+  ),
+}));
+
 vi.mock('./collection-panel', () => ({
   CollectionPanel: () => <div>Collection panel</div>,
 }));
 
 vi.mock('./contrast-indicator', () => ({
   AlgorithmToggle: () => null,
+}));
+
+vi.mock('./palette-view-mode-toggle', () => ({
+  ViewModeToggle: () => null,
 }));
 
 vi.mock('sonner', () => ({
@@ -163,6 +171,7 @@ function renderAt(pathname: string) {
 
 describe('EditPalettePage draft save flow', () => {
   beforeEach(() => {
+    breakpoint = 'desktop';
     startDraftPalette.mockReset();
     handleAddToCollection.mockReset();
     handleUpdateInCollection.mockReset();
@@ -230,5 +239,43 @@ describe('EditPalettePage draft save flow', () => {
     });
 
     expect(startDraftPalette).not.toHaveBeenCalled();
+  });
+
+  it('stays on the draft route when creating a new palette from a saved editor session', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1');
+    paletteContextValue = buildContext({
+      collection: [savedPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: false,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('New palette'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit');
+    });
+
+    expect(startDraftPalette).toHaveBeenCalledWith('collection-1');
   });
 });

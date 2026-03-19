@@ -321,7 +321,9 @@ function HeaderBreadcrumb() {
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
     startDraftPalette(activeCollection.id);
-    navigate(buildCollectionDraftEditorPath(activeCollection.slug));
+    navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
+      state: { createDraft: true },
+    });
   }, [activeCollection, navigate, startDraftPalette]);
 
   const handleNavigateToCollection = useCallback(() => {

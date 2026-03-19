@@ -13,7 +13,6 @@ export interface PaletteConfig {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
-  isNeutral: boolean;
 }
 
 export type ContrastAlgorithm = 'apca' | 'wcag';
@@ -57,8 +56,8 @@ export interface PaletteContextValue {
   handleRemove: (id: string) => void;
   handleRename: (id: string, name: string) => void;
   handleReorder: (fromIndex: number, toIndex: number) => void;
-  handleImportPalette: (config: PaletteConfig, group?: string) => string;
-  handleImportCollection: (entries: Array<{ config: PaletteConfig; group?: string }>, collectionName?: string) => { count: number; collectionSlug: string };
+  handleImportPalette: (config: PaletteConfig) => string;
+  handleImportCollection: (entries: PaletteConfig[], collectionName?: string) => { count: number; collectionSlug: string };
   handleDuplicatePalette: (name: string) => string;
   handleApplyHex: (hue: number, chroma: number) => void;
   activeCollection: Collection | null;

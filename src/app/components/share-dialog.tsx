@@ -70,7 +70,7 @@ export function SharePaletteButton({
     setError(null);
     try {
       // Serialize through the trust boundary before sending
-      const sanitized = serializePaletteConfig(palette, palette.group);
+      const sanitized = serializePaletteConfig(palette);
       const result = await createSharedPalette(sanitized);
       const url = buildShareUrl('palette', result.id);
       setShareUrl(url);
@@ -233,7 +233,7 @@ export function ShareCollectionButton({
     setError(null);
     try {
       // Serialize each palette through the trust boundary before sending
-      const sanitizedPalettes = palettes.map((p) => serializePaletteConfig(p, p.group));
+      const sanitizedPalettes = palettes.map((p) => serializePaletteConfig(p));
       const result = await createSharedCollection(sanitizedPalettes, name);
       const url = buildShareUrl('collection', result.id);
       setShareUrl(url);

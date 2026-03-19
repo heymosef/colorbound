@@ -17,12 +17,10 @@ const headers = {
 
 export interface SharedPaletteEntry {
   name: string;
-  group: string;
   hue: number;
   chroma: number;
   lightness50: number;
   lightness950: number;
-  isNeutral: boolean;
 }
 
 export interface SharedPaletteResponse {

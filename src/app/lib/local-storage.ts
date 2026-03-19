@@ -24,12 +24,10 @@ const CURRENT_VERSION = 3;
 interface StoredPaletteEntry {
   id: string;
   name: string;
-  group: string;
   hue: number;
   chroma: number;
   lightness50: number;
   lightness950: number;
-  isNeutral: boolean;
 }
 
 interface StoredCollection {
@@ -60,12 +58,10 @@ function migrateEntryV2ToV3(entry: StoredPaletteEntryV2): StoredPaletteEntry {
   return {
     id: entry.id,
     name: entry.name,
-    group: entry.group,
     hue: entry.hue,
     chroma: entry.chroma,
     lightness50,
     lightness950,
-    isNeutral: entry.isNeutral,
   };
 }
 
@@ -79,7 +75,6 @@ function migrateConfigV2ToV3(config: Record<string, unknown>): PaletteConfig {
     chroma: (config.chroma as number) ?? 0.18,
     lightness50,
     lightness950,
-    isNeutral: (config.isNeutral as boolean) ?? false,
   };
 }
 
@@ -89,12 +84,10 @@ function paletteToStored(p: Palette): StoredPaletteEntry {
   return {
     id: p.id,
     name: p.name,
-    group: p.group,
     hue: p.hue,
     chroma: p.chroma,
     lightness50: p.lightness50,
     lightness950: p.lightness950,
-    isNeutral: p.isNeutral,
   };
 }
 
@@ -104,18 +97,15 @@ function storedToPalette(entry: StoredPaletteEntry): Palette {
     entry.chroma,
     entry.lightness50,
     entry.lightness950,
-    entry.isNeutral,
   );
   return {
     id: entry.id,
     name: entry.name,
-    group: entry.group,
     tokens,
     hue: entry.hue,
     chroma: entry.chroma,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
-    isNeutral: entry.isNeutral,
   };
 }
 
@@ -156,8 +146,7 @@ function isValidConfig(c: unknown): c is PaletteConfig {
     isValidNumber(obj.hue, 0, 360) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
     isValidNumber(obj.lightness50, 0, 1) &&
-    isValidNumber(obj.lightness950, 0, 1) &&
-    typeof obj.isNeutral === 'boolean'
+    isValidNumber(obj.lightness950, 0, 1)
   );
 }
 
@@ -168,12 +157,10 @@ function isValidStoredEntry(e: unknown): e is StoredPaletteEntry {
     typeof obj.id === 'string' &&
     obj.id.length > 0 &&
     typeof obj.name === 'string' &&
-    typeof obj.group === 'string' &&
     isValidNumber(obj.hue, 0, 360) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
     isValidNumber(obj.lightness50, 0, 1) &&
-    isValidNumber(obj.lightness950, 0, 1) &&
-    typeof obj.isNeutral === 'boolean'
+    isValidNumber(obj.lightness950, 0, 1)
   );
 }
 

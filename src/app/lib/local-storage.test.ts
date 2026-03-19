@@ -75,7 +75,6 @@ describe('loadState / saveState round-trip (v3)', () => {
         chroma: 0.15,
         lightness50: 0.985,
         lightness950: 0.025,
-        isNeutral: false,
       },
       nameManuallyEdited: false,
       contrastAlgorithm: 'apca' as const,
@@ -93,6 +92,41 @@ describe('loadState / saveState round-trip (v3)', () => {
     expect(loaded!.config.lightness50).toBe(0.985);
     expect(loaded!.config.lightness950).toBe(0.025);
     expect(loaded!.hasCompletedFirstRun).toBe(true);
+  });
+
+  it('does not persist removed group or isNeutral fields in v3 state', () => {
+    const defaultCol = createDefaultCollection([
+      {
+        id: 'pal-1',
+        name: 'Blue',
+        tokens: [],
+        hue: 220,
+        chroma: 0.18,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    ]);
+    saveState({
+      collections: [defaultCol],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: null,
+      config: {
+        name: 'Test',
+        hue: 100,
+        chroma: 0.15,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+      nameManuallyEdited: false,
+      contrastAlgorithm: 'apca',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    });
+
+    const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
+    expect(raw.config).not.toHaveProperty('isNeutral');
+    expect(raw.collections[0].palettes[0]).not.toHaveProperty('group');
+    expect(raw.collections[0].palettes[0]).not.toHaveProperty('isNeutral');
   });
 });
 
@@ -174,7 +208,6 @@ describe('first-run completion flag', () => {
         chroma: 0.15,
         lightness50: 0.985,
         lightness950: 0.025,
-        isNeutral: false,
       },
       nameManuallyEdited: false,
       contrastAlgorithm: 'wcag',
@@ -202,7 +235,6 @@ describe('first-run completion flag', () => {
         chroma: 0.15,
         lightness50: 0.985,
         lightness950: 0.025,
-        isNeutral: false,
       },
       nameManuallyEdited: true,
       contrastAlgorithm: 'wcag',

@@ -177,7 +177,7 @@ function PaletteCard({
               </div>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="font-mono">{palette.isNeutral ? 'Neutral' : `${palette.hue}°`}</span>
+              <span className="font-mono">{palette.hue}°</span>
               <span>·</span>
               <span className="tabular-nums">{palette.tokens.length} tokens</span>
             </div>
@@ -228,7 +228,7 @@ function PaletteCard({
               </div>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="font-mono">{palette.isNeutral ? 'Neutral' : `${palette.hue}°`}</span>
+              <span className="font-mono">{palette.hue}°</span>
               <span>·</span>
               <span className="tabular-nums">{palette.tokens.length} tokens</span>
             </div>
@@ -299,7 +299,9 @@ export function CollectionsPage() {
   const handleNew = () => {
     if (!activeCollection) return;
     startDraftPalette(activeCollection.id);
-    navigate(buildCollectionDraftEditorPath(activeCollection.slug));
+    navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
+      state: { createDraft: true },
+    });
   };
 
   const handleOpenPalette = (id: string) => {
@@ -403,12 +405,10 @@ export function CollectionsPage() {
               <ShareCollectionButton
                 palettes={collection.map((p) => ({
                   name: p.name,
-                  group: p.group,
                   hue: p.hue,
                   chroma: p.chroma,
                   lightness50: p.lightness50,
                   lightness950: p.lightness950,
-                  isNeutral: p.isNeutral,
                 }))}
                 name={activeCollection?.name ?? 'My Collection'}
               />

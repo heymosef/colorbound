@@ -22,7 +22,6 @@ vi.mock('../lib/palette-context', () => ({
           {
             id: 'palette-1',
             name: 'Cyan',
-            group: 'Primary',
             tokens: [
               {
                 step: 500,
@@ -44,7 +43,6 @@ vi.mock('../lib/palette-context', () => ({
       {
         id: 'palette-1',
         name: 'Cyan',
-        group: 'Primary',
         tokens: [
           {
             step: 500,
@@ -62,22 +60,18 @@ vi.mock('../lib/palette-context', () => ({
         chroma: 0.12,
         lightness50: 0.985,
         lightness950: 0.025,
-        isNeutral: false,
       },
     ],
     config: {
       name: 'Cyan',
-      group: 'Primary',
       hue: 210,
       chroma: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
-      isNeutral: false,
     },
     currentPalette: {
       id: 'palette-1',
       name: 'Cyan',
-      group: 'Primary',
       tokens: [
         {
           step: 500,
@@ -95,7 +89,6 @@ vi.mock('../lib/palette-context', () => ({
       chroma: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
-      isNeutral: false,
     },
     activePaletteId: 'palette-1',
     activeCollection: {

@@ -1,4 +1,4 @@
-import { useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
+import React, { useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import {
   generatePalette,
   generateDarkPalette,
@@ -42,12 +42,11 @@ function createDefaultConfig(hue?: number): PaletteConfig {
   const h = hue ?? Math.floor(Math.random() * 360);
   const defaultChroma = 0.18;
   return {
-    name: suggestPaletteName(h, defaultChroma, false),
+    name: suggestPaletteName(h, defaultChroma),
     hue: h,
     chroma: defaultChroma,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
   };
 }
 
@@ -57,18 +56,15 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     config.chroma,
     config.lightness50,
     config.lightness950,
-    config.isNeutral
   );
   return {
     id: id ?? generateId(),
     name: config.name,
-    group: config.isNeutral ? 'Neutral' : 'Custom',
     tokens,
     hue: config.hue,
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
-    isNeutral: config.isNeutral,
   };
 }
 
@@ -78,18 +74,15 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     config.chroma,
     config.lightness50,
     config.lightness950,
-    config.isNeutral
   );
   return {
     id: generateId(),
     name: config.name,
-    group: config.isNeutral ? 'Neutral' : 'Custom',
     tokens,
     hue: config.hue,
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
-    isNeutral: config.isNeutral,
   };
 }
 
@@ -190,7 +183,6 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       chroma: palette.chroma,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
-      isNeutral: palette.isNeutral,
     });
     setNameManuallyEdited(true);
     setActivePaletteId(palette.id);
@@ -218,8 +210,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     (partial: Partial<PaletteConfig>) => {
       setConfig((prev) => {
         const next = { ...prev, ...partial };
-        if (('hue' in partial || 'chroma' in partial || 'isNeutral' in partial) && !nameManuallyEdited) {
-          next.name = suggestPaletteName(next.hue, next.chroma, next.isNeutral);
+        if (('hue' in partial || 'chroma' in partial || 'lightness50' in partial || 'lightness950' in partial) && !nameManuallyEdited) {
+          next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
         }
         return next;
       });
@@ -237,8 +229,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const handleRandomize = useCallback(() => {
     const randomHue = Math.floor(Math.random() * 360);
     setConfig((prev) => {
-      const autoName = suggestPaletteName(randomHue, prev.chroma, false);
-      return { ...prev, hue: randomHue, name: autoName, isNeutral: false };
+      const autoName = suggestPaletteName(randomHue, prev.chroma, prev.lightness50, prev.lightness950);
+      return { ...prev, hue: randomHue, name: autoName };
     });
     setNameManuallyEdited(false);
     setActivePaletteId(null);
@@ -275,7 +267,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     if (!savedBaselinePalette) return;
     const updated = buildPalette(config, savedBaselinePalette.id);
     updateActiveCollectionPalettes((prev) =>
-      prev.map((p) => (p.id === savedBaselinePalette.id ? { ...updated, group: p.group } : p))
+      prev.map((p) => (p.id === savedBaselinePalette.id ? updated : p))
     );
     setIsDirty(false);
     setHasCompletedFirstRun(true);
@@ -338,7 +330,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     });
   }, [updateActiveCollectionPalettes]);
 
-  const handleImportPalette = useCallback((importedConfig: PaletteConfig, _group?: string) => {
+  const handleImportPalette = useCallback((importedConfig: PaletteConfig) => {
     setConfig(importedConfig);
     setNameManuallyEdited(true);
     setActivePaletteId(null);
@@ -351,17 +343,16 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     return '';
   }, []);
 
-  const handleImportCollection = useCallback((entries: Array<{ config: PaletteConfig; group?: string }>, collectionName?: string): { count: number; collectionSlug: string } => {
+  const handleImportCollection = useCallback((entries: PaletteConfig[], collectionName?: string): { count: number; collectionSlug: string } => {
     if (entries.length === 0) {
       toast.info('No palettes to import', { duration: 2000 });
       return { count: 0, collectionSlug: '' };
     }
 
     // Build palettes from entries
-    const newPalettes = entries.map(({ config: c, group }) => {
+    const newPalettes = entries.map((config) => {
       const newId = generateId();
-      const newPalette = buildPalette(c, newId);
-      return { ...newPalette, group: group ?? newPalette.group };
+      return buildPalette(config, newId);
     });
 
     // Deduplicate collection name with "(2)" suffix
@@ -417,7 +408,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const handleApplyHex = useCallback((hue: number, chroma: number) => {
     setConfig((prev) => {
       const next = { ...prev, hue, chroma };
-      next.name = suggestPaletteName(next.hue, next.chroma, next.isNeutral);
+      next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
       return next;
     });
     setNameManuallyEdited(false);

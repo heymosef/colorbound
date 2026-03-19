@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams, useBlocker } from 'react-router';
+import { useNavigate, useParams, useBlocker, useLocation } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import {
@@ -408,6 +408,7 @@ function MobileLayout({
 export function EditPalettePage() {
   const breakpoint = useBreakpoint();
   const navigate = useNavigate();
+  const location = useLocation();
   const { collectionSlug, paletteId } = useParams<{ collectionSlug?: string; paletteId?: string }>();
   const {
     config,
@@ -441,6 +442,7 @@ export function EditPalettePage() {
     ? collections.find((candidate) => candidate.slug === collectionSlug) ?? null
     : null;
   const matchedPaletteLocation = paletteId ? findPaletteLocation(collections, paletteId) : null;
+  const draftRouteIntent = !!(location.state && typeof location.state === 'object' && 'createDraft' in location.state && location.state.createDraft === true);
 
   useEffect(() => {
     if (!collectionSlug) {
@@ -476,6 +478,13 @@ export function EditPalettePage() {
     }
 
     if (!paletteId) {
+      if (draftRouteIntent) {
+        if (activeCollectionId !== matchedCollection.id || activePaletteId !== null) {
+          startDraftPalette(matchedCollection.id);
+        }
+        return;
+      }
+
       if (hasPersistedBaseline && activeCollectionId === matchedCollection.id && activePaletteId) {
         navigate(
           buildCollectionSavedEditorPath(matchedCollection.slug, activePaletteId),
@@ -517,6 +526,7 @@ export function EditPalettePage() {
     matchedCollection,
     matchedPaletteLocation,
     navigate,
+    draftRouteIntent,
     paletteId,
     selectPaletteInCollection,
     startDraftPalette,
@@ -570,7 +580,9 @@ export function EditPalettePage() {
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
     startDraftPalette(activeCollection.id);
-    navigate(buildCollectionDraftEditorPath(activeCollection.slug));
+    navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
+      state: { createDraft: true },
+    });
   }, [activeCollection, navigate, startDraftPalette]);
 
   const handleNavigateToCollection = useCallback(() => {

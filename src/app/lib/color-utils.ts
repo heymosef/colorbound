@@ -30,7 +30,6 @@ export interface ColorToken {
 export interface Palette {
   id: string;
   name: string;
-  group: string;
   tokens: ColorToken[];
   hue: number;
   chroma: number;
@@ -38,7 +37,6 @@ export interface Palette {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
-  isNeutral: boolean;
 }
 
 export const SCALE_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -202,9 +200,8 @@ export function maxSrgbChromaForHue(
   lightness50 = 0.985,
   lightness950 = 0.025,
   _curve = 0.5,
-  isNeutral = false,
 ): number {
-  return maxGamutChromaForHue(hue, lightness50, lightness950, isNeutral, isInSrgbGamut);
+  return maxGamutChromaForHue(hue, lightness50, lightness950, isInSrgbGamut);
 }
 
 /**
@@ -216,9 +213,8 @@ export function maxP3ChromaForHue(
   lightness50 = 0.985,
   lightness950 = 0.025,
   _curve = 0.5,
-  isNeutral = false,
 ): number {
-  return maxGamutChromaForHue(hue, lightness50, lightness950, isNeutral, isInP3Gamut);
+  return maxGamutChromaForHue(hue, lightness50, lightness950, isInP3Gamut);
 }
 
 /**
@@ -231,15 +227,11 @@ function maxGamutChromaForHue(
   hue: number,
   lightness50: number,
   lightness950: number,
-  isNeutral: boolean,
   inGamut: (l: number, c: number, h: number) => boolean,
 ): number {
   // Compute anchor lightness at step 500 (linear interpolation)
   const t = (500 - 50) / 900;
   const anchorL = lightness50 - t * (lightness50 - lightness950);
-
-  const multiplier = isNeutral ? 0.05 : 1;
-  if (multiplier < 0.01) return 0.4;
 
   // Binary search: find max chroma at anchor lightness
   let lo = 0;
@@ -253,10 +245,8 @@ function maxGamutChromaForHue(
     }
   }
 
-  const maxSlider = lo / multiplier;
-
   // Clamp to a reasonable range and round to slider step
-  return Math.round(Math.min(maxSlider, 0.4) * 200) / 200; // snap to 0.005 step
+  return Math.round(Math.min(lo, 0.4) * 200) / 200; // snap to 0.005 step
 }
 
 // ─── Public conversion functions ───
@@ -349,7 +339,6 @@ export function generatePalette(
   maxChroma: number,
   lightness50: number,
   lightness950: number,
-  isNeutral: boolean
 ): ColorToken[] {
   const tokens: ColorToken[] = [];
 
@@ -361,8 +350,7 @@ export function generatePalette(
   // All other steps scale proportionally: c = (chroma / anchorL) × l.
   const anchorT = (500 - 50) / 900;
   const anchorL = maxL - anchorT * (maxL - minL);
-  const effectiveChroma = isNeutral ? maxChroma * 0.05 : maxChroma;
-  const chromaLightnessRatio = anchorL > 0.001 ? effectiveChroma / anchorL : 0;
+  const chromaLightnessRatio = anchorL > 0.001 ? maxChroma / anchorL : 0;
 
   for (const step of SCALE_STEPS) {
     // Map step to 0-1 range (50=bright, 950=dark)
@@ -415,14 +403,12 @@ export function generateDarkPalette(
   maxChroma: number,
   lightness50: number,
   lightness950: number,
-  isNeutral: boolean
 ): ColorToken[] {
   return generatePalette(
     hue,
     maxChroma * 0.85,
     lightness50 * 0.995,
     lightness950 * 1.2,
-    isNeutral
   );
 }
 
@@ -895,19 +881,14 @@ export function generateId(): string {
 export function get500Oklch(
   hue: number,
   maxChroma: number,
-  isNeutral: boolean
+  lightness50 = 0.985,
+  lightness950 = 0.025,
 ): { l: number; c: number; h: number } {
   // Linear interpolation at step 500
   const t = (500 - 50) / 900;
-  const minL = 0.025; // default lightness950
-  const maxL = 0.985; // default lightness50
-  const l = maxL - t * (maxL - minL);
-
-  const effectiveChroma = isNeutral
-    ? maxChroma * 0.05
-    : maxChroma;
-
-  const c = Math.max(0, Math.min(0.4, effectiveChroma));
+  const l = lightness50 - t * (lightness50 - lightness950);
+  const chromaLightnessRatio = l > 0.001 ? maxChroma / l : 0;
+  const c = Math.max(0, Math.min(0.4, chromaLightnessRatio * l));
 
   return { l, c, h: hue };
 }
@@ -953,9 +934,10 @@ const BAND_INDEX: Record<ChromaBand, number> = {
 export function suggestPaletteName(
   hue: number,
   maxChroma: number,
-  isNeutral: boolean
+  lightness50 = 0.985,
+  lightness950 = 0.025,
 ): string {
-  const swatch = get500Oklch(hue, maxChroma, isNeutral);
+  const swatch = get500Oklch(hue, maxChroma, lightness50, lightness950);
   const band = getChromaBand(swatch.c);
   const h = ((swatch.h % 360) + 360) % 360;
 

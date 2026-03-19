@@ -67,12 +67,10 @@ function clampNumber(v: unknown, min: number, max: number, fallback: number): nu
 
 interface PaletteEntry {
   name: string;
-  group: string;
   hue: number;
   chroma: number;
   lightness50: number;
   lightness950: number;
-  isNeutral: boolean;
 }
 
 function hasModernLightnessFields(obj: Record<string, unknown>): boolean {
@@ -104,20 +102,15 @@ function normalizePaletteEntry(e: unknown): PaletteEntry | null {
     typeof obj.name === 'string' &&
     obj.name.length > 0 &&
     obj.name.length <= 100 &&
-    typeof obj.group === 'string' &&
-    obj.group.length <= 50 &&
     isValidNumber(obj.hue, 0, 360) &&
-    isValidNumber(obj.chroma, 0, 0.4) &&
-    typeof obj.isNeutral === 'boolean'
+    isValidNumber(obj.chroma, 0, 0.4)
   ) {
     return {
       name: obj.name,
-      group: obj.group,
       hue: obj.hue,
       chroma: obj.chroma,
       lightness50,
       lightness950,
-      isNeutral: obj.isNeutral,
     };
   }
 
@@ -127,12 +120,10 @@ function normalizePaletteEntry(e: unknown): PaletteEntry | null {
 function sanitizePaletteEntry(e: PaletteEntry): PaletteEntry {
   return {
     name: e.name.slice(0, 100),
-    group: e.group.slice(0, 50),
     hue: e.hue,
     chroma: e.chroma,
     lightness50: e.lightness50,
     lightness950: e.lightness950,
-    isNeutral: e.isNeutral,
   };
 }
 
@@ -144,7 +135,7 @@ app.post(`${SHARE_ROUTE_PREFIX}/share/palette`, async (c) => {
     const palette = normalizePaletteEntry(body.palette);
 
     if (!palette) {
-      return c.json({ error: "Invalid palette data: all config fields (name, hue, chroma, lightness50/lightness950 or blackRange/whiteRange, isNeutral) are required and must be valid" }, 400);
+      return c.json({ error: "Invalid palette data: name, hue, chroma, and lightness50/lightness950 (or blackRange/whiteRange) are required and must be valid" }, 400);
     }
 
     const id = generateShareId();

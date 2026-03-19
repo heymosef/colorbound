@@ -6,13 +6,11 @@
 export interface StoredPaletteEntryV2 {
   id: string;
   name: string;
-  group: string;
   hue: number;
   chroma: number;
   curve: number;
   blackRange: number;
   whiteRange: number;
-  isNeutral: boolean;
 }
 
 export interface StoredCollectionV2 {

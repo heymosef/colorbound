@@ -27,13 +27,11 @@ function makePalette(overrides: Partial<Palette> = {}): Palette {
   return {
     id: overrides.id ?? 'pal-1',
     name: overrides.name ?? 'Blue',
-    group: overrides.group ?? 'Custom',
     tokens: overrides.tokens ?? SCALE_STEPS.map((step) => makeToken(step)),
     hue: 220,
     chroma: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
-    isNeutral: false,
     ...overrides,
   };
 }

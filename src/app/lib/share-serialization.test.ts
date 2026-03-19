@@ -11,34 +11,28 @@ import {
 import type { PaletteConfig } from './palette-context-types';
 import type { SharedPaletteEntry } from './share-api';
 
-// ─── Test data ───
-
 const VALID_CONFIG: PaletteConfig = {
   name: 'Ocean Blue',
   hue: 220,
   chroma: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
-  isNeutral: false,
 };
 
 const VALID_ENTRY: SharedPaletteEntry = {
   ...VALID_CONFIG,
-  group: 'Primary',
 };
 
-// ─── serializePaletteConfig ───
-
 describe('serializePaletteConfig', () => {
-  it('serializes a valid config without changes', () => {
-    const result = serializePaletteConfig(VALID_CONFIG, 'Primary');
-    expect(result.name).toBe('Ocean Blue');
-    expect(result.group).toBe('Primary');
-    expect(result.hue).toBe(220);
-    expect(result.chroma).toBe(0.18);
-    expect(result.lightness50).toBe(0.985);
-    expect(result.lightness950).toBe(0.025);
-    expect(result.isNeutral).toBe(false);
+  it('serializes a valid config without changing canonical fields', () => {
+    const result = serializePaletteConfig(VALID_CONFIG);
+    expect(result).toEqual(VALID_ENTRY);
+  });
+
+  it('does not emit removed group or isNeutral fields', () => {
+    const result = serializePaletteConfig(VALID_CONFIG);
+    expect(result).not.toHaveProperty('group');
+    expect(result).not.toHaveProperty('isNeutral');
   });
 
   it('clamps chroma to 0.4 max', () => {
@@ -46,63 +40,39 @@ describe('serializePaletteConfig', () => {
     expect(result.chroma).toBe(0.4);
   });
 
-  it('clamps hue to 0–360 range', () => {
+  it('clamps hue to 0-360 range', () => {
     expect(serializePaletteConfig({ ...VALID_CONFIG, hue: -10 }).hue).toBe(0);
     expect(serializePaletteConfig({ ...VALID_CONFIG, hue: 400 }).hue).toBe(360);
   });
 
   it('truncates name to 100 chars', () => {
-    const longName = 'A'.repeat(200);
-    const result = serializePaletteConfig({ ...VALID_CONFIG, name: longName });
+    const result = serializePaletteConfig({ ...VALID_CONFIG, name: 'A'.repeat(200) });
     expect(result.name).toHaveLength(100);
-  });
-
-  it('defaults group based on isNeutral when not provided', () => {
-    const result = serializePaletteConfig(VALID_CONFIG);
-    expect(result.group).toBe('Custom');
-
-    const neutral = serializePaletteConfig({ ...VALID_CONFIG, isNeutral: true });
-    expect(neutral.group).toBe('Neutral');
   });
 });
 
-// ─── deserializePaletteConfig ───
-
 describe('deserializePaletteConfig', () => {
   it('round-trips a valid config', () => {
-    const serialized = serializePaletteConfig(VALID_CONFIG, 'Primary');
-    const deserialized = deserializePaletteConfig(serialized);
-    expect(deserialized).not.toBeNull();
-    expect(deserialized!.name).toBe(VALID_CONFIG.name);
-    expect(deserialized!.hue).toBe(VALID_CONFIG.hue);
-    expect(deserialized!.chroma).toBe(VALID_CONFIG.chroma);
-    expect(deserialized!.lightness50).toBe(VALID_CONFIG.lightness50);
-    expect(deserialized!.lightness950).toBe(VALID_CONFIG.lightness950);
-    expect(deserialized!.isNeutral).toBe(VALID_CONFIG.isNeutral);
+    const serialized = serializePaletteConfig(VALID_CONFIG);
+    expect(deserializePaletteConfig(serialized)).toEqual(VALID_CONFIG);
   });
 
-  it('returns null for null input', () => {
+  it('returns null for null, non-object, or empty input', () => {
     expect(deserializePaletteConfig(null)).toBeNull();
-  });
-
-  it('returns null for non-object', () => {
     expect(deserializePaletteConfig('hello')).toBeNull();
     expect(deserializePaletteConfig(42)).toBeNull();
-  });
-
-  it('returns null for empty object', () => {
     expect(deserializePaletteConfig({})).toBeNull();
   });
 
   it('applies defaults for missing fields', () => {
     const result = deserializePaletteConfig({ hue: 120 });
-    expect(result).not.toBeNull();
-    expect(result!.hue).toBe(120);
-    expect(result!.name).toBe('Untitled');
-    expect(result!.chroma).toBe(0.18);
-    expect(result!.lightness50).toBe(0.985);
-    expect(result!.lightness950).toBe(0.025);
-    expect(result!.isNeutral).toBe(false);
+    expect(result).toEqual({
+      name: 'Untitled',
+      hue: 120,
+      chroma: 0.18,
+      lightness50: 0.985,
+      lightness950: 0.025,
+    });
   });
 
   it('handles legacy blackRange/whiteRange fields', () => {
@@ -125,61 +95,34 @@ describe('deserializePaletteConfig', () => {
       lightness950: -1,
       name: 'Test',
     });
-    expect(result).not.toBeNull();
-    expect(result!.lightness50).toBe(1);
-    expect(result!.lightness950).toBe(0);
+    expect(result).toEqual({
+      name: 'Test',
+      hue: 100,
+      chroma: 0.18,
+      lightness50: 1,
+      lightness950: 0,
+    });
   });
 
-  it('defaults NaN values', () => {
+  it('defaults invalid numeric values', () => {
     const result = deserializePaletteConfig({
       hue: NaN,
-      chroma: NaN,
-      name: 'Test',
-    });
-    expect(result).not.toBeNull();
-    expect(result!.hue).toBe(240); // default
-    expect(result!.chroma).toBe(0.18); // default
-  });
-
-  it('defaults string-where-number-expected', () => {
-    const result = deserializePaletteConfig({
-      hue: 'not a number' as unknown,
       chroma: true as unknown,
       name: 'Test',
     });
-    expect(result).not.toBeNull();
-    expect(result!.hue).toBe(240);
-    expect(result!.chroma).toBe(0.18);
-  });
-
-  it('defaults non-boolean isNeutral', () => {
-    const result = deserializePaletteConfig({
-      hue: 100,
-      isNeutral: 'yes' as unknown,
+    expect(result).toEqual({
+      name: 'Test',
+      hue: 240,
+      chroma: 0.18,
+      lightness50: 0.985,
+      lightness950: 0.025,
     });
-    expect(result).not.toBeNull();
-    expect(result!.isNeutral).toBe(false);
   });
 });
 
-// ─── deserializePaletteEntry ───
-
 describe('deserializePaletteEntry', () => {
-  it('extracts config and group from a valid entry', () => {
-    const result = deserializePaletteEntry(VALID_ENTRY);
-    expect(result).not.toBeNull();
-    expect(result!.config.name).toBe('Ocean Blue');
-    expect(result!.group).toBe('Primary');
-  });
-
-  it('defaults group based on isNeutral', () => {
-    const result = deserializePaletteEntry({ ...VALID_ENTRY, group: undefined as any });
-    expect(result).not.toBeNull();
-    expect(result!.group).toBe('Custom');
-
-    const neutral = deserializePaletteEntry({ ...VALID_ENTRY, isNeutral: true, group: undefined as any });
-    expect(neutral).not.toBeNull();
-    expect(neutral!.group).toBe('Neutral');
+  it('returns a config for a valid shared entry', () => {
+    expect(deserializePaletteEntry(VALID_ENTRY)).toEqual(VALID_CONFIG);
   });
 
   it('returns null for invalid input', () => {
@@ -188,73 +131,66 @@ describe('deserializePaletteEntry', () => {
   });
 });
 
-// ─── serializeCollection ───
-
 describe('serializeCollection', () => {
   it('serializes an array of palette configs', () => {
-    const result = serializeCollection(
-      [{ config: VALID_CONFIG, group: 'Primary' }],
-      'My Palettes',
-    );
+    const result = serializeCollection([VALID_CONFIG], 'My Palettes');
     expect(result.name).toBe('My Palettes');
-    expect(result.palettes).toHaveLength(1);
-    expect(result.palettes[0].name).toBe('Ocean Blue');
+    expect(result.palettes).toEqual([VALID_ENTRY]);
   });
 
-  it('defaults collection name', () => {
-    const result = serializeCollection([{ config: VALID_CONFIG }]);
+  it('defaults the collection name', () => {
+    const result = serializeCollection([VALID_CONFIG]);
     expect(result.name).toBe('My Collection');
   });
 });
-
-// ─── deserializeCollection ───
 
 describe('deserializeCollection', () => {
   it('round-trips a collection', () => {
     const serialized = serializeCollection(
       [
-        { config: VALID_CONFIG, group: 'Primary' },
-        { config: { ...VALID_CONFIG, hue: 0, name: 'Red' }, group: 'Danger' },
+        VALID_CONFIG,
+        { ...VALID_CONFIG, hue: 0, name: 'Red' },
       ],
       'Test Collection',
     );
     const deserialized = deserializeCollection(serialized);
-    expect(deserialized).not.toBeNull();
-    expect(deserialized!.name).toBe('Test Collection');
-    expect(deserialized!.entries).toHaveLength(2);
-    expect(deserialized!.entries[0].config.name).toBe('Ocean Blue');
-    expect(deserialized!.entries[1].config.name).toBe('Red');
+    expect(deserialized).toEqual({
+      name: 'Test Collection',
+      entries: [
+        VALID_CONFIG,
+        { ...VALID_CONFIG, hue: 0, name: 'Red' },
+      ],
+    });
   });
 
-  it('returns null for missing palettes array', () => {
+  it('returns null for missing or empty palette arrays', () => {
     expect(deserializeCollection({ name: 'Test' })).toBeNull();
-  });
-
-  it('returns null for empty palettes array', () => {
     expect(deserializeCollection({ palettes: [] })).toBeNull();
   });
 
-  it('filters out invalid entries, keeps valid ones', () => {
+  it('filters out invalid entries and keeps valid ones', () => {
     const result = deserializeCollection({
       name: 'Mixed',
       palettes: [
         VALID_ENTRY,
-        null, // invalid
-        {}, // invalid (no recognized fields)
-        { hue: 100, name: 'Partial' }, // valid with defaults
+        null,
+        {},
+        { hue: 100, name: 'Partial' },
       ],
     });
-    expect(result).not.toBeNull();
-    expect(result!.entries).toHaveLength(2);
-    expect(result!.entries[0].config.name).toBe('Ocean Blue');
-    expect(result!.entries[1].config.name).toBe('Partial');
-  });
-
-  it('returns null when all entries are invalid', () => {
-    expect(deserializeCollection({
-      name: 'Bad',
-      palettes: [null, undefined, 42, {}],
-    })).toBeNull();
+    expect(result).toEqual({
+      name: 'Mixed',
+      entries: [
+        VALID_CONFIG,
+        {
+          name: 'Partial',
+          hue: 100,
+          chroma: 0.18,
+          lightness50: 0.985,
+          lightness950: 0.025,
+        },
+      ],
+    });
   });
 
   it('preserves entry order', () => {
@@ -265,25 +201,19 @@ describe('deserializeCollection', () => {
         { ...VALID_ENTRY, name: 'C' },
       ],
     });
-    expect(result!.entries.map((e) => e.config.name)).toEqual(['A', 'B', 'C']);
+    expect(result!.entries.map((entry) => entry.name)).toEqual(['A', 'B', 'C']);
   });
 });
 
-// ─── configToPalette / configToDarkPalette ───
-
 describe('configToPalette', () => {
-  it('builds a palette with 11 tokens', () => {
-    const palette = configToPalette(VALID_CONFIG, 'test-id', 'Primary');
+  it('builds a palette with 11 tokens and no group field', () => {
+    const palette = configToPalette(VALID_CONFIG, 'test-id');
     expect(palette.id).toBe('test-id');
     expect(palette.name).toBe('Ocean Blue');
-    expect(palette.group).toBe('Primary');
     expect(palette.tokens).toHaveLength(11);
     expect(palette.hue).toBe(220);
-  });
-
-  it('defaults group from isNeutral when not provided', () => {
-    expect(configToPalette(VALID_CONFIG, 'id').group).toBe('Custom');
-    expect(configToPalette({ ...VALID_CONFIG, isNeutral: true }, 'id').group).toBe('Neutral');
+    expect(palette).not.toHaveProperty('group');
+    expect(palette).not.toHaveProperty('isNeutral');
   });
 });
 
