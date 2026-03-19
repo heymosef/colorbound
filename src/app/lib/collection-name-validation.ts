@@ -10,11 +10,11 @@ export interface CollectionNameValidationResult {
   message?: string;
 }
 
-export function normalizeCollectionName(name: string): string {
+function normalizeCollectionName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
 }
 
-export function normalizeCollectionNameForUniqueness(name: string): string {
+function normalizeCollectionNameForUniqueness(name: string): string {
   return normalizeCollectionName(name).toLocaleLowerCase();
 }
 

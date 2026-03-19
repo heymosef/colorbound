@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeCollectionName,
-  normalizeCollectionNameForUniqueness,
-  validateCollectionName,
-} from './collection-name-validation';
+import { validateCollectionName } from './collection-name-validation';
 
 const collections = [
   { id: 'a', name: 'Marketing' },
   { id: 'b', name: 'Product Team' },
 ];
 
-describe('normalizeCollectionName', () => {
-  it('trims and collapses whitespace', () => {
-    expect(normalizeCollectionName('  Product   Team  ')).toBe('Product Team');
-  });
-
-  it('builds a lowercase uniqueness key', () => {
-    expect(normalizeCollectionNameForUniqueness('  Product   Team  ')).toBe('product team');
+describe('normalizeCollectionName behavior', () => {
+  it('trims and collapses whitespace through validation output', () => {
+    expect(validateCollectionName('  Product   Team  ', collections, { excludeCollectionId: 'b' })).toMatchObject({
+      valid: true,
+      normalizedName: 'Product Team',
+      uniquenessKey: 'product team',
+    });
   });
 });
 

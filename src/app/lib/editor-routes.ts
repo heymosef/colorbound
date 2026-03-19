@@ -22,10 +22,6 @@ export function buildCollectionSavedEditorPath(collectionSlug: string, paletteId
   return `/${collectionSlug}/edit/${paletteId}`;
 }
 
-export function buildLegacyEditorPath(paletteId?: string | null): string {
-  return paletteId ? `/edit/${paletteId}` : '/edit';
-}
-
 export function isEditorRoute(pathname: string): boolean {
   return EDITOR_ROUTE_PATTERNS.some((pattern) =>
     matchPath({ path: pattern, end: true }, pathname),

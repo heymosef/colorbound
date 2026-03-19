@@ -101,14 +101,6 @@ export function useCollectionsContext() {
   return ctx;
 }
 
-// ─── Helper: touch collection lastModifiedAt ───
-function touchCollection(collections: Collection[], collectionId: string): Collection[] {
-  const now = new Date().toISOString();
-  return collections.map((c) =>
-    c.id === collectionId ? { ...c, lastModifiedAt: now } : c
-  );
-}
-
 export function PaletteProvider({ children }: { children: ReactNode }) {
   const [hydrated] = useState(() => loadState());
 

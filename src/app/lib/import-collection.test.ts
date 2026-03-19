@@ -1,63 +1,107 @@
-/**
- * Tests for Phase 6: Sharing & Import with snapshot copies.
- *
- * Verifies that importing a shared collection creates a NEW collection
- * (not merged into existing), with "(2)" name deduplication.
- */
-import { describe, it, expect } from 'vitest';
-import { deduplicateName, deduplicateSlug, toSlug } from './slug-utils';
+import React from 'react';
+import '@testing-library/jest-dom/vitest';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PaletteProvider, usePaletteContext } from './palette-context';
 
-describe('import collection name deduplication', () => {
-  it('uses the original name if no conflict', () => {
-    const existing = new Set(['My Collection']);
-    expect(deduplicateName('Brand Colors', existing)).toBe('Brand Colors');
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
+vi.mock('../components/aria-live-announcer', () => ({
+  announce: vi.fn(),
+  announcePolite: vi.fn(),
+}));
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return React.createElement(PaletteProvider, null, children);
+}
+
+describe('import collection behavior', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
   });
 
-  it('appends (2) when name conflicts', () => {
-    const existing = new Set(['Brand Colors']);
-    expect(deduplicateName('Brand Colors', existing)).toBe('Brand Colors (2)');
-  });
+  it('creates fresh palette IDs, preserves imported order, and deduplicates collection names and slugs', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
 
-  it('appends (3) when (2) also conflicts', () => {
-    const existing = new Set(['Brand Colors', 'Brand Colors (2)']);
-    expect(deduplicateName('Brand Colors', existing)).toBe('Brand Colors (3)');
-  });
+    let existingPaletteIds = new Set<string>();
 
-  it('deduplicates slugs alongside names', () => {
-    const existingSlugs = new Set(['brand-colors']);
-    expect(deduplicateSlug('brand-colors', existingSlugs)).toBe('brand-colors-2');
-  });
+    act(() => {
+      const addResult = result.current.handleAddToCollection();
+      if (!addResult.ok) {
+        throw new Error('Expected the palette to be added to the default collection');
+      }
+      existingPaletteIds = new Set(
+        result.current.collections.flatMap((collection) =>
+          collection.palettes.map((palette) => palette.id),
+        ),
+      );
+    });
 
-  it('deduplicates slug (3) when (2) also conflicts', () => {
-    const existingSlugs = new Set(['brand-colors', 'brand-colors-2']);
-    expect(deduplicateSlug('brand-colors', existingSlugs)).toBe('brand-colors-3');
-  });
-});
+    act(() => {
+      const created = result.current.handleCreateCollection('Imported Collection');
+      expect(created.slug).toBe('imported-collection');
+    });
 
-describe('slug generation from collection name', () => {
-  it('converts name to lowercase hyphenated slug', () => {
-    expect(toSlug('Brand Colors')).toBe('brand-colors');
-  });
+    const entries = [
+      {
+        name: 'First import',
+        hue: 10,
+        chroma: 0.12,
+        lightness50: 0.98,
+        lightness950: 0.03,
+      },
+      {
+        name: 'Second import',
+        hue: 40,
+        chroma: 0.14,
+        lightness50: 0.97,
+        lightness950: 0.04,
+      },
+      {
+        name: 'Third import',
+        hue: 80,
+        chroma: 0.16,
+        lightness50: 0.96,
+        lightness950: 0.05,
+      },
+    ];
 
-  it('handles special characters', () => {
-    expect(toSlug('My  Collection (v2)!')).toBe('my-collection-v2');
-  });
+    let importResult: { count: number; collectionSlug: string } | undefined;
+    act(() => {
+      importResult = result.current.handleImportCollection(entries, 'Imported Collection');
+    });
 
-  it('returns "untitled" for empty string', () => {
-    expect(toSlug('')).toBe('untitled');
-  });
+    expect(importResult).toEqual({
+      count: 3,
+      collectionSlug: 'imported-collection-2',
+    });
 
-  it('collapses consecutive hyphens', () => {
-    expect(toSlug('a---b')).toBe('a-b');
-  });
-});
+    const collectionSlugs = result.current.collections.map((collection) => collection.slug);
+    expect(collectionSlugs).toEqual([
+      'my-collection',
+      'imported-collection',
+      'imported-collection-2',
+    ]);
 
-describe('import creates snapshot copies', () => {
-  it('imported palettes get new IDs (snapshot, not reference)', () => {
-    // This is tested at the context level — each imported palette
-    // goes through generateId() which produces a unique ID.
-    // Here we just verify the deduplication utilities work correctly,
-    // since the actual snapshot copy logic is in PaletteProvider.
-    expect(true).toBe(true);
+    const importedCollection = result.current.collections.at(-1);
+    expect(importedCollection?.name).toBe('Imported Collection (2)');
+    expect(importedCollection?.slug).toBe('imported-collection-2');
+    expect(importedCollection?.palettes.map((palette) => palette.name)).toEqual([
+      'First import',
+      'Second import',
+      'Third import',
+    ]);
+    expect(importedCollection?.palettes.map((palette) => palette.hue)).toEqual([10, 40, 80]);
+
+    const importedPaletteIds = importedCollection?.palettes.map((palette) => palette.id) ?? [];
+    expect(new Set(importedPaletteIds).size).toBe(importedPaletteIds.length);
+    expect(importedPaletteIds.every((id) => !existingPaletteIds.has(id))).toBe(true);
   });
 });

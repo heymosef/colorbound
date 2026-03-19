@@ -5,7 +5,7 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 // This deployed function identifier is intentionally retained so existing share
 // links and deployed clients keep working. Change only with a migration plan.
-export const SHARE_FUNCTION_ID = 'make-server-15a4cf79';
+const SHARE_FUNCTION_ID = 'make-server-15a4cf79';
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/${SHARE_FUNCTION_ID}`;
 
 const headers = {

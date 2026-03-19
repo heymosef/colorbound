@@ -3,7 +3,6 @@ import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
   buildCollectionSavedEditorPath,
-  buildLegacyEditorPath,
   getEditorNavigationMode,
   isEditorRoute,
 } from './editor-routes';
@@ -13,8 +12,6 @@ describe('editor-routes', () => {
     expect(buildCollectionPath('marketing')).toBe('/marketing');
     expect(buildCollectionDraftEditorPath('marketing')).toBe('/marketing/edit');
     expect(buildCollectionSavedEditorPath('marketing', 'palette-1')).toBe('/marketing/edit/palette-1');
-    expect(buildLegacyEditorPath('palette-1')).toBe('/edit/palette-1');
-    expect(buildLegacyEditorPath()).toBe('/edit');
   });
 
   it('returns replace navigation for rename, first-run, and move', () => {

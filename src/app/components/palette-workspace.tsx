@@ -3,7 +3,7 @@
  * token table, and UI preview.
  *
  * The toolbar shows the palette name, a More menu (⋮) with contextual
- * actions (save/reset when dirty, duplicate, share, delete), and a
+ * actions (duplicate, share, move/copy, delete), and a
  * ViewModeToggle (Light | Dark | Both). The toolbar layout is the same
  * regardless of dirty/clean state.
  *
@@ -16,15 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
 import {
-  Moon, Sun, Save, MoreVertical,
-  CopyPlus, RotateCcw, Trash2, Share2, FolderInput, FolderOutput,
+  Moon, Sun, MoreVertical,
+  CopyPlus, Trash2, Share2, FolderInput, FolderOutput,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import type { Palette } from '../lib/color-utils';
 import { oklchToRgb } from '../lib/color-utils';
-import { copyToClipboard } from '../lib/clipboard';
-import { serializePaletteConfig } from '../lib/share-serialization';
-import { createSharedPalette, buildShareUrl } from '../lib/share-api';
 import { UIPreview } from './ui-preview';
 import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
 import { DuplicateDialog } from './duplicate-dialog';
@@ -43,7 +39,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { cn } from './ui/utils';
 import { usePaletteContext } from '../lib/palette-context';
 import { PopoverMenuItem } from './popover-menu-item';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
@@ -117,26 +112,6 @@ function PaletteRow({
   );
 }
 
-// ─── Async share helper (used by overflow menus) ───
-// Generates a share link, copies it to clipboard, and shows a toast.
-async function handleShareFromMenu(palette: Palette) {
-  try {
-    const sanitized = serializePaletteConfig(palette);
-    const result = await createSharedPalette(sanitized);
-    const url = buildShareUrl('palette', result.id);
-    await copyToClipboard(url);
-    toast.success('Share link copied to clipboard', {
-      description: url,
-      duration: 3000,
-    });
-  } catch (err) {
-    console.error('Failed to create share link from menu:', err);
-    toast.error('Failed to create share link', {
-      description: err instanceof Error ? err.message : 'Unknown error',
-    });
-  }
-}
-
 // ─── Inline AlertDialog for delete confirmation ───
 
 function DeleteConfirmDialog({
@@ -173,63 +148,29 @@ function DeleteConfirmDialog({
   );
 }
 
-// Inline reset confirmation (used from overflow menu)
+// ─── Shared overflow menu for desktop + mobile ───
 
-function ResetConfirmInline({
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Discard changes?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will revert the palette to the last saved version. Any unsaved changes will be lost.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="text-[13px]">Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="text-[13px]">
-            Discard Changes
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-// ─── More menu for desktop + mobile ───
-
-function DesktopMoreMenu({
+function PaletteMoreMenu({
   isDirty,
   isEditingCollection,
-  onSave,
-  onRevert,
   onDuplicate,
   onDelete,
   onCollectionAction,
   palette,
+  triggerClassName = 'inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
 }: {
   isDirty?: boolean;
   isEditingCollection?: boolean;
-  onSave?: () => void;
-  onRevert?: () => void;
   onDuplicate?: (name: string) => void;
   onDelete?: () => void;
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [dupOpen, setDupOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
 
   const handleAction = (action: () => void) => {
     setOpen(false);
@@ -240,7 +181,7 @@ function DesktopMoreMenu({
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          className="inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          className={triggerClassName}
           aria-label="More actions"
         >
           <MoreVertical className="w-4 h-4" />
@@ -314,15 +255,6 @@ function DesktopMoreMenu({
         hideTrigger
       />
 
-      {/* Reset confirmation */}
-      {resetOpen && onRevert && (
-        <ResetConfirmInline
-          open={resetOpen}
-          onOpenChange={setResetOpen}
-          onConfirm={() => { onRevert(); setResetOpen(false); }}
-        />
-      )}
-
       {/* Delete confirmation */}
       {deleteOpen && onDelete && (
         <DeleteConfirmDialog
@@ -336,13 +268,12 @@ function DesktopMoreMenu({
   );
 }
 
-// ─── Mobile More Menu ───
-// Used in the mobile top bar (EditPalettePage handles placement).
+// Mobile top bar wrapper used by EditPalettePage.
 
 export function MobileMoreMenu({
   isDirty,
   isEditingCollection,
-  onRevert,
+  onRevert: _onRevert,
   onDuplicate,
   onDelete,
   onCollectionAction,
@@ -356,114 +287,15 @@ export function MobileMoreMenu({
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;
 }) {
-  const [open, setOpen] = useState(false);
-  const [dupOpen, setDupOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
-
-  const handleAction = (action: () => void) => {
-    setOpen(false);
-    action();
-  };
-
   return (
-    <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          className="inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-          aria-label="More actions"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-[210px] p-1">
-          {/* Duplicate */}
-          <PopoverMenuItem onClick={() => handleAction(() => setDupOpen(true))}>
-            <CopyPlus className="w-3.5 h-3.5" />
-            Duplicate palette
-          </PopoverMenuItem>
-          {/* Share */}
-          <PopoverMenuItem
-            onClick={() => handleAction(() => setShareOpen(true))}
-            disabled={isDirty}
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            Share palette
-          </PopoverMenuItem>
-
-          {/* Move / Copy to collection */}
-          {isEditingCollection && (
-            <>
-              <Separator className="my-1" />
-              <PopoverMenuItem
-                onClick={() => handleAction(() => onCollectionAction?.('move', palette))}
-              >
-                <FolderOutput className="w-3.5 h-3.5" />
-                Move to collection…
-              </PopoverMenuItem>
-              <PopoverMenuItem
-                onClick={() => handleAction(() => onCollectionAction?.('copy', palette))}
-              >
-                <FolderInput className="w-3.5 h-3.5" />
-                Duplicate to collection…
-              </PopoverMenuItem>
-            </>
-          )}
-
-          {/* Delete */}
-          {isEditingCollection && onDelete && (
-            <>
-              <Separator className="my-1" />
-              <PopoverMenuItem
-                onClick={() => handleAction(() => setDeleteOpen(true))}
-                variant="destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete palette
-              </PopoverMenuItem>
-            </>
-          )}
-        </PopoverContent>
-      </Popover>
-
-      {/* Duplicate dialog */}
-      {onDuplicate && (
-        <DuplicateDialog
-          currentName={palette.name}
-          onDuplicate={onDuplicate}
-          open={dupOpen}
-          onOpenChange={setDupOpen}
-          hideTrigger
-        />
-      )}
-
-      {/* Share dialog */}
-      <SharePaletteButton
-        palette={palette}
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        hideTrigger
-      />
-
-      {/* Reset confirmation */}
-      {resetOpen && onRevert && (
-        <ResetConfirmInline
-          open={resetOpen}
-          onOpenChange={setResetOpen}
-          onConfirm={() => { onRevert(); setResetOpen(false); }}
-        />
-      )}
-
-      {/* Delete confirmation */}
-      {deleteOpen && onDelete && (
-        <DeleteConfirmDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          onConfirm={() => { onDelete(); setDeleteOpen(false); }}
-          paletteName={palette.name}
-        />
-      )}
-    </>
+    <PaletteMoreMenu
+      isDirty={isDirty}
+      isEditingCollection={isEditingCollection}
+      onDuplicate={onDuplicate}
+      onDelete={onDelete}
+      onCollectionAction={onCollectionAction}
+      palette={palette}
+    />
   );
 }
 
@@ -513,11 +345,9 @@ export function PaletteWorkspace({
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-1 min-w-0">
               <h2 className="text-[14px] sm:text-[15px] font-medium truncate min-w-0">{palette.name}</h2>
-              <DesktopMoreMenu
+              <PaletteMoreMenu
                 isDirty={isDirty}
                 isEditingCollection={isEditingCollection}
-                onSave={onSave}
-                onRevert={onRevert}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onCollectionAction={onCollectionAction}

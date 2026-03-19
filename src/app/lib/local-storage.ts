@@ -14,7 +14,6 @@ import {
 } from './legacy-palette-compat';
 import type { PaletteConfig, ContrastAlgorithm } from './palette-context-types';
 import type { Collection } from './collection-types';
-import { toSlug, deduplicateSlug } from './slug-utils';
 
 const STORAGE_KEY = 'color-token-generator';
 const CURRENT_VERSION = 3;
@@ -328,14 +327,6 @@ export function saveState(state: {
     // Surface quota or availability errors so the caller can notify the user
     console.error('Failed to save state to localStorage:', err);
     return false;
-  }
-}
-
-export function clearState(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // fail silently
   }
 }
 
