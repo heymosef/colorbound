@@ -3,9 +3,14 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
 import {
-  hasLegacyLightnessFields,
-  normalizeLegacyLightnessFields,
-} from "../../../src/app/lib/legacy-palette-compat.ts";
+  CANONICAL_SHARE_FIELDS,
+  LEGACY_LIGHTNESS_FIELDS,
+  normalizePaletteEntry,
+  type PaletteEntry,
+  sanitizePaletteEntry,
+  SHARE_SCHEMA_VERSION,
+  usesLegacyLightnessFields,
+} from "./share-contract.ts";
 
 const app = new Hono();
 // This deployed identifier is intentionally retained so existing share links
@@ -31,7 +36,14 @@ app.use(
 
 // Health check endpoint
 app.get(`${SHARE_ROUTE_PREFIX}/health`, (c) => {
-  return c.json({ status: "ok" });
+  return c.json({
+    status: "ok",
+    functionId: SHARE_FUNCTION_ID,
+    schemaVersion: SHARE_SCHEMA_VERSION,
+    canonicalShareFields: CANONICAL_SHARE_FIELDS,
+    legacyLightnessFields: LEGACY_LIGHTNESS_FIELDS,
+    requiresLegacyMetadata: false,
+  });
 });
 
 // ─── Share ID Generation ───
@@ -54,84 +66,14 @@ function isExpired(createdAt: string | number): boolean {
   return Date.now() - created > TTL_MS;
 }
 
-// ─── Validation helpers ───
-
-function isValidNumber(v: unknown, min: number, max: number): boolean {
-  return typeof v === 'number' && !Number.isNaN(v) && v >= min && v <= max;
-}
-
-function clampNumber(v: unknown, min: number, max: number, fallback: number): number {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return fallback;
-  return Math.min(max, Math.max(min, v));
-}
-
-interface PaletteEntry {
-  name: string;
-  hue: number;
-  chroma: number;
-  lightness50: number;
-  lightness950: number;
-}
-
-function hasModernLightnessFields(obj: Record<string, unknown>): boolean {
-  return (
-    isValidNumber(obj.lightness50, 0, 1) &&
-    isValidNumber(obj.lightness950, 0, 1)
-  );
-}
-
-function normalizePaletteEntry(e: unknown): PaletteEntry | null {
-  if (!e || typeof e !== 'object') return null;
-  const obj = e as Record<string, unknown>;
-
-  let lightness50: number;
-  let lightness950: number;
-  if (hasModernLightnessFields(obj)) {
-    lightness50 = obj.lightness50;
-    lightness950 = obj.lightness950;
-  } else if (hasLegacyLightnessFields(obj, isValidNumber)) {
-    console.log('[legacy-compat] server-accepted-legacy-palette');
-    const normalized = normalizeLegacyLightnessFields(obj, clampNumber);
-    lightness50 = normalized.lightness50;
-    lightness950 = normalized.lightness950;
-  } else {
-    return null;
-  }
-
-  if (
-    typeof obj.name === 'string' &&
-    obj.name.length > 0 &&
-    obj.name.length <= 100 &&
-    isValidNumber(obj.hue, 0, 360) &&
-    isValidNumber(obj.chroma, 0, 0.4)
-  ) {
-    return {
-      name: obj.name,
-      hue: obj.hue,
-      chroma: obj.chroma,
-      lightness50,
-      lightness950,
-    };
-  }
-
-  return null;
-}
-
-function sanitizePaletteEntry(e: PaletteEntry): PaletteEntry {
-  return {
-    name: e.name.slice(0, 100),
-    hue: e.hue,
-    chroma: e.chroma,
-    lightness50: e.lightness50,
-    lightness950: e.lightness950,
-  };
-}
-
 // ─── Share a single palette ───
 
 app.post(`${SHARE_ROUTE_PREFIX}/share/palette`, async (c) => {
   try {
     const body = await c.req.json();
+    if (usesLegacyLightnessFields(body.palette)) {
+      console.log("[legacy-compat] server-accepted-legacy-palette");
+    }
     const palette = normalizePaletteEntry(body.palette);
 
     if (!palette) {
@@ -173,7 +115,12 @@ app.post(`${SHARE_ROUTE_PREFIX}/share/collection`, async (c) => {
     }
 
     const validPalettes = palettes
-      .map(normalizePaletteEntry)
+      .map((entry) => {
+        if (usesLegacyLightnessFields(entry)) {
+          console.log("[legacy-compat] server-accepted-legacy-palette");
+        }
+        return normalizePaletteEntry(entry);
+      })
       .filter((palette): palette is PaletteEntry => palette !== null);
     if (validPalettes.length === 0) {
       return c.json({ error: "No valid palette entries found in collection" }, 400);

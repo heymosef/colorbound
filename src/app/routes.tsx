@@ -1,3 +1,4 @@
+import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import { RootLayout } from './components/root-layout';
 import { HomeEntryPage } from './components/home-entry-page';
@@ -10,7 +11,7 @@ import { getSharedPalette, getSharedCollection } from './lib/share-api';
 
 // ─── Route loaders for shared pages ───
 
-async function sharedPaletteLoader({ params }: { params: Record<string, string | undefined> }) {
+export async function sharedPaletteLoader({ params }: { params: Record<string, string | undefined> }) {
   const shareId = params.shareId;
   if (!shareId) throw new Error('Invalid share link');
   try {
@@ -22,7 +23,7 @@ async function sharedPaletteLoader({ params }: { params: Record<string, string |
   }
 }
 
-async function sharedCollectionLoader({ params }: { params: Record<string, string | undefined> }) {
+export async function sharedCollectionLoader({ params }: { params: Record<string, string | undefined> }) {
   const shareId = params.shareId;
   if (!shareId) throw new Error('Invalid share link');
   try {
