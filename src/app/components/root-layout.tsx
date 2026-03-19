@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import type React from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import type { Collection } from '../lib/collection-types';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -17,6 +16,7 @@ import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
   buildCollectionSavedEditorPath,
+  isEditorRoute,
 } from '../lib/editor-routes';
 
 type AppTheme = 'light' | 'dark' | 'system';
@@ -281,7 +281,7 @@ function HeaderBreadcrumb() {
   } = usePaletteContext();
 
   const pathname = location.pathname;
-  const isEdit = pathname.startsWith('/edit') || pathname.includes('/edit/');
+  const isEdit = isEditorRoute(pathname);
   const isShared = pathname.startsWith('/p/') || pathname.startsWith('/c/');
   const isCollectionsList = pathname === '/';
   const collectionCount = collection.length;
@@ -428,7 +428,7 @@ export function RootLayout() {
   // On mobile, hide the global header when on the edit page —
   // MobileLayout in EditPalettePage provides its own top bar
   // (PaletteSwitcher + More + Edit).
-  const isEditPage = location.pathname.startsWith('/edit') || location.pathname.includes('/edit/');
+  const isEditPage = isEditorRoute(location.pathname);
   const isHomePage = location.pathname === '/';
   const hideHeader = breakpoint === 'mobile' && isEditPage;
 

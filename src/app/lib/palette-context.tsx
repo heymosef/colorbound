@@ -11,6 +11,7 @@ import { PaletteContext, CollectionsContext } from './palette-context-value';
 import { loadState, saveState, createDefaultCollection } from './local-storage';
 import type { Collection } from './collection-types';
 import type {
+  AddPaletteToCollectionResult,
   CollectionRenameResult,
   CollectionSortBy,
   CollectionsContextValue,
@@ -251,7 +252,11 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     }, 0);
   }, []);
 
-  const handleAddToCollection = useCallback(() => {
+  const handleAddToCollection = useCallback((): AddPaletteToCollectionResult => {
+    if (!activeCollectionId) {
+      return { ok: false };
+    }
+
     const snapshot: Palette = {
       ...currentPalette,
       id: generateId(),
@@ -263,7 +268,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setHasCompletedFirstRun(true);
     toast.success(`Added "${config.name}" to collection`, { duration: 2000 });
     announcePolite(`Added ${config.name} to collection`);
-  }, [currentPalette, config.name, updateActiveCollectionPalettes]);
+    return { ok: true, paletteId: snapshot.id, collectionId: activeCollectionId };
+  }, [activeCollectionId, currentPalette, config.name, updateActiveCollectionPalettes]);
 
   const handleUpdateInCollection = useCallback(() => {
     if (!savedBaselinePalette) return;

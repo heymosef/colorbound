@@ -4,7 +4,7 @@
  * Used in both palette options menus (collections-page) and
  * overflow/more menus (palette-workspace) to keep styling consistent.
  */
-import type React from 'react';
+import React from 'react';
 import { cn } from './ui/utils';
 
 export function PopoverMenuItem({

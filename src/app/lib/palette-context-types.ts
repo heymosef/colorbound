@@ -23,6 +23,10 @@ export type CollectionRenameResult =
   | { ok: true; collectionId: string; slug: string; name: string }
   | { ok: false; error: 'empty' | 'duplicate'; message: string };
 
+export type AddPaletteToCollectionResult =
+  | { ok: true; paletteId: string; collectionId: string }
+  | { ok: false };
+
 export interface PaletteContextValue {
   config: PaletteConfig;
   /** Palettes in the active collection (backward-compat alias) */
@@ -45,7 +49,7 @@ export interface PaletteContextValue {
   handleNameChange: (name: string) => void;
   handleRandomize: () => void;
   startDraftPalette: (collectionId?: string) => void;
-  handleAddToCollection: () => void;
+  handleAddToCollection: () => AddPaletteToCollectionResult;
   handleUpdateInCollection: () => void;
   handleSelectFromCollection: (id: string) => void;
   selectPaletteInCollection: (collectionId: string, paletteId: string) => boolean;

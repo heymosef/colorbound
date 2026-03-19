@@ -1,5 +1,14 @@
+import { matchPath } from 'react-router';
+
 export type EditorNavigationReason = 'move' | 'copy' | 'rename' | 'firstRun';
 export type EditorNavigationMode = 'push' | 'replace';
+
+const EDITOR_ROUTE_PATTERNS = [
+  '/edit',
+  '/edit/:paletteId',
+  '/:collectionSlug/edit',
+  '/:collectionSlug/edit/:paletteId',
+] as const;
 
 export function buildCollectionPath(collectionSlug: string): string {
   return `/${collectionSlug}`;
@@ -15,6 +24,12 @@ export function buildCollectionSavedEditorPath(collectionSlug: string, paletteId
 
 export function buildLegacyEditorPath(paletteId?: string | null): string {
   return paletteId ? `/edit/${paletteId}` : '/edit';
+}
+
+export function isEditorRoute(pathname: string): boolean {
+  return EDITOR_ROUTE_PATTERNS.some((pattern) =>
+    matchPath({ path: pattern, end: true }, pathname),
+  );
 }
 
 export function getEditorNavigationMode(reason: EditorNavigationReason): EditorNavigationMode {

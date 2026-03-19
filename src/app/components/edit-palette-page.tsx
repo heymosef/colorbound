@@ -19,7 +19,7 @@
  *   - Right sidebar: CollectionPanel (a11y + export tabs)
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useBlocker } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -476,7 +476,15 @@ export function EditPalettePage() {
     }
 
     if (!paletteId) {
-      if (activeCollectionId !== matchedCollection.id || hasPersistedBaseline) {
+      if (hasPersistedBaseline && activeCollectionId === matchedCollection.id && activePaletteId) {
+        navigate(
+          buildCollectionSavedEditorPath(matchedCollection.slug, activePaletteId),
+          { replace: true },
+        );
+        return;
+      }
+
+      if (activeCollectionId !== matchedCollection.id || activePaletteId !== null) {
         startDraftPalette(matchedCollection.id);
       }
       return;
@@ -552,6 +560,13 @@ export function EditPalettePage() {
     [activeCollection, handleAddToCollection, navigate]
   );
 
+  const handleSaveDraftPalette = useCallback(() => {
+    if (!activeCollection) return;
+    const result = handleAddToCollection();
+    if (!result.ok) return;
+    navigate(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), { replace: true });
+  }, [activeCollection, handleAddToCollection, navigate]);
+
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
     startDraftPalette(activeCollection.id);
@@ -572,7 +587,7 @@ export function EditPalettePage() {
       activePaletteId={activePaletteId}
       hasPersistedBaseline={hasPersistedBaseline}
       onSave={handleUpdateInCollection}
-      onAddToCollection={handleAddToCollection}
+      onAddToCollection={handleSaveDraftPalette}
       onRevert={handleRevertChanges}
       onClose={onClose}
     />
@@ -588,7 +603,7 @@ export function EditPalettePage() {
     isDirty,
     onRevert: handleRevertChanges,
     onSave: handleUpdateInCollection,
-    onAddToCollection: handleAddToCollection,
+    onAddToCollection: handleSaveDraftPalette,
     onDuplicate: handleDuplicatePalette,
     onDelete: handleDeletePalette,
     collection,
