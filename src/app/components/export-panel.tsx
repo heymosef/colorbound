@@ -22,11 +22,11 @@ import type { Palette } from '../lib/color-utils';
 import {
   deriveDarkPalette,
   exportAsCSS,
-  exportAsFigmaTokens,
   exportAsTailwind,
   exportAsSCSS,
   exportAsJSON,
   exportAsW3C,
+  exportAsFigmaVariables,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
 import { usePaletteContext } from '../lib/palette-context';
@@ -75,8 +75,22 @@ const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; 
   figma: {
     label: 'Figma',
     icon: <Figma className="w-3.5 h-3.5" />,
+<<<<<<< ours
+<<<<<<< ours
     ext: '.tokens.json',
+<<<<<<< ours
+    desc: 'Figma Variables import JSON. Turn on dark mode to download light and dark files together.',
+=======
+    ext: '.figma.json',
+    desc: 'Figma Variables API-compatible JSON',
+>>>>>>> theirs
+=======
+    ext: '.figma.json',
+    desc: 'Figma Variables API-compatible JSON',
+>>>>>>> theirs
+=======
     desc: 'Figma Variables import JSON (DTCG, one mode per file)',
+>>>>>>> theirs
   },
 };
 
@@ -210,6 +224,28 @@ function ExportSettings({
 
   return (
     <div className="space-y-3">
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+=======
+      {/* Include dark mode */}
+>>>>>>> theirs
+=======
+      {/* Include dark mode */}
+>>>>>>> theirs
+      <div className="flex items-center justify-between">
+        <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
+          Include dark mode
+        </Label>
+        <Switch
+          id="include-dark"
+          checked={includeDark}
+          onCheckedChange={onIncludeDarkChange}
+          className="origin-left"
+          aria-label="Include dark mode"
+        />
+      </div>
+=======
       {showIncludeDark && (
         <div className="flex items-center justify-between">
           <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
@@ -224,6 +260,7 @@ function ExportSettings({
           />
         </div>
       )}
+>>>>>>> theirs
       
       {/* Scope, Format, Prefix — grid for consistent widths */}
       <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-3">
@@ -304,12 +341,26 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     return undefined;
   }, [includeDark, scope, darkPalette, collection]);
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+  const figmaLightCode = useMemo(() => exportAsFigmaTokens(palettes), [palettes]);
+  const figmaDarkCode = useMemo(() => {
+    if (!darkPalettes || darkPalettes.length === 0) return '';
+    return exportAsFigmaTokens(darkPalettes);
+  }, [darkPalettes]);
+=======
   const figmaPalettes: Palette[] = useMemo(() => {
     if (figmaMode === 'light') return palettes;
     if (scope === 'palette') return darkPalette ? [darkPalette] : [];
     return collection.map(deriveDarkPalette);
   }, [figmaMode, palettes, scope, darkPalette, collection]);
+>>>>>>> theirs
 
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
   const exportOptions = useMemo(() => ({
     prefix,
     colorFormat,
@@ -331,20 +382,73 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
       case 'dtcg':
         return exportAsW3C(palettes, { darkPalettes });
       case 'figma':
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+        return figmaLightCode;
+      default:
+        return '';
+    }
+  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, figmaLightCode]);
+=======
+        return exportAsFigmaVariables(palettes, { darkPalettes });
+      default:
+        return '';
+    }
+  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes]);
+>>>>>>> theirs
+=======
+        return exportAsFigmaVariables(palettes, { darkPalettes });
+      default:
+        return '';
+    }
+  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes]);
+>>>>>>> theirs
+=======
         return exportAsFigmaTokens(figmaPalettes);
       default:
         return '';
     }
   }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, figmaPalettes]);
+>>>>>>> theirs
 
   const paletteName = useMemo(() => {
     if (scope === 'collection') return 'collection';
     return currentPalette?.name.toLowerCase().replace(/\s+/g, '-') || 'palette';
   }, [scope, currentPalette]);
 
+<<<<<<< ours
+  const filename = `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
+<<<<<<< ours
+<<<<<<< ours
+  const figmaDownloadFiles = useMemo(() => {
+    if (activeFormat !== 'figma') return undefined;
+
+    const files = [
+      {
+        filename: `${paletteName}-light${FORMAT_INFO.figma.ext}`,
+        code: figmaLightCode,
+      },
+    ];
+
+    if (includeDark && figmaDarkCode) {
+      files.push({
+        filename: `${paletteName}-dark${FORMAT_INFO.figma.ext}`,
+        code: figmaDarkCode,
+      });
+    }
+
+    return files;
+  }, [activeFormat, paletteName, figmaLightCode, includeDark, figmaDarkCode]);
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
   const filename = activeFormat === 'figma'
     ? `${paletteName}-${figmaMode}${FORMAT_INFO[activeFormat].ext}`
     : `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
+>>>>>>> theirs
   const languageMap: Record<ExportFormat, string> = {
     css: 'CSS',
     tailwind: 'CSS',

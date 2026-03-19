@@ -17,7 +17,6 @@ import {
   get500Oklch,
   SCALE_STEPS,
   exportAsCSS,
-  exportAsFigmaTokens,
   exportAsFigmaVariables,
   exportAsJSON,
   formatHsl,
@@ -633,48 +632,5 @@ describe('exportAsFigmaVariables', () => {
     expect(variables.every((variable: { modeValues: Record<string, unknown> }) => 'dark' in variable.modeValues)).toBe(true);
     expect(variables.some((variable: { name: string }) => variable.name === 'blue/500')).toBe(true);
     expect(variables.some((variable: { name: string }) => variable.name === 'rose/500')).toBe(true);
-  });
-});
-
-describe('exportAsFigmaTokens', () => {
-  it('produces DTCG color tokens that Figma can import', () => {
-    const palette = {
-      id: 'blue',
-      name: 'Blue',
-      tokens: generatePalette(210, 0.18, 0.985, 0.025),
-      hue: 210,
-      chroma: 0.18,
-      lightness50: 0.985,
-      lightness950: 0.025,
-    };
-
-    const json = exportAsFigmaTokens([palette]);
-    const parsed = JSON.parse(json);
-
-    expect(parsed.blue[500].$type).toBe('color');
-    expect(parsed.blue[500].$value.colorSpace).toBe('srgb');
-    expect(parsed.blue[500].$value.components).toHaveLength(3);
-    expect(parsed.blue[500].$value.alpha).toBe(1);
-    expect(parsed.blue[500].$value.hex).toMatch(/^#[0-9A-F]{6}$/);
-    expect(parsed).not.toHaveProperty('$schema');
-    expect(parsed).not.toHaveProperty('collections');
-  });
-
-  it('can export a dark-mode token file separately', () => {
-    const palette = {
-      id: 'blue',
-      name: 'Blue',
-      tokens: generatePalette(210, 0.18, 0.985, 0.025),
-      hue: 210,
-      chroma: 0.18,
-      lightness50: 0.985,
-      lightness950: 0.025,
-    };
-
-    const json = exportAsFigmaTokens([deriveDarkPalette(palette)]);
-    const parsed = JSON.parse(json);
-
-    expect(parsed.blue[500].$type).toBe('color');
-    expect(parsed.blue[500].$value.colorSpace).toBe('srgb');
   });
 });
