@@ -832,6 +832,36 @@ export function exportAsW3C(palettes: Palette[], options?: { darkPalettes?: Pale
   return JSON.stringify(obj, null, 2);
 }
 
+// Export as DTCG color tokens compatible with Figma Variables import.
+export function exportAsFigmaTokens(palettes: Palette[]): string {
+  const obj: Record<string, Record<string, object>> = {};
+
+  for (const palette of palettes) {
+    const key = sanitizeName(palette.name);
+    obj[key] = {};
+
+    for (const token of palette.tokens) {
+      const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
+      obj[key][String(token.step)] = {
+        $type: 'color',
+        $value: {
+          colorSpace: 'srgb',
+          components: [
+            +(r / 255).toFixed(6),
+            +(g / 255).toFixed(6),
+            +(b / 255).toFixed(6),
+          ],
+          alpha: 1,
+          hex: token.hex.toUpperCase(),
+        },
+        $description: `${palette.name} ${token.step}`,
+      };
+    }
+  }
+
+  return JSON.stringify(obj, null, 2);
+}
+
 // Export as Figma Variables compatible JSON
 export function exportAsFigmaVariables(palettes: Palette[], options?: { darkPalettes?: Palette[] }): string {
   const variables: Array<{

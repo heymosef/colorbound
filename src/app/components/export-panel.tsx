@@ -22,11 +22,11 @@ import type { Palette } from '../lib/color-utils';
 import {
   deriveDarkPalette,
   exportAsCSS,
+  exportAsFigmaTokens,
   exportAsTailwind,
   exportAsSCSS,
   exportAsJSON,
   exportAsW3C,
-  exportAsFigmaVariables,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
 import { usePaletteContext } from '../lib/palette-context';
@@ -34,6 +34,7 @@ import { usePaletteContext } from '../lib/palette-context';
 type ExportFormat = 'css' | 'tailwind' | 'scss' | 'json' | 'dtcg' | 'figma';
 type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'hsl' | 'p3';
 type ExportScope = 'palette' | 'collection';
+type FigmaMode = 'light' | 'dark';
 
 interface ExportPanelProps {
   /** When true, renders in a compact inline layout (for tab content) */
@@ -74,8 +75,8 @@ const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; 
   figma: {
     label: 'Figma',
     icon: <Figma className="w-3.5 h-3.5" />,
-    ext: '.figma.json',
-    desc: 'Figma Variables API-compatible JSON',
+    ext: '.tokens.json',
+    desc: 'Figma Variables import JSON (DTCG, one mode per file)',
   },
 };
 
@@ -179,6 +180,8 @@ function ExportSettings({
   onPrefixChange,
   includeDark,
   onIncludeDarkChange,
+  figmaMode,
+  onFigmaModeChange,
   collectionCount,
   activeFormat,
 }: {
@@ -190,11 +193,15 @@ function ExportSettings({
   onPrefixChange: (v: string) => void;
   includeDark: boolean;
   onIncludeDarkChange: (v: boolean) => void;
+  figmaMode: FigmaMode;
+  onFigmaModeChange: (v: FigmaMode) => void;
   collectionCount: number;
   activeFormat: ExportFormat;
 }) {
   const showColorFormat = activeFormat !== 'dtcg' && activeFormat !== 'figma';
   const showPrefix = activeFormat === 'css' || activeFormat === 'tailwind';
+  const showIncludeDark = activeFormat !== 'figma';
+  const showFigmaMode = activeFormat === 'figma';
 
   const scopeItems = [
     { value: 'palette', label: 'Current Palette' },
@@ -203,19 +210,20 @@ function ExportSettings({
 
   return (
     <div className="space-y-3">
-      {/* Include dark mode */}
-      <div className="flex items-center justify-between">
-        <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
-          Include dark mode
-        </Label>
-        <Switch
-          id="include-dark"
-          checked={includeDark}
-          onCheckedChange={onIncludeDarkChange}
-          className="origin-left"
-          aria-label="Include dark mode"
-        />
-      </div>
+      {showIncludeDark && (
+        <div className="flex items-center justify-between">
+          <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
+            Include dark mode
+          </Label>
+          <Switch
+            id="include-dark"
+            checked={includeDark}
+            onCheckedChange={onIncludeDarkChange}
+            className="origin-left"
+            aria-label="Include dark mode"
+          />
+        </div>
+      )}
       
       {/* Scope, Format, Prefix — grid for consistent widths */}
       <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-3">
@@ -253,6 +261,22 @@ function ExportSettings({
             />
           </>
         )}
+
+        {showFigmaMode && (
+          <>
+            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Mode</Label>
+            <PopoverSelect
+              value={figmaMode}
+              onValueChange={(v) => onFigmaModeChange(v as FigmaMode)}
+              items={[
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              ariaLabel="Figma mode"
+              triggerClassName="h-8 text-[13px]"
+            />
+          </>
+        )}
       </div>
     </div>
   );
@@ -266,6 +290,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
   const [colorFormat, setColorFormat] = useState<ColorFormat>('oklch');
   const [prefix, setPrefix] = useState('');
   const [includeDark, setIncludeDark] = useState(true);
+  const [figmaMode, setFigmaMode] = useState<FigmaMode>('light');
 
   const palettes: Palette[] = useMemo(() => {
     if (scope === 'collection' && collection.length > 0) return collection;
@@ -278,6 +303,12 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     if (scope === 'collection' && collection.length > 0) return collection.map(deriveDarkPalette);
     return undefined;
   }, [includeDark, scope, darkPalette, collection]);
+
+  const figmaPalettes: Palette[] = useMemo(() => {
+    if (figmaMode === 'light') return palettes;
+    if (scope === 'palette') return darkPalette ? [darkPalette] : [];
+    return collection.map(deriveDarkPalette);
+  }, [figmaMode, palettes, scope, darkPalette, collection]);
 
   const exportOptions = useMemo(() => ({
     prefix,
@@ -300,18 +331,20 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
       case 'dtcg':
         return exportAsW3C(palettes, { darkPalettes });
       case 'figma':
-        return exportAsFigmaVariables(palettes, { darkPalettes });
+        return exportAsFigmaTokens(figmaPalettes);
       default:
         return '';
     }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes]);
+  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, figmaPalettes]);
 
   const paletteName = useMemo(() => {
     if (scope === 'collection') return 'collection';
     return currentPalette?.name.toLowerCase().replace(/\s+/g, '-') || 'palette';
   }, [scope, currentPalette]);
 
-  const filename = `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
+  const filename = activeFormat === 'figma'
+    ? `${paletteName}-${figmaMode}${FORMAT_INFO[activeFormat].ext}`
+    : `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
   const languageMap: Record<ExportFormat, string> = {
     css: 'CSS',
     tailwind: 'CSS',
@@ -348,6 +381,8 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
           onPrefixChange={setPrefix}
           includeDark={includeDark}
           onIncludeDarkChange={setIncludeDark}
+          figmaMode={figmaMode}
+          onFigmaModeChange={setFigmaMode}
           collectionCount={collection.length}
           activeFormat={activeFormat}
         />
