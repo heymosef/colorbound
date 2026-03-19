@@ -412,6 +412,18 @@ export function generateDarkPalette(
   );
 }
 
+export function deriveDarkPalette(palette: Palette): Palette {
+  return {
+    ...palette,
+    tokens: generateDarkPalette(
+      palette.hue,
+      palette.chroma,
+      palette.lightness50,
+      palette.lightness950,
+    ),
+  };
+}
+
 // ─── Contrast Utilities ───
 
 // WCAG 2 Relative Luminance

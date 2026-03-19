@@ -11,11 +11,13 @@ import {
   getApcaRating,
   generatePalette,
   generateDarkPalette,
+  deriveDarkPalette,
   generateId,
   suggestPaletteName,
   get500Oklch,
   SCALE_STEPS,
   exportAsCSS,
+  exportAsFigmaVariables,
   exportAsJSON,
   formatHsl,
   isInSrgbGamut,
@@ -400,6 +402,33 @@ describe('generateDarkPalette', () => {
   });
 });
 
+describe('deriveDarkPalette', () => {
+  it('preserves palette metadata while regenerating dark tokens', () => {
+    const palette = {
+      id: 'blue',
+      name: 'Blue',
+      tokens: generatePalette(210, 0.18, 0.985, 0.025),
+      hue: 210,
+      chroma: 0.18,
+      lightness50: 0.985,
+      lightness950: 0.025,
+    };
+
+    const darkPalette = deriveDarkPalette(palette);
+
+    expect(darkPalette).toMatchObject({
+      id: palette.id,
+      name: palette.name,
+      hue: palette.hue,
+      chroma: palette.chroma,
+      lightness50: palette.lightness50,
+      lightness950: palette.lightness950,
+    });
+    expect(darkPalette.tokens).toHaveLength(palette.tokens.length);
+    expect(darkPalette.tokens).not.toEqual(palette.tokens);
+  });
+});
+
 // ─── ID Generation ───
 
 describe('generateId', () => {
@@ -566,5 +595,42 @@ describe('exportAsJSON', () => {
     for (const step of SCALE_STEPS) {
       expect(parsed).toHaveProperty(`blue.${step}`);
     }
+  });
+});
+
+describe('exportAsFigmaVariables', () => {
+  it('includes dark mode values for each palette in a collection export', () => {
+    const collection = [
+      {
+        id: 'blue',
+        name: 'Blue',
+        tokens: generatePalette(210, 0.18, 0.985, 0.025),
+        hue: 210,
+        chroma: 0.18,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+      {
+        id: 'rose',
+        name: 'Rose',
+        tokens: generatePalette(350, 0.16, 0.985, 0.025),
+        hue: 350,
+        chroma: 0.16,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    ];
+
+    const json = exportAsFigmaVariables(collection, {
+      darkPalettes: collection.map(deriveDarkPalette),
+    });
+    const parsed = JSON.parse(json);
+    const variables = parsed.collections[0].variables;
+
+    expect(parsed.collections[0].modes).toEqual(['light', 'dark']);
+    expect(variables).toHaveLength(collection.length * SCALE_STEPS.length);
+    expect(variables.every((variable: { modeValues: Record<string, unknown> }) => 'dark' in variable.modeValues)).toBe(true);
+    expect(variables.some((variable: { name: string }) => variable.name === 'blue/500')).toBe(true);
+    expect(variables.some((variable: { name: string }) => variable.name === 'rose/500')).toBe(true);
   });
 });

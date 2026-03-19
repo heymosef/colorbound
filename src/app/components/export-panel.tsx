@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import type { Palette } from '../lib/color-utils';
 import {
+  deriveDarkPalette,
   exportAsCSS,
   exportAsTailwind,
   exportAsSCSS,
@@ -271,14 +272,12 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     return currentPalette ? [currentPalette] : [];
   }, [scope, collection, currentPalette]);
 
-  // For dark palettes in collection mode, we'd need to generate them.
-  // For now, use the current dark palette for single palette, or skip for collection.
   const darkPalettes: Palette[] | undefined = useMemo(() => {
     if (!includeDark) return undefined;
     if (scope === 'palette' && darkPalette) return [darkPalette];
-    // For collection, dark palettes aren't individually generated in this context
+    if (scope === 'collection' && collection.length > 0) return collection.map(deriveDarkPalette);
     return undefined;
-  }, [includeDark, scope, darkPalette]);
+  }, [includeDark, scope, darkPalette, collection]);
 
   const exportOptions = useMemo(() => ({
     prefix,
