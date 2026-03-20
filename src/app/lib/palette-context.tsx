@@ -49,16 +49,38 @@ export type {
   PaletteContextValue,
 } from './palette-context-types';
 
+const DEFAULT_TARGET_COLOR_SPACE = 'srgb' as const;
+const DEFAULT_CHROMA = 0.18;
+const DEFAULT_LIGHTNESS_50 = 0.985;
+const DEFAULT_LIGHTNESS_950 = 0.025;
+
 function createDefaultConfig(hue?: number): PaletteConfig {
   const h = hue ?? Math.floor(Math.random() * 360);
-  const defaultChroma = 0.18;
   return {
-    name: suggestPaletteName(h, defaultChroma),
+    name: suggestPaletteName(h, DEFAULT_CHROMA),
     hue: h,
-    chroma: defaultChroma,
-    lightness50: 0.985,
-    lightness950: 0.025,
-    targetColorSpace: 'srgb',
+    chroma: DEFAULT_CHROMA,
+    lightness50: DEFAULT_LIGHTNESS_50,
+    lightness950: DEFAULT_LIGHTNESS_950,
+    targetColorSpace: DEFAULT_TARGET_COLOR_SPACE,
+    generationVersion: GENERATION_VERSION,
+  };
+}
+
+function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): PaletteConfig {
+  const h = hue ?? Math.floor(Math.random() * 360);
+  const targetColorSpace = seedPalette?.targetColorSpace ?? DEFAULT_TARGET_COLOR_SPACE;
+  const chroma = seedPalette?.chroma ?? DEFAULT_CHROMA;
+  const lightness50 = seedPalette?.lightness50 ?? DEFAULT_LIGHTNESS_50;
+  const lightness950 = seedPalette?.lightness950 ?? DEFAULT_LIGHTNESS_950;
+
+  return {
+    name: suggestPaletteName(h, chroma, lightness50, lightness950),
+    hue: h,
+    chroma,
+    lightness50,
+    lightness950,
+    targetColorSpace,
     generationVersion: GENERATION_VERSION,
   };
 }
@@ -145,6 +167,9 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   });
 
   const [activePaletteId, setActivePaletteId] = useState<string | null>(() => hydrated?.activePaletteId ?? null);
+  const [lastViewedSavedPaletteId, setLastViewedSavedPaletteId] = useState<string | null>(
+    () => hydrated?.lastViewedSavedPaletteId ?? null,
+  );
 
   // ─── Derived: active collection & its palettes ───
   const activeCollection = useMemo(
@@ -166,6 +191,11 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const savedBaselinePalette = useMemo(
     () => activeCollection?.palettes.find((palette) => palette.id === activePaletteId) ?? null,
     [activeCollection, activePaletteId]
+  );
+
+  const lastViewedSavedPalette = useMemo(
+    () => (lastViewedSavedPaletteId ? findPaletteLocation(collections, lastViewedSavedPaletteId)?.palette ?? null : null),
+    [collections, lastViewedSavedPaletteId],
   );
 
   const hasPersistedBaseline = !!savedBaselinePalette;
@@ -217,13 +247,14 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     });
     setNameManuallyEdited(true);
     setActivePaletteId(palette.id);
+    setLastViewedSavedPaletteId(palette.id);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
   }, []);
 
   const startDraftPalette = useCallback((collectionId?: string) => {
     const randomHue = Math.floor(Math.random() * 360);
-    const draftConfig = createDefaultConfig(randomHue);
+    const draftConfig = buildDraftSeedConfig(lastViewedSavedPalette, randomHue);
     const nextCollectionId = collectionId ?? activeCollectionId ?? collections[0]?.id ?? null;
 
     if (nextCollectionId && nextCollectionId !== activeCollectionId) {
@@ -235,7 +266,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setActivePaletteId(null);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-  }, [activeCollectionId, collections]);
+  }, [activeCollectionId, collections, lastViewedSavedPalette]);
 
   const handleConfigChange = useCallback(
     (partial: Partial<PaletteConfig>) => {
@@ -313,6 +344,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     updateActiveCollectionPalettes((prev) => [...prev, snapshot]);
     setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
     setActivePaletteId(snapshot.id);
+    setLastViewedSavedPaletteId(snapshot.id);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
     toast.success(`Added "${validation.normalizedName}" to collection`, { duration: 2000 });
@@ -543,6 +575,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setConfig(dupConfig);
     setNameManuallyEdited(true);
     setActivePaletteId(newId);
+    setLastViewedSavedPaletteId(newId);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
     toast.success(`Duplicated as "${validation.normalizedName}"`, {
@@ -796,6 +829,12 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const saveFailedRef = useRef(false);
 
   useEffect(() => {
+    if (lastViewedSavedPaletteId && !lastViewedSavedPalette) {
+      setLastViewedSavedPaletteId(null);
+    }
+  }, [lastViewedSavedPalette, lastViewedSavedPaletteId]);
+
+  useEffect(() => {
     // Clear any pending save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -807,6 +846,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
         collections,
         activeCollectionId,
         activePaletteId,
+        lastViewedSavedPaletteId,
         config,
         nameManuallyEdited,
         contrastAlgorithm,
@@ -830,7 +870,17 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [collections, activeCollectionId, activePaletteId, config, nameManuallyEdited, isDirty, contrastAlgorithm, hasCompletedFirstRun]);
+  }, [
+    collections,
+    activeCollectionId,
+    activePaletteId,
+    lastViewedSavedPaletteId,
+    config,
+    nameManuallyEdited,
+    isDirty,
+    contrastAlgorithm,
+    hasCompletedFirstRun,
+  ]);
 
   // ─── Fix #2b: Flush pending save on page unload ───
   // Ensures the debounced save isn't lost if the user closes the tab.
@@ -842,6 +892,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
           collections,
           activeCollectionId,
           activePaletteId,
+          lastViewedSavedPaletteId,
           config,
           nameManuallyEdited,
           contrastAlgorithm,
@@ -852,7 +903,17 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  });
+  }, [
+    collections,
+    activeCollectionId,
+    activePaletteId,
+    lastViewedSavedPaletteId,
+    config,
+    nameManuallyEdited,
+    contrastAlgorithm,
+    isDirty,
+    hasCompletedFirstRun,
+  ]);
 
   // ─── Fix #3: Warn before losing unsaved changes on tab/window close ───
   useEffect(() => {

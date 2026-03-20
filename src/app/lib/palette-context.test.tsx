@@ -3,14 +3,15 @@ import '@testing-library/jest-dom/vitest';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaletteProvider, usePaletteContext } from './palette-context';
-import { suggestPaletteName } from './color-utils';
+import { GENERATION_VERSION, suggestPaletteName } from './color-utils';
+import { createDefaultCollection, saveState } from './local-storage';
 
 vi.mock('sonner', () => ({
-  toast: {
+  toast: Object.assign(vi.fn(), {
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
-  },
+  }),
 }));
 
 vi.mock('../components/aria-live-announcer', () => ({
@@ -22,9 +23,62 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <PaletteProvider>{children}</PaletteProvider>;
 }
 
+function makeSavedPalette(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: 'Saved Palette',
+    tokens: [],
+    hue: 210,
+    chroma: 0.12,
+    lightness50: 0.985,
+    lightness950: 0.025,
+    targetColorSpace: 'srgb' as const,
+    generationVersion: GENERATION_VERSION,
+    ...overrides,
+  };
+}
+
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    name: 'Draft',
+    hue: 100,
+    chroma: 0.15,
+    lightness50: 0.985,
+    lightness950: 0.025,
+    targetColorSpace: 'srgb' as const,
+    generationVersion: GENERATION_VERSION,
+    ...overrides,
+  };
+}
+
+function seedHydratedState(options: {
+  palettes: ReturnType<typeof makeSavedPalette>[];
+  activePaletteId?: string | null;
+  lastViewedSavedPaletteId?: string | null;
+  config?: ReturnType<typeof makeConfig>;
+}) {
+  const collection = createDefaultCollection(options.palettes);
+  const activePalette = options.palettes.find((palette) => palette.id === options.activePaletteId) ?? null;
+
+  saveState({
+    collections: [collection],
+    activeCollectionId: collection.id,
+    activePaletteId: options.activePaletteId ?? null,
+    lastViewedSavedPaletteId: options.lastViewedSavedPaletteId ?? null,
+    config: options.config ?? makeConfig(activePalette ?? {}),
+    nameManuallyEdited: true,
+    contrastAlgorithm: 'wcag',
+    isDirty: false,
+    hasCompletedFirstRun: true,
+  });
+
+  return collection;
+}
+
 describe('PaletteProvider naming behavior', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it('auto-updates the generated name when lightness changes affect the 500-step chroma', () => {
@@ -195,5 +249,226 @@ describe('PaletteProvider naming behavior', () => {
       'Ocean',
       'Ocean Alt',
     ]);
+  });
+
+  it('seeds a new draft from the last viewed saved display-p3 palette', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const p3Palette = makeSavedPalette('saved-p3', {
+      name: 'P3 Sky',
+      hue: 220,
+      chroma: 0.28,
+      lightness50: 0.97,
+      lightness950: 0.04,
+      targetColorSpace: 'p3',
+    });
+    const collection = seedHydratedState({ palettes: [p3Palette] });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.selectPaletteInCollection(collection.id, p3Palette.id);
+    });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.activePaletteId).toBeNull();
+    expect(result.current.config.hue).toBe(180);
+    expect(result.current.config.targetColorSpace).toBe('p3');
+    expect(result.current.config.chroma).toBe(0.28);
+    expect(result.current.config.lightness50).toBe(0.97);
+    expect(result.current.config.lightness950).toBe(0.04);
+    expect(result.current.config.name).toBe(suggestPaletteName(180, 0.28, 0.97, 0.04));
+  });
+
+  it('seeds a new draft from the last viewed saved srgb palette', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.25);
+    const srgbPalette = makeSavedPalette('saved-srgb', {
+      name: 'sRGB Mint',
+      hue: 120,
+      chroma: 0.14,
+      lightness50: 0.99,
+      lightness950: 0.03,
+      targetColorSpace: 'srgb',
+    });
+    const collection = seedHydratedState({ palettes: [srgbPalette] });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.selectPaletteInCollection(collection.id, srgbPalette.id);
+    });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.config.hue).toBe(90);
+    expect(result.current.config.targetColorSpace).toBe('srgb');
+    expect(result.current.config.chroma).toBe(0.14);
+    expect(result.current.config.lightness50).toBe(0.99);
+    expect(result.current.config.lightness950).toBe(0.03);
+  });
+
+  it('ignores unsaved gamut changes when starting another new palette until that draft is saved', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const srgbPalette = makeSavedPalette('saved-srgb', {
+      name: 'Baseline',
+      chroma: 0.13,
+      lightness50: 0.99,
+      lightness950: 0.03,
+      targetColorSpace: 'srgb',
+    });
+    const collection = seedHydratedState({
+      palettes: [srgbPalette],
+      activePaletteId: srgbPalette.id,
+      lastViewedSavedPaletteId: srgbPalette.id,
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    act(() => {
+      result.current.handleConfigChange({
+        targetColorSpace: 'p3',
+        chroma: 0.27,
+        lightness50: 0.96,
+        lightness950: 0.05,
+      });
+    });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.config.targetColorSpace).toBe('srgb');
+    expect(result.current.config.chroma).toBe(0.13);
+    expect(result.current.config.lightness50).toBe(0.99);
+    expect(result.current.config.lightness950).toBe(0.03);
+
+    act(() => {
+      result.current.handleConfigChange({
+        targetColorSpace: 'p3',
+        chroma: 0.27,
+        lightness50: 0.96,
+        lightness950: 0.05,
+      });
+    });
+
+    act(() => {
+      const addResult = result.current.handleAddToCollection();
+      if (!addResult.ok) {
+        throw new Error('Expected the updated draft to save');
+      }
+    });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.config.targetColorSpace).toBe('p3');
+    expect(result.current.config.chroma).toBe(0.27);
+    expect(result.current.config.lightness50).toBe(0.96);
+    expect(result.current.config.lightness950).toBe(0.05);
+  });
+
+  it('reloads with the remembered saved palette and reuses its target color space for new drafts', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.75);
+    const rememberedPalette = makeSavedPalette('saved-p3', {
+      chroma: 0.24,
+      lightness50: 0.98,
+      lightness950: 0.02,
+      targetColorSpace: 'p3',
+    });
+    const collection = seedHydratedState({
+      palettes: [rememberedPalette],
+      activePaletteId: null,
+      lastViewedSavedPaletteId: rememberedPalette.id,
+      config: makeConfig({ targetColorSpace: 'srgb', chroma: 0.1 }),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.config.targetColorSpace).toBe('p3');
+    expect(result.current.config.chroma).toBe(0.24);
+    expect(result.current.config.lightness50).toBe(0.98);
+    expect(result.current.config.lightness950).toBe(0.02);
+  });
+
+  it('falls back to defaults when the remembered palette is deleted', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const rememberedPalette = makeSavedPalette('saved-p3', {
+      chroma: 0.29,
+      lightness50: 0.97,
+      lightness950: 0.05,
+      targetColorSpace: 'p3',
+    });
+    const collection = seedHydratedState({
+      palettes: [rememberedPalette],
+      activePaletteId: rememberedPalette.id,
+      lastViewedSavedPaletteId: rememberedPalette.id,
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleRemove(rememberedPalette.id);
+    });
+
+    act(() => {
+      result.current.startDraftPalette(collection.id);
+    });
+
+    expect(result.current.config.targetColorSpace).toBe('srgb');
+    expect(result.current.config.chroma).toBe(0.18);
+    expect(result.current.config.lightness50).toBe(0.985);
+    expect(result.current.config.lightness950).toBe(0.025);
+  });
+
+  it('falls back to defaults when the remembered palette collection is deleted', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const otherCollectionPalette = makeSavedPalette('other-palette');
+    const rememberedPalette = makeSavedPalette('saved-p3', {
+      chroma: 0.26,
+      targetColorSpace: 'p3',
+    });
+    const firstCollection = createDefaultCollection([otherCollectionPalette]);
+    const secondCollection = createDefaultCollection([rememberedPalette]);
+
+    saveState({
+      collections: [firstCollection, secondCollection],
+      activeCollectionId: secondCollection.id,
+      activePaletteId: rememberedPalette.id,
+      lastViewedSavedPaletteId: rememberedPalette.id,
+      config: makeConfig(rememberedPalette),
+      nameManuallyEdited: true,
+      contrastAlgorithm: 'wcag',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleDeleteCollection(secondCollection.id);
+    });
+
+    act(() => {
+      result.current.startDraftPalette(firstCollection.id);
+    });
+
+    expect(result.current.activeCollectionId).toBe(firstCollection.id);
+    expect(result.current.config.targetColorSpace).toBe('srgb');
+    expect(result.current.config.chroma).toBe(0.18);
+    expect(result.current.config.lightness50).toBe(0.985);
+    expect(result.current.config.lightness950).toBe(0.025);
   });
 });

@@ -4,8 +4,11 @@
 // v2: multi-collection model — array of Collection containers
 // v3: lightness50/lightness950 replace blackRange/whiteRange
 // v4: targetColorSpace/generationVersion persisted per palette
+// v5: duplicate palette names migrated into conflictedPalettes
+// v6: remembered last-viewed saved palette id for draft seeding
 
 import { GENERATION_VERSION, generatePalette, generateId, type Palette } from './color-utils';
+import { findPaletteLocation } from './collection-operations';
 import {
   legacyRangeToLightness,
   type StoredCollectionV2,
@@ -21,7 +24,7 @@ import {
 } from './palette-name-validation';
 
 const STORAGE_KEY = 'color-token-generator';
-const CURRENT_VERSION = 5;
+const CURRENT_VERSION = 6;
 
 // ─── Stored types (lightweight, no derived tokens) ───
 
@@ -75,6 +78,19 @@ interface StoredStateV5 {
   collections: StoredCollection[];
   activeCollectionId: string | null;
   activePaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
+interface StoredStateV6 {
+  version: 6;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
   config: PaletteConfig;
   nameManuallyEdited: boolean;
   contrastAlgorithm: ContrastAlgorithm;
@@ -372,12 +388,38 @@ function migrateV4toV5(v4: StoredStateV4): StoredStateV5 {
   };
 }
 
+function migrateV5toV6(v5: StoredStateV5): StoredStateV6 {
+  const activeCollection =
+    typeof v5.activeCollectionId === 'string'
+      ? v5.collections.find((collection) => collection.id === v5.activeCollectionId)
+      : null;
+  const lastViewedSavedPaletteId =
+    typeof v5.activePaletteId === 'string' &&
+    activeCollection?.palettes.some((palette) => palette.id === v5.activePaletteId)
+      ? v5.activePaletteId
+      : null;
+
+  return {
+    version: 6,
+    collections: v5.collections,
+    activeCollectionId: v5.activeCollectionId,
+    activePaletteId: v5.activePaletteId,
+    lastViewedSavedPaletteId,
+    config: normalizeConfig(v5.config),
+    nameManuallyEdited: v5.nameManuallyEdited,
+    contrastAlgorithm: v5.contrastAlgorithm,
+    isDirty: v5.isDirty,
+    hasCompletedFirstRun: v5.hasCompletedFirstRun,
+  };
+}
+
 // ─── Public API ───
 
 export interface HydratedState {
   collections: Collection[];
   activeCollectionId: string | null;
   activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
   config: PaletteConfig;
   nameManuallyEdited: boolean;
   contrastAlgorithm: ContrastAlgorithm;
@@ -417,16 +459,21 @@ export function loadState(): HydratedState | null {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }
 
+    if (parsed.version === 5) {
+      parsed = migrateV5toV6(parsed as StoredStateV5);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     if (parsed.version !== CURRENT_VERSION) return null;
 
-    const v5 = parsed as StoredStateV5;
+    const v6 = parsed as StoredStateV6;
 
     // Validate config
-    if (!isValidConfig(v5.config)) return null;
+    if (!isValidConfig(v6.config)) return null;
 
     // Validate & rebuild collections
-    const validStoredCollections = Array.isArray(v5.collections)
-      ? v5.collections.filter(isValidStoredCollection)
+    const validStoredCollections = Array.isArray(v6.collections)
+      ? v6.collections.filter(isValidStoredCollection)
       : [];
 
     let didSanitizeCollections = false;
@@ -440,20 +487,32 @@ export function loadState(): HydratedState | null {
 
     // Validate activeCollectionId still exists
     const activeCollectionId =
-      typeof v5.activeCollectionId === 'string' &&
-      collections.some((c) => c.id === v5.activeCollectionId)
-        ? v5.activeCollectionId
+      typeof v6.activeCollectionId === 'string' &&
+      collections.some((c) => c.id === v6.activeCollectionId)
+        ? v6.activeCollectionId
         : collections.length > 0 ? collections[0].id : null;
 
     // Validate activePaletteId still exists within the active collection
     const activeCollection = collections.find((c) => c.id === activeCollectionId);
     const activePaletteId =
-      typeof v5.activePaletteId === 'string' &&
-      activeCollection?.palettes.some((p) => p.id === v5.activePaletteId)
-        ? v5.activePaletteId
+      typeof v6.activePaletteId === 'string' &&
+      activeCollection?.palettes.some((p) => p.id === v6.activePaletteId)
+        ? v6.activePaletteId
         : null;
 
-    if (didSanitizeCollections) {
+    const lastViewedSavedPaletteId =
+      typeof v6.lastViewedSavedPaletteId === 'string' &&
+      findPaletteLocation(collections, v6.lastViewedSavedPaletteId)
+        ? v6.lastViewedSavedPaletteId
+        : null;
+
+    const shouldPersistNormalizedState =
+      didSanitizeCollections ||
+      activeCollectionId !== v6.activeCollectionId ||
+      activePaletteId !== v6.activePaletteId ||
+      lastViewedSavedPaletteId !== v6.lastViewedSavedPaletteId;
+
+    if (shouldPersistNormalizedState) {
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -461,11 +520,12 @@ export function loadState(): HydratedState | null {
           collections: collections.map(collectionToStored),
           activeCollectionId,
           activePaletteId,
-          config: normalizeConfig(v5.config),
-          nameManuallyEdited: typeof v5.nameManuallyEdited === 'boolean' ? v5.nameManuallyEdited : false,
-          contrastAlgorithm: v5.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-          isDirty: typeof v5.isDirty === 'boolean' ? v5.isDirty : false,
-          hasCompletedFirstRun: typeof v5.hasCompletedFirstRun === 'boolean' ? v5.hasCompletedFirstRun : true,
+          lastViewedSavedPaletteId,
+          config: normalizeConfig(v6.config),
+          nameManuallyEdited: typeof v6.nameManuallyEdited === 'boolean' ? v6.nameManuallyEdited : false,
+          contrastAlgorithm: v6.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+          isDirty: typeof v6.isDirty === 'boolean' ? v6.isDirty : false,
+          hasCompletedFirstRun: typeof v6.hasCompletedFirstRun === 'boolean' ? v6.hasCompletedFirstRun : true,
         }),
       );
     }
@@ -474,11 +534,12 @@ export function loadState(): HydratedState | null {
       collections,
       activeCollectionId,
       activePaletteId,
-      config: normalizeConfig(v5.config),
-      nameManuallyEdited: typeof v5.nameManuallyEdited === 'boolean' ? v5.nameManuallyEdited : false,
-      contrastAlgorithm: v5.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-      isDirty: typeof v5.isDirty === 'boolean' ? v5.isDirty : false,
-      hasCompletedFirstRun: typeof v5.hasCompletedFirstRun === 'boolean' ? v5.hasCompletedFirstRun : true,
+      lastViewedSavedPaletteId,
+      config: normalizeConfig(v6.config),
+      nameManuallyEdited: typeof v6.nameManuallyEdited === 'boolean' ? v6.nameManuallyEdited : false,
+      contrastAlgorithm: v6.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+      isDirty: typeof v6.isDirty === 'boolean' ? v6.isDirty : false,
+      hasCompletedFirstRun: typeof v6.hasCompletedFirstRun === 'boolean' ? v6.hasCompletedFirstRun : true,
     };
   } catch {
     return null;
@@ -489,6 +550,7 @@ export function saveState(state: {
   collections: Collection[];
   activeCollectionId: string | null;
   activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
   config: PaletteConfig;
   nameManuallyEdited: boolean;
   contrastAlgorithm: ContrastAlgorithm;
@@ -500,11 +562,12 @@ export function saveState(state: {
       throw new Error('Duplicate active palette names cannot be persisted');
     }
 
-    const stored: StoredStateV5 = {
+    const stored: StoredStateV6 = {
       version: CURRENT_VERSION,
       collections: state.collections.map(collectionToStored),
       activeCollectionId: state.activeCollectionId,
       activePaletteId: state.activePaletteId,
+      lastViewedSavedPaletteId: state.lastViewedSavedPaletteId,
       config: normalizeConfig(state.config),
       nameManuallyEdited: state.nameManuallyEdited,
       contrastAlgorithm: state.contrastAlgorithm,
@@ -519,8 +582,6 @@ export function saveState(state: {
     return false;
   }
 }
-
-// ─── Helper: create a default collection ───
 
 export function createDefaultCollection(palettes: Palette[] = []): Collection {
   const now = new Date().toISOString();

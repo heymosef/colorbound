@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadState, saveState, createDefaultCollection } from './local-storage';
+import { GENERATION_VERSION } from './color-utils';
 
 // ─── Helpers ───
 
@@ -48,6 +49,33 @@ function makeV1State(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    name: 'Test',
+    hue: 100,
+    chroma: 0.15,
+    lightness50: 0.985,
+    lightness950: 0.025,
+    targetColorSpace: 'srgb',
+    generationVersion: GENERATION_VERSION,
+    ...overrides,
+  };
+}
+
+function makeStoredPaletteEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'pal-1',
+    name: 'Blue',
+    hue: 220,
+    chroma: 0.18,
+    lightness50: 0.985,
+    lightness950: 0.025,
+    targetColorSpace: 'srgb',
+    generationVersion: GENERATION_VERSION,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   localStorage.clear();
 });
@@ -58,7 +86,7 @@ afterEach(() => {
 
 // ─── Tests ───
 
-describe('loadState / saveState round-trip (v3)', () => {
+describe('loadState / saveState round-trip', () => {
   it('returns null for empty localStorage', () => {
     expect(loadState()).toBeNull();
   });
@@ -69,13 +97,8 @@ describe('loadState / saveState round-trip (v3)', () => {
       collections: [defaultCol],
       activeCollectionId: defaultCol.id,
       activePaletteId: null,
-      config: {
-        name: 'Test',
-        hue: 100,
-        chroma: 0.15,
-        lightness50: 0.985,
-        lightness950: 0.025,
-      },
+      lastViewedSavedPaletteId: null,
+      config: makeConfig(),
       nameManuallyEdited: false,
       contrastAlgorithm: 'apca' as const,
       isDirty: false,
@@ -104,19 +127,16 @@ describe('loadState / saveState round-trip (v3)', () => {
         chroma: 0.18,
         lightness50: 0.985,
         lightness950: 0.025,
+        targetColorSpace: 'srgb',
+        generationVersion: GENERATION_VERSION,
       },
     ]);
     saveState({
       collections: [defaultCol],
       activeCollectionId: defaultCol.id,
       activePaletteId: null,
-      config: {
-        name: 'Test',
-        hue: 100,
-        chroma: 0.15,
-        lightness50: 0.985,
-        lightness950: 0.025,
-      },
+      lastViewedSavedPaletteId: 'pal-1',
+      config: makeConfig(),
       nameManuallyEdited: false,
       contrastAlgorithm: 'apca',
       isDirty: false,
@@ -127,11 +147,36 @@ describe('loadState / saveState round-trip (v3)', () => {
     expect(raw.config).not.toHaveProperty('isNeutral');
     expect(raw.collections[0].palettes[0]).not.toHaveProperty('group');
     expect(raw.collections[0].palettes[0]).not.toHaveProperty('isNeutral');
+    expect(raw.lastViewedSavedPaletteId).toBe('pal-1');
+  });
+
+  it('round-trips the remembered saved palette id', () => {
+    const palette = {
+      ...makeStoredPaletteEntry({ id: 'pal-p3', targetColorSpace: 'p3', chroma: 0.24 }),
+      tokens: [],
+    };
+    const defaultCol = createDefaultCollection([palette]);
+
+    saveState({
+      collections: [defaultCol],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: null,
+      lastViewedSavedPaletteId: 'pal-p3',
+      config: makeConfig({ targetColorSpace: 'p3', chroma: 0.24 }),
+      nameManuallyEdited: false,
+      contrastAlgorithm: 'wcag',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    });
+
+    const loaded = loadState();
+    expect(loaded?.lastViewedSavedPaletteId).toBe('pal-p3');
+    expect(loaded?.collections[0].palettes[0].targetColorSpace).toBe('p3');
   });
 });
 
-describe('v1 → v3 migration', () => {
-  it('migrates v1 state through v2 to v3 with a default collection', () => {
+describe('legacy migrations', () => {
+  it('migrates v1 state through current storage with a default collection', () => {
     localStorage.setItem('color-token-generator', JSON.stringify(makeV1State()));
     const loaded = loadState();
     expect(loaded).not.toBeNull();
@@ -143,7 +188,7 @@ describe('v1 → v3 migration', () => {
     expect(loaded!.collections[0].palettes[1].name).toBe('Slate');
   });
 
-  it('maps v1 activeCollectionId to v3 activePaletteId', () => {
+  it('maps v1 activeCollectionId to current activePaletteId', () => {
     localStorage.setItem('color-token-generator', JSON.stringify(makeV1State()));
     const loaded = loadState();
     expect(loaded!.activePaletteId).toBe('pal-1');
@@ -187,6 +232,61 @@ describe('v1 → v3 migration', () => {
     expect(loaded!.config.hue).toBe(220);
     expect(loaded!.hasCompletedFirstRun).toBe(true);
   });
+
+  it('migrates v5 state to v6 and seeds the remembered saved palette from a valid active palette id', () => {
+    const defaultCol = createDefaultCollection();
+    const storedPalette = makeStoredPaletteEntry({ id: 'pal-p3', targetColorSpace: 'p3', chroma: 0.24 });
+
+    localStorage.setItem('color-token-generator', JSON.stringify({
+      version: 5,
+      collections: [
+        {
+          ...defaultCol,
+          palettes: [storedPalette],
+          conflictedPalettes: [],
+        },
+      ],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: 'pal-p3',
+      config: makeConfig({ targetColorSpace: 'p3', chroma: 0.24 }),
+      nameManuallyEdited: true,
+      contrastAlgorithm: 'wcag',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    }));
+
+    const loaded = loadState();
+    const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
+
+    expect(loaded?.lastViewedSavedPaletteId).toBe('pal-p3');
+    expect(raw.version).toBe(6);
+    expect(raw.lastViewedSavedPaletteId).toBe('pal-p3');
+  });
+
+  it('migrates v5 state to v6 with a null remembered palette when the active palette is not persisted', () => {
+    const defaultCol = createDefaultCollection();
+
+    localStorage.setItem('color-token-generator', JSON.stringify({
+      version: 5,
+      collections: [
+        {
+          ...defaultCol,
+          palettes: [],
+          conflictedPalettes: [],
+        },
+      ],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: 'missing-palette',
+      config: makeConfig(),
+      nameManuallyEdited: false,
+      contrastAlgorithm: 'wcag',
+      isDirty: true,
+      hasCompletedFirstRun: true,
+    }));
+
+    const loaded = loadState();
+    expect(loaded?.lastViewedSavedPaletteId).toBeNull();
+  });
 });
 
 describe('first-run completion flag', () => {
@@ -202,13 +302,7 @@ describe('first-run completion flag', () => {
       ],
       activeCollectionId: defaultCol.id,
       activePaletteId: null,
-      config: {
-        name: 'Test',
-        hue: 100,
-        chroma: 0.15,
-        lightness50: 0.985,
-        lightness950: 0.025,
-      },
+      config: makeConfig(),
       nameManuallyEdited: false,
       contrastAlgorithm: 'wcag',
       isDirty: false,
@@ -229,13 +323,7 @@ describe('first-run completion flag', () => {
       ],
       activeCollectionId: defaultCol.id,
       activePaletteId: 'missing-palette',
-      config: {
-        name: 'Draft',
-        hue: 32,
-        chroma: 0.15,
-        lightness50: 0.985,
-        lightness950: 0.025,
-      },
+      config: makeConfig({ name: 'Draft', hue: 32 }),
       nameManuallyEdited: true,
       contrastAlgorithm: 'wcag',
       isDirty: true,
@@ -246,6 +334,34 @@ describe('first-run completion flag', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.activePaletteId).toBeNull();
     expect(loaded!.config.name).toBe('Draft');
+  });
+
+  it('clears a dangling remembered saved palette id when hydrating', () => {
+    const defaultCol = createDefaultCollection();
+    localStorage.setItem('color-token-generator', JSON.stringify({
+      version: 6,
+      collections: [
+        {
+          ...defaultCol,
+          palettes: [],
+          conflictedPalettes: [],
+        },
+      ],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: null,
+      lastViewedSavedPaletteId: 'missing-palette',
+      config: makeConfig(),
+      nameManuallyEdited: false,
+      contrastAlgorithm: 'wcag',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    }));
+
+    const loaded = loadState();
+    const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
+
+    expect(loaded?.lastViewedSavedPaletteId).toBeNull();
+    expect(raw.lastViewedSavedPaletteId).toBeNull();
   });
 });
 
@@ -284,15 +400,7 @@ describe('duplicate palette migration', () => {
       ],
       activeCollectionId: defaultCol.id,
       activePaletteId: 'pal-1',
-      config: {
-        name: 'Ocean',
-        hue: 210,
-        chroma: 0.12,
-        lightness50: 0.985,
-        lightness950: 0.025,
-        targetColorSpace: 'srgb',
-        generationVersion: 1,
-      },
+      config: makeConfig({ name: 'Ocean', hue: 210, chroma: 0.12 }),
       nameManuallyEdited: true,
       contrastAlgorithm: 'wcag',
       isDirty: false,
@@ -305,7 +413,7 @@ describe('duplicate palette migration', () => {
     expect(loaded?.collections[0].conflictedPalettes.map((palette) => palette.name)).toEqual([' ocean ']);
 
     const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
-    expect(raw.version).toBe(5);
+    expect(raw.version).toBe(6);
     expect(raw.collections[0].palettes).toHaveLength(1);
     expect(raw.collections[0].conflictedPalettes).toHaveLength(1);
   });
