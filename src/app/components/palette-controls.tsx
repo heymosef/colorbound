@@ -150,9 +150,7 @@ export function PaletteControls({
 }: PaletteControlsProps) {
   const [hexInput, setHexInput] = useState('');
   const [hexError, setHexError] = useState(false);
-
-  // Gamut target for chroma capping: sRGB (default) or Display P3 (wide-gamut)
-  const [gamutTarget, setGamutTarget] = useState<'srgb' | 'p3'>('srgb');
+  const targetColorSpace = config.targetColorSpace ?? 'srgb';
 
   // Compute gamut status for the identity swatch (500 step equivalent)
   const midpointGamut = useMemo((): GamutFlag => {
@@ -164,10 +162,10 @@ export function PaletteControls({
   // Dynamic chroma cap: max slider value that keeps the anchor step (500) within target gamut.
   // Other steps use proportional C/L scaling and are individually gamut-mapped.
   const chromaCap = useMemo(
-    () => gamutTarget === 'p3'
+    () => targetColorSpace === 'p3'
       ? maxP3ChromaForHue(config.hue, config.lightness50, config.lightness950, 0)
       : maxSrgbChromaForHue(config.hue, config.lightness50, config.lightness950, 0),
-    [config.hue, config.lightness50, config.lightness950, gamutTarget],
+    [config.hue, config.lightness50, config.lightness950, targetColorSpace],
   );
 
   // Auto-clamp chroma when the cap shrinks below current value
@@ -293,7 +291,7 @@ export function PaletteControls({
         {/* Color space / gamut target */}
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
-            <Label className="text-[13px]">Color Space</Label>
+            <Label className="text-[13px]">Palette Target</Label>
             <Tooltip>
               <TooltipTrigger
                 className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -303,7 +301,7 @@ export function PaletteControls({
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-[220px]">
                 <p className="text-[12px]">
-                  Limits the chroma slider to colors reproducible in the chosen gamut. sRGB is safe for all screens; Display P3 unlocks more vivid colors on supported devices.
+                  Chooses the palette's canonical target gamut. Preview, values, copy, and OKLCH export all follow this target.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -311,20 +309,20 @@ export function PaletteControls({
           <div className="flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5" role="radiogroup" aria-label="Gamut target">
             <button
               role="radio"
-              aria-checked={gamutTarget === 'srgb'}
-              onClick={() => setGamutTarget('srgb')}
+              aria-checked={targetColorSpace === 'srgb'}
+              onClick={() => onConfigChange({ targetColorSpace: 'srgb' })}
               className={`flex-1 px-2 py-0.5 rounded-sm text-[11px]! font-medium! leading-tight transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
-                gamutTarget === 'srgb' ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground' : 'text-muted-foreground hover:text-foreground'
+                targetColorSpace === 'srgb' ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               sRGB
             </button>
             <button
               role="radio"
-              aria-checked={gamutTarget === 'p3'}
-              onClick={() => setGamutTarget('p3')}
+              aria-checked={targetColorSpace === 'p3'}
+              onClick={() => onConfigChange({ targetColorSpace: 'p3' })}
               className={`flex-1 px-2 py-0.5 rounded-sm text-[11px]! font-medium! leading-tight transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
-                gamutTarget === 'p3' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 shadow-sm dark:shadow-none' : 'text-muted-foreground hover:text-foreground'
+                targetColorSpace === 'p3' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 shadow-sm dark:shadow-none' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Display P3
@@ -389,7 +387,7 @@ export function PaletteControls({
           max={chromaCap}
           step={0.005}
           onChange={(v) => onConfigChange({ chroma: v })}
-          tooltip={`Controls color intensity at the anchor step (500). Max ${gamutTarget.toUpperCase()}-safe: ${chromaCap.toFixed(3)}`}
+          tooltip={`Controls color intensity at the anchor step (500). Max ${targetColorSpace.toUpperCase()}-safe: ${chromaCap.toFixed(3)}`}
           displayValue={config.chroma.toFixed(3)}
         />
 

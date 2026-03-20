@@ -25,7 +25,7 @@ export function PaletteColorRamp({
           style={{
             backgroundColor: useBestAvailableColor
               ? getTokenDisplayColor(token, supportsP3)
-              : token.displayCss,
+              : token.hex,
           }}
         />
       ))}

@@ -3,6 +3,7 @@ import {
   generatePalette,
   generateDarkPalette,
   generateId,
+  GENERATION_VERSION,
   suggestPaletteName,
   type Palette,
 } from './color-utils';
@@ -48,6 +49,8 @@ function createDefaultConfig(hue?: number): PaletteConfig {
     chroma: defaultChroma,
     lightness50: 0.985,
     lightness950: 0.025,
+    targetColorSpace: 'srgb',
+    generationVersion: GENERATION_VERSION,
   };
 }
 
@@ -57,6 +60,7 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     config.chroma,
     config.lightness50,
     config.lightness950,
+    config.targetColorSpace,
   );
   return {
     id: id ?? generateId(),
@@ -66,6 +70,8 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    targetColorSpace: config.targetColorSpace,
+    generationVersion: config.generationVersion,
   };
 }
 
@@ -75,6 +81,7 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     config.chroma,
     config.lightness50,
     config.lightness950,
+    config.targetColorSpace,
   );
   return {
     id: generateId(),
@@ -84,6 +91,8 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    targetColorSpace: config.targetColorSpace,
+    generationVersion: config.generationVersion,
   };
 }
 
@@ -176,6 +185,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       chroma: palette.chroma,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
+      targetColorSpace: palette.targetColorSpace,
+      generationVersion: palette.generationVersion,
     });
     setNameManuallyEdited(true);
     setActivePaletteId(palette.id);

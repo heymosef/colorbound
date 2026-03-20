@@ -108,6 +108,8 @@ describe('Share dialog flows', () => {
       chroma: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
+      targetColorSpace: 'srgb',
+      generationVersion: 1,
     });
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
@@ -143,6 +145,8 @@ describe('Share dialog flows', () => {
         chroma: 0.12,
         lightness50: 0.985,
         lightness950: 0.025,
+        targetColorSpace: 'srgb',
+        generationVersion: 1,
       }], 'Brand Colors');
     });
     expect(await screen.findByDisplayValue('https://colorbound.test/collection/collection-1')).toBeInTheDocument();

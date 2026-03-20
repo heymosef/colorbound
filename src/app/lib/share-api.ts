@@ -21,6 +21,8 @@ export interface SharedPaletteEntry {
   chroma: number;
   lightness50: number;
   lightness950: number;
+  targetColorSpace: 'srgb' | 'p3';
+  generationVersion: number;
 }
 
 export interface SharedPaletteResponse {

@@ -10,6 +10,7 @@ import {
 } from './share-serialization';
 import type { PaletteConfig } from './palette-context-types';
 import type { SharedPaletteEntry } from './share-api';
+import { GENERATION_VERSION } from './color-utils';
 
 const VALID_CONFIG: PaletteConfig = {
   name: 'Ocean Blue',
@@ -17,6 +18,8 @@ const VALID_CONFIG: PaletteConfig = {
   chroma: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
+  targetColorSpace: 'srgb',
+  generationVersion: GENERATION_VERSION,
 };
 
 const VALID_ENTRY: SharedPaletteEntry = {
@@ -72,6 +75,8 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
+      targetColorSpace: 'srgb',
+      generationVersion: GENERATION_VERSION,
     });
   });
 
@@ -101,6 +106,8 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 1,
       lightness950: 0,
+      targetColorSpace: 'srgb',
+      generationVersion: GENERATION_VERSION,
     });
   });
 
@@ -116,6 +123,21 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
+      targetColorSpace: 'srgb',
+      generationVersion: GENERATION_VERSION,
+    });
+  });
+
+  it('preserves Display P3 as the target color space', () => {
+    const result = deserializePaletteConfig({
+      ...VALID_ENTRY,
+      targetColorSpace: 'p3',
+    });
+
+    expect(result).toEqual({
+      ...VALID_CONFIG,
+      targetColorSpace: 'p3',
+      generationVersion: GENERATION_VERSION,
     });
   });
 });
@@ -188,6 +210,8 @@ describe('deserializeCollection', () => {
           chroma: 0.18,
           lightness50: 0.985,
           lightness950: 0.025,
+          targetColorSpace: 'srgb',
+          generationVersion: GENERATION_VERSION,
         },
       ],
     });

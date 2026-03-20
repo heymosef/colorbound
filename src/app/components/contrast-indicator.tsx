@@ -6,7 +6,7 @@ import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 import { Check, X, AlertTriangle, Shield, ChevronDown, CircleCheck, CircleX } from 'lucide-react';
 import type { ColorToken, Palette } from '../lib/color-utils';
-import { oklchToRgb, rgbToHex, relativeLuminance, wcag2Contrast, getWcag2Rating, apcaContrast, getApcaRating } from '../lib/color-utils';
+import { relativeLuminance, wcag2Contrast, getWcag2Rating, apcaContrast, getApcaRating } from '../lib/color-utils';
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
 import { usePaletteContext, type ContrastAlgorithm } from '../lib/palette-context';
@@ -80,8 +80,7 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function getTokenHex(token: ColorToken): string {
-  const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
-  return rgbToHex(r, g, b);
+  return token.hex;
 }
 
 /** Return the best display CSS string: P3 when supported, sRGB-mapped fallback otherwise. */

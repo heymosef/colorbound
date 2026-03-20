@@ -7,24 +7,42 @@ export interface OklchColor {
   h: number; // Hue 0-360
 }
 
+export type TargetColorSpace = 'srgb' | 'p3';
+
 /** Which gamut the *original* (pre-mapping) OKLCH color falls in. */
 export type GamutFlag = 'srgb' | 'p3' | 'out';
 
+export const GENERATION_VERSION = 1;
+
 export interface ColorToken {
   step: number;
-  /** Original OKLCH value (may be outside sRGB). */
-  oklch: OklchColor;
-  /** Gamut-mapped OKLCH that fits sRGB (chroma reduced, L & H preserved). */
-  oklchMapped: OklchColor;
-  css: string;
+  /** Palette target captured at generation time so previews stay self-contained. */
+  targetColorSpace: TargetColorSpace;
+  /** Authored OKLCH value before gamut resolution. Advanced/debug only. */
+  authoredOklch: OklchColor;
+  /** sRGB-resolved OKLCH (chroma-reduced only when needed). */
+  srgbOklch: OklchColor;
+  /** Display P3-resolved OKLCH (chroma-reduced only when needed). */
+  p3Oklch: OklchColor;
+  /** Canonical user-facing OKLCH derived from the selected palette target. */
+  targetOklch: OklchColor;
+  authoredCss: string;
+  srgbCss: string;
+  targetCss: string;
   rgb: string;
   hex: string;
   /** CSS `color(display-p3 r g b)` string for wide-gamut displays. */
   p3Css: string;
-  /** Whether the original OKLCH value is in sRGB, in P3 only, or outside both. */
-  gamut: GamutFlag;
-  /** CSS oklch() string for display: uses sRGB-mapped values so swatches match hex. */
-  displayCss: string;
+  /** Whether the authored OKLCH value is in sRGB, in P3 only, or outside both. */
+  authoredGamut: GamutFlag;
+  /** Whether the sRGB fallback differs materially from the target value. */
+  fallbackDiffers: boolean;
+  /** Deprecated compatibility aliases. */
+  oklch?: OklchColor;
+  oklchMapped?: OklchColor;
+  css?: string;
+  gamut?: GamutFlag;
+  displayCss?: string;
 }
 
 export interface Palette {
@@ -37,6 +55,8 @@ export interface Palette {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
+  targetColorSpace: TargetColorSpace;
+  generationVersion: number;
 }
 
 export const SCALE_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -299,7 +319,15 @@ export function oklchMappedToRgb(l: number, c: number, h: number): [number, numb
  */
 export function oklchToP3(l: number, c: number, h: number): [number, number, number] {
   const mapped = gamutMapToP3(l, c, h);
-  const [L, a, b] = oklchToOklab(mapped.l, mapped.c, mapped.h);
+  return oklchMappedToP3(mapped.l, mapped.c, mapped.h);
+}
+
+/**
+ * Convert already-gamut-mapped OKLCH to Display P3 [0–1].
+ * Skips gamut mapping — caller must ensure the color already fits P3.
+ */
+export function oklchMappedToP3(l: number, c: number, h: number): [number, number, number] {
+  const [L, a, b] = oklchToOklab(l, c, h);
   const [lr, lg, lb] = oklabToLinearP3(L, a, b);
   // P3 uses the same 2.4 gamma as sRGB
   return [
@@ -326,6 +354,12 @@ export function formatP3(r: number, g: number, b: number): string {
   return `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
 }
 
+function oklchDiffers(a: OklchColor, b: OklchColor): boolean {
+  return Math.abs(a.l - b.l) > 0.0005 ||
+    Math.abs(a.c - b.c) > 0.0005 ||
+    Math.abs(a.h - b.h) > 0.05;
+}
+
 // ─── Palette Generation ───
 
 /**
@@ -339,6 +373,7 @@ export function generatePalette(
   maxChroma: number,
   lightness50: number,
   lightness950: number,
+  targetColorSpace: TargetColorSpace = 'srgb',
 ): ColorToken[] {
   const tokens: ColorToken[] = [];
 
@@ -367,30 +402,44 @@ export function generatePalette(
     const c = Math.max(0, Math.min(0.4, chromaLightnessRatio * l));
     const effectiveHue = hue;
 
-    // Original OKLCH (may be outside sRGB)
-    const originalColor: OklchColor = { l, c, h: effectiveHue };
+    // Original OKLCH (may be outside target gamuts)
+    const authoredColor: OklchColor = { l, c, h: effectiveHue };
 
     // Classify gamut
-    const gamut = classifyGamut(l, c, effectiveHue);
+    const authoredGamut = classifyGamut(l, c, effectiveHue);
 
-    // Gamut-mapped sRGB values
-    const mappedColor = gamutMapToSrgb(l, c, effectiveHue);
-    const [r, g, b] = oklchMappedToRgb(mappedColor.l, mappedColor.c, mappedColor.h);
+    // Gamut-mapped sRGB and P3 values
+    const srgbOklch = gamutMapToSrgb(l, c, effectiveHue);
+    const p3Oklch = gamutMapToP3(l, c, effectiveHue);
+    const targetOklch = targetColorSpace === 'p3' ? p3Oklch : srgbOklch;
+
+    const [r, g, b] = oklchMappedToRgb(srgbOklch.l, srgbOklch.c, srgbOklch.h);
     const hex = rgbToHex(r, g, b);
+    const rgb = formatRgb(r, g, b);
 
     // Display P3 values
-    const [p3r, p3g, p3b] = oklchToP3(l, c, effectiveHue);
+    const [p3r, p3g, p3b] = oklchMappedToP3(p3Oklch.l, p3Oklch.c, p3Oklch.h);
 
     tokens.push({
       step,
-      oklch: originalColor,
-      oklchMapped: mappedColor,
-      css: formatOklch(originalColor),
-      rgb: formatRgb(r, g, b),
+      targetColorSpace,
+      authoredOklch: authoredColor,
+      srgbOklch,
+      p3Oklch,
+      targetOklch,
+      authoredCss: formatOklch(authoredColor),
+      srgbCss: formatOklch(srgbOklch),
+      targetCss: formatOklch(targetOklch),
+      rgb,
       hex,
       p3Css: formatP3(p3r, p3g, p3b),
-      gamut,
-      displayCss: formatOklch(mappedColor),
+      authoredGamut,
+      fallbackDiffers: targetColorSpace === 'p3' && oklchDiffers(targetOklch, srgbOklch),
+      oklch: authoredColor,
+      oklchMapped: srgbOklch,
+      css: formatOklch(targetOklch),
+      gamut: authoredGamut,
+      displayCss: hex,
     });
   }
 
@@ -403,12 +452,14 @@ export function generateDarkPalette(
   maxChroma: number,
   lightness50: number,
   lightness950: number,
+  targetColorSpace: TargetColorSpace = 'srgb',
 ): ColorToken[] {
   return generatePalette(
     hue,
     maxChroma * 0.85,
     lightness50 * 0.995,
     lightness950 * 1.2,
+    targetColorSpace,
   );
 }
 
@@ -420,6 +471,7 @@ export function deriveDarkPalette(palette: Palette): Palette {
       palette.chroma,
       palette.lightness50,
       palette.lightness950,
+      palette.targetColorSpace,
     ),
   };
 }
@@ -489,7 +541,7 @@ function sanitizeName(name: string): string {
 }
 
 function oklchToHsl(l: number, c: number, h: number): [number, number, number] {
-  const [r, g, b] = oklchToRgb(l, c, h);
+  const [r, g, b] = oklchMappedToRgb(l, c, h);
   const rn = r / 255, gn = g / 255, bn = b / 255;
   const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
   const light = (max + min) / 2;
@@ -511,17 +563,15 @@ export function formatHsl(l: number, c: number, h: number): string {
 
 // ─── Export Functions ───
 
-type ExportColorFormat = 'oklch' | 'hex' | 'rgb' | 'hsl' | 'p3';
+type ExportColorFormat = 'oklch' | 'hex' | 'rgb' | 'p3';
 
 function formatTokenValue(token: ColorToken, format: ExportColorFormat): string {
-  const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
   switch (format) {
     case 'hex': return token.hex;
-    case 'rgb': return formatRgb(r, g, b);
-    case 'hsl': return formatHsl(token.oklch.l, token.oklch.c, token.oklch.h);
+    case 'rgb': return token.rgb;
     case 'p3': return token.p3Css;
     case 'oklch':
-    default: return token.css;
+    default: return token.targetCss;
   }
 }
 
@@ -545,37 +595,33 @@ export function exportAsCSS(palettes: Palette[], options?: { prefix?: string; co
   }
   css += '}\n';
 
-  // If OKLCH with sRGB fallback
   if (format === 'oklch') {
     css = '/* Light Mode Palette — sRGB Fallback */\n:root {\n';
     for (const palette of palettes) {
       const name = sanitizeName(palette.name);
       for (const token of palette.tokens) {
-        const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
-        css += `  --${varPrefix}${name}-${token.step}: ${formatRgb(r, g, b)};\n`;
+        css += `  --${varPrefix}${name}-${token.step}: ${token.rgb};\n`;
       }
       css += '\n';
     }
     css += '}\n\n';
-    css += '/* Light Mode Palette — OKLCH (modern browsers) */\n@supports (color: oklch(0 0 0)) {\n  :root {\n';
+    css += '/* Light Mode Palette — Target OKLCH (modern browsers) */\n@supports (color: oklch(0 0 0)) {\n  :root {\n';
     for (const palette of palettes) {
       const name = sanitizeName(palette.name);
       for (const token of palette.tokens) {
-        css += `    --${varPrefix}${name}-${token.step}: ${token.css};\n`;
+        css += `    --${varPrefix}${name}-${token.step}: ${token.targetCss};\n`;
       }
       css += '\n';
     }
     css += '  }\n}\n';
   }
 
-  // P3 with sRGB fallback
   if (format === 'p3') {
     css = '/* Light Mode Palette — sRGB Fallback */\n:root {\n';
     for (const palette of palettes) {
       const name = sanitizeName(palette.name);
       for (const token of palette.tokens) {
-        const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
-        css += `  --${varPrefix}${name}-${token.step}: ${formatRgb(r, g, b)};\n`;
+        css += `  --${varPrefix}${name}-${token.step}: ${token.rgb};\n`;
       }
       css += '\n';
     }
@@ -609,7 +655,7 @@ export function exportAsCSS(palettes: Palette[], options?: { prefix?: string; co
       for (const palette of darkPals) {
         const name = sanitizeName(palette.name);
         for (const token of palette.tokens) {
-          css += `    --${varPrefix}${name}-${token.step}: ${token.css};\n`;
+          css += `    --${varPrefix}${name}-${token.step}: ${token.targetCss};\n`;
         }
         css += '\n';
       }
@@ -790,9 +836,8 @@ export function exportAsW3C(palettes: Palette[], options?: { darkPalettes?: Pale
       const key = sanitizeName(palette.name) + (suffix || '');
       group[key] = {};
       for (const token of palette.tokens) {
-        const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
         group[key][String(token.step)] = {
-          $value: token.css,
+          $value: token.targetCss,
           $type: 'color',
           $description: `${palette.name} ${token.step}`,
           $extensions: {
@@ -801,14 +846,20 @@ export function exportAsW3C(palettes: Palette[], options?: { darkPalettes?: Pale
               scopes: ['ALL_SCOPES'],
             },
             'org.w3c.design-tokens': {
-              rgb: formatRgb(r, g, b),
+              rgb: token.rgb,
               hex: token.hex,
               p3: token.p3Css,
-              gamut: token.gamut,
-              oklch: {
-                l: +token.oklch.l.toFixed(4),
-                c: +token.oklch.c.toFixed(4),
-                h: +token.oklch.h.toFixed(1),
+              authoredGamut: token.authoredGamut,
+              targetColorSpace: token.targetColorSpace,
+              targetOklch: {
+                l: +token.targetOklch.l.toFixed(4),
+                c: +token.targetOklch.c.toFixed(4),
+                h: +token.targetOklch.h.toFixed(1),
+              },
+              srgbFallbackOklch: {
+                l: +token.srgbOklch.l.toFixed(4),
+                c: +token.srgbOklch.c.toFixed(4),
+                h: +token.srgbOklch.h.toFixed(1),
               },
             },
           },
@@ -841,7 +892,7 @@ export function exportAsFigmaTokens(palettes: Palette[]): string {
     obj[key] = {};
 
     for (const token of palette.tokens) {
-      const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
+      const [r, g, b] = oklchMappedToRgb(token.srgbOklch.l, token.srgbOklch.c, token.srgbOklch.h);
       obj[key][String(token.step)] = {
         $type: 'color',
         $value: {
@@ -874,7 +925,7 @@ export function exportAsFigmaVariables(palettes: Palette[], options?: { darkPale
   for (const palette of palettes) {
     const name = sanitizeName(palette.name);
     for (const token of palette.tokens) {
-      const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
+      const [r, g, b] = oklchMappedToRgb(token.srgbOklch.l, token.srgbOklch.c, token.srgbOklch.h);
       const lightValue = { r: +(r / 255).toFixed(4), g: +(g / 255).toFixed(4), b: +(b / 255).toFixed(4), a: 1 };
       const modeValues: Record<string, { r: number; g: number; b: number; a: number }> = { light: lightValue };
 
@@ -885,7 +936,7 @@ export function exportAsFigmaVariables(palettes: Palette[], options?: { darkPale
         if (darkPal) {
           const darkToken = darkPal.tokens.find(t => t.step === token.step);
           if (darkToken) {
-            const [dr, dg, db] = oklchToRgb(darkToken.oklch.l, darkToken.oklch.c, darkToken.oklch.h);
+            const [dr, dg, db] = oklchMappedToRgb(darkToken.srgbOklch.l, darkToken.srgbOklch.c, darkToken.srgbOklch.h);
             modeValues.dark = { r: +(dr / 255).toFixed(4), g: +(dg / 255).toFixed(4), b: +(db / 255).toFixed(4), a: 1 };
           }
         }

@@ -20,7 +20,6 @@ import {
   CopyPlus, Trash2, Share2, FolderInput, FolderOutput,
 } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
-import { oklchToRgb } from '../lib/color-utils';
 import { UIPreview } from './ui-preview';
 import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
@@ -280,6 +279,7 @@ export function PaletteWorkspace({
   }
 
   const activePalette = viewMode === 'dark' && darkPalette ? darkPalette : palette;
+  const previewLimited = palette.targetColorSpace === 'p3' && !supportsP3;
 
   return (
     <div className="h-full flex flex-col overflow-auto">
@@ -307,6 +307,12 @@ export function PaletteWorkspace({
       )}
 
       <div className="p-3 sm:p-5 space-y-6 flex-1">
+        {previewLimited && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            Preview limited: this display shows the sRGB fallback for P3-target colors.
+          </div>
+        )}
+
         {/* Palette swatches */}
         {viewMode === 'both' ? (
           <div className="space-y-5">
@@ -381,47 +387,43 @@ export function PaletteWorkspace({
           </TabsContent>
 
           <TabsContent value="values" className="mt-4">
-            <div className="rounded-md border border-border overflow-hidden overflow-x-auto">
-              <Table className="text-[12px]" aria-label="Token values table">
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Step</TableHead>
-                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">OKLCH</TableHead>
-                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Hex</TableHead>
-                    <TableHead className="px-3 py-2 h-auto font-mono text-[12px] hidden sm:table-cell" scope="col">RGB</TableHead>
-                    <TableHead className="px-3 py-2 h-auto text-center text-[12px]" scope="col">Gamut</TableHead>
-                    <TableHead className="px-3 py-2 h-auto text-center text-[12px]" scope="col">Swatch</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activePalette.tokens.map((token) => {
-                    const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
-                    return (
-                      <TableRow key={token.step}>
-                        <TableCell className="px-3 py-1.5 font-mono">{token.step}</TableCell>
-                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.css}</TableCell>
-                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.hex}</TableCell>
-                        <TableCell className="px-3 py-1.5 font-mono text-muted-foreground hidden sm:table-cell">{token.rgb}</TableCell>
-                        <TableCell className="px-3 py-1.5 text-center">
-                          {token.gamut === 'srgb' ? (
-                            <span className="text-[9px] text-muted-foreground/60">sRGB</span>
-                          ) : token.gamut === 'p3' ? (
-                            <span className="inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[9px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">P3</span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[9px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">OOG</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="px-3 py-1.5 text-center">
-                          <div
-                            className="w-6 h-4 rounded-sm mx-auto border border-border"
-                            style={{ backgroundColor: getTokenDisplayColor(token, supportsP3) }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <div className="space-y-2">
+              <div className="rounded-md border border-border overflow-hidden overflow-x-auto">
+                <Table className="text-[12px]" aria-label="Token values table">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Step</TableHead>
+                      <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">OKLCH</TableHead>
+                      <TableHead className="px-3 py-2 h-auto font-mono text-[12px]" scope="col">Hex</TableHead>
+                      <TableHead className="px-3 py-2 h-auto font-mono text-[12px] hidden sm:table-cell" scope="col">RGB</TableHead>
+                      <TableHead className="px-3 py-2 h-auto text-center text-[12px]" scope="col">Swatch</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activePalette.tokens.map((token) => {
+                      return (
+                        <TableRow key={token.step}>
+                          <TableCell className="px-3 py-1.5 font-mono">{token.step}</TableCell>
+                          <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.targetCss}</TableCell>
+                          <TableCell className="px-3 py-1.5 font-mono text-muted-foreground">{token.hex}</TableCell>
+                          <TableCell className="px-3 py-1.5 font-mono text-muted-foreground hidden sm:table-cell">{token.rgb}</TableCell>
+                          <TableCell className="px-3 py-1.5 text-center">
+                            <div
+                              className="w-6 h-4 rounded-sm mx-auto border border-border"
+                              style={{ backgroundColor: getTokenDisplayColor(token, supportsP3) }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {activePalette.targetColorSpace === 'p3'
+                  ? 'OKLCH is the main color value for this palette and is designed for Display P3. Use it when you want the richer P3 version; Hex and RGB show the more widely compatible sRGB version.'
+                  : 'OKLCH is the main color value for this palette. Hex and RGB show the same color in the more widely compatible sRGB formats used by many apps and tools.'}
+              </p>
             </div>
           </TabsContent>
         </Tabs>

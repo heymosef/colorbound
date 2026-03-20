@@ -32,7 +32,7 @@ import { copyToClipboard } from '../lib/clipboard';
 import { usePaletteContext } from '../lib/palette-context';
 
 type ExportFormat = 'css' | 'tailwind' | 'scss' | 'json' | 'dtcg' | 'figma';
-type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'hsl' | 'p3';
+type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'p3';
 type ExportScope = 'palette' | 'collection';
 
 interface ExportPanelProps {
@@ -53,7 +53,7 @@ const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; 
     label: 'CSS',
     icon: <FileCode2 className="w-3.5 h-3.5" />,
     ext: '.css',
-    desc: 'CSS custom properties with @supports fallback for OKLCH',
+    desc: 'CSS custom properties that keep the selected target representation aligned with its sRGB fallback',
   },
   tailwind: {
     label: 'Tailwind',
@@ -80,10 +80,10 @@ const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; 
     desc: 'W3C Design Tokens Community Group format',
   },
   figma: {
-    label: 'Figma',
+    label: 'Figma (sRGB)',
     icon: <Figma className="w-3.5 h-3.5" />,
     ext: '.tokens.json',
-    desc: 'Figma token files split into light and optional dark mode exports',
+    desc: 'Figma-compatible token files that always export the sRGB fallback representation',
   },
 };
 
@@ -91,7 +91,6 @@ const COLOR_FORMAT_OPTIONS = [
   { value: 'oklch', label: 'OKLCH' },
   { value: 'hex', label: 'Hex' },
   { value: 'rgb', label: 'RGB' },
-  { value: 'hsl', label: 'HSL' },
   { value: 'p3', label: 'Display P3' },
 ];
 
@@ -128,9 +127,9 @@ const EXPORT_TARGET_CONFIG: Record<ExportFormat, {
     allowedColorFormats: ALL_COLOR_FORMATS,
   },
   figma: {
-    showColorFormat: true,
+    showColorFormat: false,
     showPrefix: false,
-    allowedColorFormats: ['hex', 'rgb', 'hsl'],
+    allowedColorFormats: ['hex'],
   },
 };
 
@@ -357,6 +356,23 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     return currentPalette?.name.toLowerCase().replace(/\s+/g, '-') || 'palette';
   }, [scope, currentPalette]);
 
+  const primaryTarget = palettes[0]?.targetColorSpace ?? currentPalette?.targetColorSpace ?? 'srgb';
+  const exportDescription = useMemo(() => {
+    if (activeFormat === 'css') {
+      return primaryTarget === 'p3'
+        ? 'Primary target: Display P3. Base variables use the sRGB fallback, with target overrides included for capable browsers.'
+        : 'Primary target: sRGB. Exported values match the selected sRGB target directly.';
+    }
+
+    if (activeFormat === 'figma') {
+      return primaryTarget === 'p3'
+        ? 'Represents the sRGB fallback for Figma parity. Use OKLCH or CSS exports for the Display P3 target.'
+        : 'Represents the palette target directly in Figma-compatible sRGB values.';
+    }
+
+    return FORMAT_INFO[activeFormat].desc;
+  }, [activeFormat, primaryTarget]);
+
   const exportArtifacts = useMemo<ExportArtifact[]>(() => {
     if (palettes.length === 0) return [];
 
@@ -438,11 +454,13 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     }
   }, [exportArtifacts, activePreviewId]);
 
-  const formatItems = (Object.keys(FORMAT_INFO) as ExportFormat[]).map((key) => ({
-    value: key,
-    label: FORMAT_INFO[key].label,
-    icon: FORMAT_INFO[key].icon,
-  }));
+  const formatItems = (Object.keys(FORMAT_INFO) as ExportFormat[])
+    .map((key) => ({
+      value: key,
+      label: FORMAT_INFO[key].label,
+      icon: FORMAT_INFO[key].icon,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   if (!currentPalette && collection.length === 0) {
     return (
@@ -509,7 +527,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         <div className="flex items-start gap-1.5">
           <Info className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
           <p className="text-[10px] text-muted-foreground leading-relaxed">
-            {FORMAT_INFO[activeFormat].desc}
+            {exportDescription}
           </p>
         </div>
     </div>

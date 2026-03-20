@@ -1,3 +1,4 @@
+import type { TargetColorSpace } from './color-utils';
 import type { Palette } from './color-utils';
 import type { Collection } from './collection-types';
 import type {
@@ -13,6 +14,8 @@ export interface PaletteConfig {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
+  targetColorSpace: TargetColorSpace;
+  generationVersion: number;
 }
 
 export type ContrastAlgorithm = 'apca' | 'wcag';

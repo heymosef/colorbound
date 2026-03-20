@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Eye, Plus, ChevronLeft, ChevronRight, ArrowUp, Copy } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
-import { oklchToRgb, rgbToHex, relativeLuminance } from '../lib/color-utils';
+import { rgbToHex, relativeLuminance } from '../lib/color-utils';
 
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
@@ -21,6 +21,13 @@ interface UIPreviewProps {
 
 function usePaletteColors(palette: Palette) {
   const supportsP3 = useSupportsP3();
+  const hexToRgba = (hex: string, alpha: number) => {
+    const [r, g, b] = hex
+      .replace('#', '')
+      .match(/.{2}/g)!
+      .map((value) => parseInt(value, 16));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
   const getDisplayCss = (step: number) => {
     const token = palette.tokens.find(t => t.step === step);
     if (!token) return '#888888';
@@ -30,13 +37,19 @@ function usePaletteColors(palette: Palette) {
   const getDisplayCssAlpha = (step: number, alpha: number) => {
     const token = palette.tokens.find(t => t.step === step);
     if (!token) return `rgba(136,136,136,${alpha})`;
-    const { l, c, h } = token.oklchMapped;
-    return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)} / ${alpha})`;
+    if (token.targetColorSpace === 'p3' && supportsP3) {
+      const { l, c, h } = token.targetOklch;
+      return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)} / ${alpha})`;
+    }
+    return hexToRgba(token.hex, alpha);
   };
   const getLum = (step: number) => {
     const token = palette.tokens.find(t => t.step === step);
     if (!token) return 0.5;
-    const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
+    const [r, g, b] = token.hex
+      .replace('#', '')
+      .match(/.{2}/g)!
+      .map((value) => parseInt(value, 16)) as [number, number, number];
     return relativeLuminance(r, g, b);
   };
   const c = {

@@ -90,6 +90,9 @@ describe('CopyableTokenSwatch', () => {
     expect(screen.getByText('L')).toBeInTheDocument();
     expect(screen.getByText('C')).toBeInTheDocument();
     expect(screen.getByText('H')).toBeInTheDocument();
+    expect(screen.queryByText('OKLCH')).not.toBeInTheDocument();
+    expect(screen.queryByText('sRGB')).not.toBeInTheDocument();
+    expect(screen.queryByText('HEX')).not.toBeInTheDocument();
 
     rerender(
       <TooltipProvider>

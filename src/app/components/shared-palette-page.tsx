@@ -23,8 +23,6 @@ import {
   type SharedPaletteEntry,
 } from '../lib/share-api';
 import {
-  oklchToRgb,
-  rgbToHex,
   relativeLuminance,
   type Palette,
 } from '../lib/color-utils';
@@ -39,6 +37,7 @@ import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
+import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 
 // ─── Palette strip ───
 
@@ -84,6 +83,7 @@ function PaletteStrip({ palette, label }: { palette: Palette; label?: string }) 
 
 function ConfigSpec({ entry }: { entry: SharedPaletteEntry }) {
   const specs = [
+    { label: 'Target', value: entry.targetColorSpace === 'p3' ? 'Display P3' : 'sRGB' },
     { label: 'Hue', value: `${entry.hue.toFixed(1)}°` },
     { label: 'Chroma', value: entry.chroma.toFixed(3) },
     { label: 'Lightness 50', value: entry.lightness50.toFixed(3) },
@@ -91,7 +91,7 @@ function ConfigSpec({ entry }: { entry: SharedPaletteEntry }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {specs.map((s) => (
         <div key={s.label} className="space-y-0.5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
@@ -117,6 +117,7 @@ export function SharedPalettePage() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('light');
   const [linkCopied, setLinkCopied] = useState(false);
+  const supportsP3 = useSupportsP3();
 
   // Deserialize through the trust boundary, then build light + dark palettes
   const deserialized = useMemo(() => {
@@ -137,15 +138,13 @@ export function SharedPalettePage() {
     if (!palette) return;
     const swatch500 = palette.tokens.find((t) => t.step === 500);
     if (!swatch500) return;
-    const [r, g, b] = oklchToRgb(swatch500.oklch.l, swatch500.oklch.c, swatch500.oklch.h);
-    const hex = rgbToHex(r, g, b);
     let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
     if (!meta) {
       meta = document.createElement('meta');
       meta.name = 'theme-color';
       document.head.appendChild(meta);
     }
-    meta.content = hex;
+    meta.content = swatch500.hex;
     return () => {
       if (meta) meta.content = '';
     };
@@ -188,13 +187,15 @@ export function SharedPalettePage() {
 
   // Get 500 swatch color for hero
   const swatch500 = palette.tokens.find((t) => t.step === 500);
-  const [r500, g500, b500] = swatch500
-    ? oklchToRgb(swatch500.oklch.l, swatch500.oklch.c, swatch500.oklch.h)
-    : [128, 128, 128];
-  const heroHex = rgbToHex(r500, g500, b500);
-  const heroDisplayCss = swatch500?.displayCss ?? heroHex;
+  const heroHex = swatch500?.hex ?? '#808080';
+  const [r500, g500, b500] = heroHex
+    .replace('#', '')
+    .match(/.{2}/g)!
+    .map((value) => parseInt(value, 16)) as [number, number, number];
+  const heroDisplayCss = swatch500 ? getTokenDisplayColor(swatch500, supportsP3) : heroHex;
   const heroLum = relativeLuminance(r500, g500, b500);
   const heroTextClass = heroLum > 0.4 ? 'text-black/80' : 'text-white/90';
+  const previewLimited = palette.targetColorSpace === 'p3' && !supportsP3;
 
   return (
     <div className="flex-1 overflow-auto">
@@ -258,6 +259,12 @@ export function SharedPalettePage() {
             </Button>
           </div>
         </div>
+
+        {previewLimited && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            Preview limited: this display shows the sRGB fallback for P3-target colors.
+          </div>
+        )}
 
         {/* Palette swatches */}
         {viewMode === 'both' ? (

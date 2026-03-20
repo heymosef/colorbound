@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import { oklchToRgb, rgbToHex, relativeLuminance, type ColorToken } from '../lib/color-utils';
+import { relativeLuminance, type ColorToken } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
 import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -34,15 +34,18 @@ export function CopyableTokenSwatch({
   const [copied, setCopied] = useState(false);
   const resetTimeoutRef = useRef<number | null>(null);
   const supportsP3 = useSupportsP3();
-  const [r, g, b] = oklchToRgb(token.oklch.l, token.oklch.c, token.oklch.h);
-  const hex = rgbToHex(r, g, b);
+  const [r, g, b] = token.hex
+    .replace('#', '')
+    .match(/.{2}/g)!
+    .map((value) => parseInt(value, 16)) as [number, number, number];
   const lum = relativeLuminance(r, g, b);
   const textColor = lum > 0.4 ? '#000000' : '#ffffff';
   const textOpacity = lum > 0.4 ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
-  const displayBg = preferBestAvailableColor
-    ? getTokenDisplayColor(token, supportsP3)
-    : token.displayCss;
-  const ariaLabel = `${paletteName} ${token.step}: ${token.css}. ${getAriaLabelSuffix(variant)}`;
+  const displayBg = getTokenDisplayColor(token, supportsP3);
+  const targetOklch = token.targetOklch ?? token.oklch ?? token.srgbOklch ?? token.p3Oklch;
+  const targetCss = token.targetCss ?? token.css ?? '';
+  const secondaryValue = token.hex;
+  const ariaLabel = `${paletteName} ${token.step}: ${targetCss}. ${getAriaLabelSuffix(variant)}`;
 
   useEffect(() => {
     return () => {
@@ -57,10 +60,10 @@ export function CopyableTokenSwatch({
       event?.stopPropagation();
     }
 
-    await copyToClipboard(token.css);
+    await copyToClipboard(targetCss);
     setCopied(true);
     toast.success(`Copied ${paletteName}-${token.step}`, {
-      description: token.css,
+      description: targetCss,
       duration: 2000,
     });
 
@@ -87,7 +90,10 @@ export function CopyableTokenSwatch({
           />
         </TooltipTrigger>
         <TooltipContent>
-          <p className="text-[12px] font-mono">{token.step}: {token.css}</p>
+          <div className="space-y-1">
+            <p className="text-[12px] font-mono">{token.step}: {targetCss}</p>
+            <p className="text-[11px] text-muted-foreground">{secondaryValue}</p>
+          </div>
         </TooltipContent>
       </Tooltip>
     );
@@ -106,34 +112,49 @@ export function CopyableTokenSwatch({
           <span className="text-[13px] font-mono" style={{ color: textColor }}>
             {token.step}
           </span>
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
-            {copied ? (
-              <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
-            ) : (
-              <Copy className="w-3.5 h-3.5" style={{ color: textColor }} />
-            )}
-          </span>
         </div>
-        <div className="p-2.5 space-y-0.5">
+        <div className="p-2.5 pt-0 space-y-0.5">
           <div className="flex justify-between text-[10px] font-mono tabular-nums" style={{ color: textOpacity }}>
             <span>L</span>
-            <span>{token.oklch.l.toFixed(3)}</span>
+            <span>{targetOklch?.l.toFixed(3)}</span>
           </div>
           <div className="flex justify-between text-[10px] font-mono tabular-nums" style={{ color: textOpacity }}>
             <span>C</span>
-            <span>{token.oklch.c.toFixed(3)}</span>
+            <span>{targetOklch?.c.toFixed(3)}</span>
           </div>
           <div className="flex justify-between text-[10px] font-mono tabular-nums" style={{ color: textOpacity }}>
             <span>H</span>
-            <span>{token.oklch.h.toFixed(1)}</span>
+            <span>{targetOklch?.h.toFixed(1)}</span>
           </div>
-          <p className="text-[10px] font-mono tabular-nums text-right pt-1" style={{ color: textOpacity }}>
-            {hex}
-          </p>
+          <div className="flex justify-between text-[10px] font-mono tabular-nums pt-1" style={{ color: textOpacity }}>
+            <span>&nbsp;</span>
+            <span>{secondaryValue}</span>
+          </div>
         </div>
+        <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
+          {copied ? (
+            <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
+          ) : (
+            <Copy className="w-3.5 h-3.5" style={{ color: textColor }} />
+          )}
+        </span>
       </button>
     );
   }
+
+  const compactBody = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-mono" style={{ color: textColor }}>
+          {token.step}
+        </span>
+      </div>
+      <div className="space-y-0.5">
+        <p className="text-[9px] font-mono truncate" style={{ color: textOpacity }}>{targetCss}</p>
+        <p className="text-[9px] font-mono truncate" style={{ color: textOpacity }}>{secondaryValue}</p>
+      </div>
+    </>
+  );
 
   if (variant === 'sharedCompact') {
     return (
@@ -144,22 +165,16 @@ export function CopyableTokenSwatch({
         style={{ backgroundColor: displayBg, minHeight: '80px' }}
         aria-label={ariaLabel}
       >
-        <div className="p-2 flex justify-between items-start">
-          <span className="text-[11px] font-mono" style={{ color: textColor }}>
-            {token.step}
-          </span>
-          <span className="opacity-0 group-hover/swatch:opacity-100 transition-opacity" aria-hidden="true">
-            {copied ? (
-              <Check className="w-3 h-3 lucide-check" style={{ color: textColor }} />
-            ) : (
-              <Copy className="w-3 h-3" style={{ color: textColor }} />
-            )}
-          </span>
+        <div className="p-2 space-y-1">
+          {compactBody}
         </div>
-        <div className="p-2 space-y-0.5">
-          <p className="text-[9px] font-mono truncate" style={{ color: textOpacity }}>{token.css}</p>
-          <p className="text-[9px] font-mono" style={{ color: textOpacity }}>{hex}</p>
-        </div>
+        <span className="absolute right-2 top-2 opacity-0 group-hover/swatch:opacity-100 transition-opacity" aria-hidden="true">
+          {copied ? (
+            <Check className="w-3 h-3 lucide-check" style={{ color: textColor }} />
+          ) : (
+            <Copy className="w-3 h-3" style={{ color: textColor }} />
+          )}
+        </span>
       </button>
     );
   }
@@ -176,22 +191,22 @@ export function CopyableTokenSwatch({
         <span className="text-[13px] font-mono" style={{ color: textColor }}>
           {token.step}
         </span>
-        <span className="opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
-          {copied ? (
-            <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
-          ) : (
-            <Copy className="w-3.5 h-3.5" style={{ color: textColor }} />
-          )}
-        </span>
       </div>
-      <div className="p-2.5 space-y-0.5">
+      <div className="p-2.5 space-y-1">
         <p className="text-[10px] font-mono truncate" style={{ color: textOpacity }}>
-          {token.css}
+          {targetCss}
         </p>
-        <p className="text-[10px] font-mono" style={{ color: textOpacity }}>
-          {hex}
+        <p className="text-[10px] font-mono truncate" style={{ color: textOpacity }}>
+          {secondaryValue}
         </p>
       </div>
+      <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
+        {copied ? (
+          <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
+        ) : (
+          <Copy className="w-3.5 h-3.5" style={{ color: textColor }} />
+        )}
+      </span>
     </button>
   );
 }

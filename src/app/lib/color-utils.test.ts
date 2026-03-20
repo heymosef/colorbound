@@ -28,6 +28,7 @@ import {
   gamutMapToP3,
   formatP3,
   oklchToP3,
+  oklchMappedToRgb,
 } from './color-utils';
 
 // ─── OKLCH → RGB Conversion ───
@@ -388,6 +389,33 @@ describe('generatePalette', () => {
     const t950 = tokens.find(t => t.step === 950)!;
     expect(t950.oklch.l).toBeCloseTo(0.025, 2);
   });
+
+  it('uses the sRGB-resolved token as the canonical target in sRGB mode', () => {
+    const token500 = tokens.find((t) => t.step === 500)!;
+    expect(token500.targetColorSpace).toBe('srgb');
+    expect(token500.targetOklch).toEqual(token500.srgbOklch);
+    expect(token500.targetCss).toBe(token500.srgbCss);
+    expect(token500.fallbackDiffers).toBe(false);
+  });
+
+  it('uses the P3-resolved token as the canonical target in Display P3 mode', () => {
+    const p3Tokens = generatePalette(78, 0.115, 0.985, 0.125, 'p3');
+    const token50 = p3Tokens.find((t) => t.step === 50)!;
+
+    expect(token50.targetColorSpace).toBe('p3');
+    expect(token50.targetOklch).toEqual(token50.p3Oklch);
+    expect(token50.targetCss).toBe(formatOklch(token50.p3Oklch));
+    expect(token50.fallbackDiffers).toBe(true);
+  });
+
+  it('derives hex and rgb from the sRGB fallback token', () => {
+    const p3Tokens = generatePalette(78, 0.115, 0.985, 0.125, 'p3');
+    const token50 = p3Tokens.find((t) => t.step === 50)!;
+    const [r, g, b] = oklchMappedToRgb(token50.srgbOklch.l, token50.srgbOklch.c, token50.srgbOklch.h);
+
+    expect(token50.hex).toBe(rgbToHex(r, g, b));
+    expect(token50.rgb).toBe(formatRgb(r, g, b));
+  });
 });
 
 describe('generateDarkPalette', () => {
@@ -413,6 +441,8 @@ describe('deriveDarkPalette', () => {
       chroma: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
+      targetColorSpace: 'srgb' as const,
+      generationVersion: 1,
     };
 
     const darkPalette = deriveDarkPalette(palette);
@@ -424,6 +454,8 @@ describe('deriveDarkPalette', () => {
       chroma: palette.chroma,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
+      targetColorSpace: palette.targetColorSpace,
+      generationVersion: palette.generationVersion,
     });
     expect(darkPalette.tokens).toHaveLength(palette.tokens.length);
     expect(darkPalette.tokens).not.toEqual(palette.tokens);
@@ -679,5 +711,25 @@ describe('exportAsFigmaTokens', () => {
     expect(parsed.primary[500].$type).toBe('color');
     expect(parsed.primary[500].$value.colorSpace).toBe('srgb');
     expect(parsed.primary[500].$description).toBe('Primary 500');
+  });
+
+  it('exports the sRGB fallback for Display P3 palettes', () => {
+    const palette = {
+      id: 'gold',
+      name: 'Gold',
+      tokens: generatePalette(78, 0.115, 0.985, 0.125, 'p3'),
+      hue: 78,
+      chroma: 0.115,
+      lightness50: 0.985,
+      lightness950: 0.125,
+      targetColorSpace: 'p3' as const,
+      generationVersion: 1,
+    };
+
+    const json = exportAsFigmaTokens([palette]);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.gold[50].$value.colorSpace).toBe('srgb');
+    expect(parsed.gold[50].$value.hex).toBe(palette.tokens.find((token) => token.step === 50)!.hex.toUpperCase());
   });
 });

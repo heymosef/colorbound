@@ -285,7 +285,7 @@ export function PaletteSwitcher({
   /** Representative color for the compact variant (step 500 token) */
   const representativeColor = useMemo(() => {
     const t = currentPalette?.tokens?.find((tok) => tok.step === 500);
-    return t?.displayCss ?? '#888888';
+    return t?.hex ?? '#888888';
   }, [currentPalette?.tokens]);
 
   /**

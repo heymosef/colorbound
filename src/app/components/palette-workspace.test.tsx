@@ -14,9 +14,13 @@ function makePalette() {
     chroma: 0.12,
     lightness50: 0.985,
     lightness950: 0.025,
+    targetColorSpace: 'srgb',
+    generationVersion: 1,
     tokens: [
       {
         step: 500,
+        targetColorSpace: 'srgb',
+        targetCss: 'oklch(0.6 0.12 210)',
         css: 'oklch(0.6 0.12 210)',
         hex: '#00aac8',
         rgb: 'rgb(0, 170, 200)',
@@ -161,5 +165,36 @@ describe('Palette workspace collection actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: /share palette/i }));
 
     expect(await screen.findByText('Share dialog')).toBeInTheDocument();
+  });
+
+  it('shows simplified Token Values headers and helper text', () => {
+    const palette = {
+      ...makePalette(),
+      targetColorSpace: 'p3',
+      tokens: [
+        {
+          ...makePalette().tokens[0],
+          targetColorSpace: 'p3',
+          targetCss: 'oklch(0.6 0.12 210)',
+        },
+      ],
+    };
+
+    render(
+      <PaletteWorkspace
+        palette={palette}
+        darkPalette={palette}
+      />,
+    );
+
+    const valuesTab = screen.getByRole('tab', { name: 'Token Values' });
+    fireEvent.click(valuesTab);
+    fireEvent.keyDown(valuesTab, { key: 'Enter' });
+
+    expect(screen.getByRole('columnheader', { name: 'OKLCH' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Hex' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'RGB' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Authored Gamut' })).not.toBeInTheDocument();
+    expect(screen.getByText(/OKLCH is the main color value for this palette and is designed for Display P3/i)).toBeInTheDocument();
   });
 });

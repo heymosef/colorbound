@@ -80,25 +80,19 @@ describe('ExportPanel', () => {
     URL.revokeObjectURL = vi.fn();
   });
 
-  it('shows Output first, hides Prefix for Figma, and limits Figma color formats', async () => {
+  it('shows Output first and hides format and prefix controls for Figma', async () => {
     const { container } = render(<ExportPanel inlineMode />);
 
     fireEvent.change(screen.getByLabelText('Output'), { target: { value: 'figma' } });
 
-    const colorFormatSelect = screen.getByLabelText('Color format') as HTMLSelectElement;
-
-    await waitFor(() => {
-      expect(colorFormatSelect.value).toBe('hex');
-    });
-
     expect(screen.queryByLabelText('Variable prefix')).not.toBeInTheDocument();
-    expect(Array.from(colorFormatSelect.options).map((option) => option.value)).toEqual(['hex', 'rgb', 'hsl']);
+    expect(screen.queryByLabelText('Color format')).not.toBeInTheDocument();
 
     const labels = Array.from(container.querySelectorAll('[data-slot="label"]')).map((label) =>
       label.textContent?.trim(),
     );
 
-    expect(labels.slice(0, 4)).toEqual(['Output', 'Format', 'Scope', 'Include dark mode']);
+    expect(labels.slice(0, 3)).toEqual(['Output', 'Scope', 'Include dark mode']);
     expect(container.querySelector('[data-slot="separator-root"]')).not.toBeInTheDocument();
   });
 
@@ -183,7 +177,7 @@ describe('ExportPanel', () => {
     const { container } = render(<ExportPanel inlineMode />);
 
     const codeRegion = screen.getByRole('region', { name: /primary-tokens\.css/i });
-    const description = screen.getByText('CSS custom properties with @supports fallback for OKLCH');
+    const description = screen.getByText('Primary target: sRGB. Exported values match the selected sRGB target directly.');
 
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(codeRegion).toBeInTheDocument();

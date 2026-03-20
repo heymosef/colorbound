@@ -11,7 +11,7 @@ function getTokenColor(
   key: 'hex' | 'displayCss',
 ): string {
   const token = tokens.find((candidate) => candidate.step === step);
-  return token?.[key] ?? COLOR_FALLBACK;
+  return token?.[key] ?? token?.hex ?? COLOR_FALLBACK;
 }
 
 export function getRampColors(tokens: ColorToken[]): string[] {
@@ -37,7 +37,7 @@ export function getCollectionPreviewColors(
   for (const palette of collection.palettes) {
     const token = palette.tokens.find((candidate) => candidate.step === step);
     if (token) {
-      colors.push(token.displayCss);
+      colors.push(token.displayCss ?? token.hex);
     }
     if (colors.length >= limit) {
       break;

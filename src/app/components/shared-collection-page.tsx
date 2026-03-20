@@ -39,13 +39,14 @@ import { CopyableTokenSwatch } from './copyable-token-swatch';
 
 function InlineConfigSpec({ config }: { config: PaletteConfig }) {
   const specs = [
+    { label: 'Target', value: config.targetColorSpace === 'p3' ? 'Display P3' : 'sRGB' },
     { label: 'Hue', value: `${config.hue.toFixed(1)}°` },
     { label: 'Chroma', value: config.chroma.toFixed(3) },
     { label: 'L 950', value: config.lightness950.toFixed(3) },
     { label: 'L 50', value: config.lightness50.toFixed(3) },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
       {specs.map((s) => (
         <div key={s.label} className="space-y-0.5">
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
