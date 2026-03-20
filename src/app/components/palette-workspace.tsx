@@ -38,9 +38,9 @@ interface PaletteWorkspaceProps {
   isEditingCollection?: boolean;
   isDirty?: boolean;
   onRevert?: () => void;
-  onSave?: () => void;
-  onAddToCollection?: () => void;
-  onDuplicate?: (name: string) => void;
+  onSave?: () => unknown;
+  onAddToCollection?: () => unknown;
+  onDuplicate?: (name: string) => { ok: boolean; message?: string };
   onDelete?: () => void;
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   /** Mobile: hide the built-in toolbar (handled externally by EditPalettePage) */
@@ -117,7 +117,7 @@ function PaletteMoreMenu({
 }: {
   isDirty?: boolean;
   isEditingCollection?: boolean;
-  onDuplicate?: (name: string) => void;
+  onDuplicate?: (name: string) => { ok: boolean; message?: string };
   onDelete?: () => void;
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;
@@ -225,7 +225,7 @@ export function MobileMoreMenu({
   isDirty?: boolean;
   isEditingCollection?: boolean;
   onRevert?: () => void;
-  onDuplicate?: (name: string) => void;
+  onDuplicate?: (name: string) => { ok: boolean; message?: string };
   onDelete?: () => void;
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
   palette: Palette;

@@ -10,4 +10,5 @@ export interface Collection {
   createdAt: string;       // ISO 8601
   lastModifiedAt: string;  // ISO 8601
   palettes: Palette[];     // ordered
+  conflictedPalettes: Palette[];
 }

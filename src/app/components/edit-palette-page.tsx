@@ -126,9 +126,9 @@ function DesktopLayout({
   hasPersistedBaseline: boolean;
   isDirty: boolean;
   onRevert: () => void;
-  onSave: () => void;
-  onAddToCollection: () => void;
-  onDuplicate: (name: string) => void;
+  onSave: () => unknown;
+  onAddToCollection: () => unknown;
+  onDuplicate: (name: string) => { ok: boolean; message?: string };
   onDelete: () => void;
   onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
@@ -194,9 +194,9 @@ function TabletLayout({
   hasPersistedBaseline: boolean;
   isDirty: boolean;
   onRevert: () => void;
-  onSave: () => void;
-  onAddToCollection: () => void;
-  onDuplicate: (name: string) => void;
+  onSave: () => unknown;
+  onAddToCollection: () => unknown;
+  onDuplicate: (name: string) => { ok: boolean; message?: string };
   onDelete: () => void;
   onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
@@ -292,6 +292,7 @@ function MobileLayout({
   onSaveNewAndSwitch,
   onNewPalette,
   onNavigateToCollection,
+  controlsOpenSignal,
 }: {
   controlsNode: (onClose?: () => void) => React.ReactNode;
   config: { name: string };
@@ -301,17 +302,18 @@ function MobileLayout({
   hasPersistedBaseline: boolean;
   isDirty: boolean;
   onRevert: () => void;
-  onSave: () => void;
-  onAddToCollection: () => void;
-  onDuplicate: (name: string) => void;
+  onSave: () => unknown;
+  onAddToCollection: () => unknown;
+  onDuplicate: (name: string) => { ok: boolean; message?: string };
   onDelete: () => void;
   onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
   onSelectPalette: (id: string) => void;
-  onSaveAndSwitch: (targetId: string) => void;
-  onSaveNewAndSwitch: (targetId: string) => void;
+  onSaveAndSwitch: (targetId: string) => boolean;
+  onSaveNewAndSwitch: (targetId: string) => boolean;
   onNewPalette: () => void;
   onNavigateToCollection: () => void;
+  controlsOpenSignal: number;
 }) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<ViewMode>('light');
@@ -322,6 +324,12 @@ function MobileLayout({
 
   const navigate = useNavigate();
   const collectionName = activeCollection?.name ?? 'Collection';
+
+  useEffect(() => {
+    if (controlsOpenSignal > 0) {
+      setControlsOpen(true);
+    }
+  }, [controlsOpenSignal]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -482,6 +490,7 @@ export function EditPalettePage() {
     activeCollectionId,
     hasPersistedBaseline,
     isDirty,
+    paletteNameError,
     currentPalette,
     darkPalette,
     activeCollection,
@@ -499,6 +508,11 @@ export function EditPalettePage() {
     handleCreateCollection,
   } = usePaletteContext();
   const [pendingCollectionAction, setPendingCollectionAction] = useState<PendingCollectionAction | null>(null);
+  const [mobileControlsOpenSignal, setMobileControlsOpenSignal] = useState(0);
+
+  const openMobileControls = useCallback(() => {
+    setMobileControlsOpenSignal((value) => value + 1);
+  }, []);
 
   // Set document title: "PaletteName — CollectionName — Colorbound"
   const titleParts = [config.name];
@@ -620,29 +634,42 @@ export function EditPalettePage() {
   );
 
   const handleSaveAndSwitch = useCallback(
-    (targetId: string) => {
-      if (!activeCollection) return;
-      handleUpdateInCollection();
+    (targetId: string): boolean => {
+      if (!activeCollection) return false;
+      const result = handleUpdateInCollection();
+      if (!result.ok) {
+        openMobileControls();
+        return false;
+      }
       navigate(buildCollectionSavedEditorPath(activeCollection.slug, targetId));
+      return true;
     },
-    [activeCollection, handleUpdateInCollection, navigate]
+    [activeCollection, handleUpdateInCollection, navigate, openMobileControls]
   );
 
   const handleSaveNewAndSwitch = useCallback(
-    (targetId: string) => {
-      if (!activeCollection) return;
-      handleAddToCollection();
+    (targetId: string): boolean => {
+      if (!activeCollection) return false;
+      const result = handleAddToCollection();
+      if (!result.ok) {
+        openMobileControls();
+        return false;
+      }
       navigate(buildCollectionSavedEditorPath(activeCollection.slug, targetId));
+      return true;
     },
-    [activeCollection, handleAddToCollection, navigate]
+    [activeCollection, handleAddToCollection, navigate, openMobileControls]
   );
 
   const handleSaveDraftPalette = useCallback(() => {
     if (!activeCollection) return;
     const result = handleAddToCollection();
-    if (!result.ok) return;
+    if (!result.ok) {
+      openMobileControls();
+      return;
+    }
     navigate(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), { replace: true });
-  }, [activeCollection, handleAddToCollection, navigate]);
+  }, [activeCollection, handleAddToCollection, navigate, openMobileControls]);
 
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
@@ -673,6 +700,7 @@ export function EditPalettePage() {
       onConfigChange={handleConfigChange}
       onNameChange={handleNameChange}
       onApplyHex={handleApplyHex}
+      paletteNameError={paletteNameError}
       isDirty={isDirty}
       activePaletteId={activePaletteId}
       hasPersistedBaseline={hasPersistedBaseline}
@@ -726,7 +754,11 @@ export function EditPalettePage() {
           </Button>
           <Button
             onClick={() => {
-              handleUpdateInCollection();
+              const result = handleUpdateInCollection();
+              if (!result.ok) {
+                openMobileControls();
+                return;
+              }
               blocker.proceed?.();
             }}
           >
@@ -773,6 +805,7 @@ export function EditPalettePage() {
         onSaveNewAndSwitch={handleSaveNewAndSwitch}
         onNewPalette={handleCreateNewPalette}
         onNavigateToCollection={handleNavigateToCollection}
+        controlsOpenSignal={mobileControlsOpenSignal}
       />
     </>
   );

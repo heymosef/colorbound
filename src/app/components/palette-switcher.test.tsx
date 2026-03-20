@@ -167,7 +167,7 @@ describe('PaletteSwitcher', () => {
   });
 
   it('dirty confirmation: Save & Switch calls onSaveAndSwitch', () => {
-    const onSaveAndSwitch = vi.fn();
+    const onSaveAndSwitch = vi.fn(() => true);
     const collection = [
       makePalette({ id: 'a', name: 'Red' }),
       makePalette({ id: 'b', name: 'Green' }),
@@ -187,6 +187,32 @@ describe('PaletteSwitcher', () => {
     fireEvent.click(screen.getByRole('option', { name: /Green/ }));
     fireEvent.click(screen.getByText('Update & Switch'));
     expect(onSaveAndSwitch).toHaveBeenCalledWith('b');
+  });
+
+  it('keeps the confirmation open when Save & Switch fails', () => {
+    const onSaveAndSwitch = vi.fn(() => false);
+    const collection = [
+      makePalette({ id: 'a', name: 'Red' }),
+      makePalette({ id: 'b', name: 'Green' }),
+    ];
+    render(
+      <PaletteSwitcher
+        {...defaultProps({
+          collection,
+          activePaletteId: 'a',
+          isDirty: true,
+          currentName: 'Red',
+          onSaveAndSwitch,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText(/Switch palette/));
+    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
+    fireEvent.click(screen.getByText('Update & Switch'));
+
+    expect(onSaveAndSwitch).toHaveBeenCalledWith('b');
+    expect(screen.getByText(/Unsaved changes to "Red"/)).toBeInTheDocument();
   });
 
   it('dirty confirmation: Discard calls onSelectPalette directly', () => {

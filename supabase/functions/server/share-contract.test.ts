@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CANONICAL_SHARE_FIELDS,
+  DUPLICATE_PALETTE_NAME_MESSAGE,
+  hasDuplicatePaletteNames,
   normalizePaletteEntry,
   sanitizePaletteEntry,
   SHARE_SCHEMA_VERSION,
@@ -65,13 +67,25 @@ describe('share-contract', () => {
   });
 
   it('exports the current schema contract metadata', () => {
-    expect(SHARE_SCHEMA_VERSION).toBe(2);
+    expect(SHARE_SCHEMA_VERSION).toBe(3);
     expect(CANONICAL_SHARE_FIELDS).toEqual([
       'name',
       'hue',
       'chroma',
       'lightness50',
       'lightness950',
+      'targetColorSpace',
+      'generationVersion',
     ]);
+  });
+
+  it('detects duplicate collection palette names using normalized comparison', () => {
+    expect(hasDuplicatePaletteNames([
+      { name: 'Ocean' },
+      { name: '  ocean ' },
+    ])).toBe(true);
+    expect(DUPLICATE_PALETTE_NAME_MESSAGE).toBe(
+      'A palette with this name already exists in this collection.',
+    );
   });
 });

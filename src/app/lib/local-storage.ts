@@ -15,9 +15,13 @@ import {
 } from './legacy-palette-compat';
 import type { PaletteConfig, ContrastAlgorithm } from './palette-context-types';
 import type { Collection } from './collection-types';
+import {
+  hasDuplicatePaletteNames,
+  partitionPalettesByUniqueName,
+} from './palette-name-validation';
 
 const STORAGE_KEY = 'color-token-generator';
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 
 // ─── Stored types (lightweight, no derived tokens) ───
 
@@ -39,6 +43,7 @@ interface StoredCollection {
   createdAt: string;
   lastModifiedAt: string;
   palettes: StoredPaletteEntry[];
+  conflictedPalettes?: StoredPaletteEntry[];
 }
 
 interface StoredStateV3 {
@@ -55,6 +60,18 @@ interface StoredStateV3 {
 
 interface StoredStateV4 {
   version: 4;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
+interface StoredStateV5 {
+  version: 5;
   collections: StoredCollection[];
   activeCollectionId: string | null;
   activePaletteId: string | null;
@@ -162,6 +179,7 @@ function collectionToStored(c: Collection): StoredCollection {
     createdAt: c.createdAt,
     lastModifiedAt: c.lastModifiedAt,
     palettes: c.palettes.map(paletteToStored),
+    conflictedPalettes: c.conflictedPalettes.map(paletteToStored),
   };
 }
 
@@ -181,6 +199,38 @@ function storedToCollection(s: StoredCollection): Collection {
     createdAt: s.createdAt,
     lastModifiedAt: s.lastModifiedAt,
     palettes: (s.palettes || []).filter(isValidStoredEntry).map(storedToPalette),
+    conflictedPalettes: (s.conflictedPalettes || []).filter(isValidStoredEntry).map(storedToPalette),
+  };
+}
+
+function sanitizeStoredCollection(
+  collection: StoredCollection,
+): { collection: StoredCollection; changed: boolean } {
+  const validPalettes = Array.isArray(collection.palettes)
+    ? collection.palettes.filter(isValidStoredEntry)
+    : [];
+  const validConflictedPalettes = Array.isArray(collection.conflictedPalettes)
+    ? collection.conflictedPalettes.filter(isValidStoredEntry)
+    : [];
+  const partitioned = partitionPalettesByUniqueName(validPalettes);
+  const conflictedPalettes = [
+    ...validConflictedPalettes,
+    ...partitioned.conflictedPalettes,
+  ];
+
+  const changed =
+    !Array.isArray(collection.conflictedPalettes) ||
+    partitioned.conflictedPalettes.length > 0 ||
+    validPalettes.length !== collection.palettes.length ||
+    validConflictedPalettes.length !== (collection.conflictedPalettes?.length ?? 0);
+
+  return {
+    collection: {
+      ...collection,
+      palettes: partitioned.activePalettes,
+      conflictedPalettes,
+    },
+    changed,
   };
 }
 
@@ -239,7 +289,8 @@ function isValidStoredCollection(c: unknown): c is StoredCollection {
     typeof obj.slug === 'string' &&
     typeof obj.createdAt === 'string' &&
     typeof obj.lastModifiedAt === 'string' &&
-    Array.isArray(obj.palettes)
+    Array.isArray(obj.palettes) &&
+    (!('conflictedPalettes' in obj) || Array.isArray(obj.conflictedPalettes))
   );
 }
 
@@ -305,6 +356,22 @@ function migrateV3toV4(v3: StoredStateV3): StoredStateV4 {
   };
 }
 
+function migrateV4toV5(v4: StoredStateV4): StoredStateV5 {
+  const sanitizedCollections = v4.collections.map((collection) => sanitizeStoredCollection(collection).collection);
+
+  return {
+    version: 5,
+    collections: sanitizedCollections,
+    activeCollectionId: v4.activeCollectionId,
+    activePaletteId: v4.activePaletteId,
+    config: normalizeConfig(v4.config),
+    nameManuallyEdited: v4.nameManuallyEdited,
+    contrastAlgorithm: v4.contrastAlgorithm,
+    isDirty: v4.isDirty,
+    hasCompletedFirstRun: v4.hasCompletedFirstRun,
+  };
+}
+
 // ─── Public API ───
 
 export interface HydratedState {
@@ -345,44 +412,73 @@ export function loadState(): HydratedState | null {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }
 
+    if (parsed.version === 4) {
+      parsed = migrateV4toV5(parsed as StoredStateV4);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     if (parsed.version !== CURRENT_VERSION) return null;
 
-    const v4 = parsed as StoredStateV4;
+    const v5 = parsed as StoredStateV5;
 
     // Validate config
-    if (!isValidConfig(v4.config)) return null;
+    if (!isValidConfig(v5.config)) return null;
 
     // Validate & rebuild collections
-    const validStoredCollections = Array.isArray(v4.collections)
-      ? v4.collections.filter(isValidStoredCollection)
+    const validStoredCollections = Array.isArray(v5.collections)
+      ? v5.collections.filter(isValidStoredCollection)
       : [];
 
-    const collections = validStoredCollections.map(storedToCollection);
+    let didSanitizeCollections = false;
+    const collections = validStoredCollections.map((collection) => {
+      const sanitized = sanitizeStoredCollection(collection);
+      if (sanitized.changed) {
+        didSanitizeCollections = true;
+      }
+      return storedToCollection(sanitized.collection);
+    });
 
     // Validate activeCollectionId still exists
     const activeCollectionId =
-      typeof v4.activeCollectionId === 'string' &&
-      collections.some((c) => c.id === v4.activeCollectionId)
-        ? v4.activeCollectionId
+      typeof v5.activeCollectionId === 'string' &&
+      collections.some((c) => c.id === v5.activeCollectionId)
+        ? v5.activeCollectionId
         : collections.length > 0 ? collections[0].id : null;
 
     // Validate activePaletteId still exists within the active collection
     const activeCollection = collections.find((c) => c.id === activeCollectionId);
     const activePaletteId =
-      typeof v4.activePaletteId === 'string' &&
-      activeCollection?.palettes.some((p) => p.id === v4.activePaletteId)
-        ? v4.activePaletteId
+      typeof v5.activePaletteId === 'string' &&
+      activeCollection?.palettes.some((p) => p.id === v5.activePaletteId)
+        ? v5.activePaletteId
         : null;
+
+    if (didSanitizeCollections) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          version: CURRENT_VERSION,
+          collections: collections.map(collectionToStored),
+          activeCollectionId,
+          activePaletteId,
+          config: normalizeConfig(v5.config),
+          nameManuallyEdited: typeof v5.nameManuallyEdited === 'boolean' ? v5.nameManuallyEdited : false,
+          contrastAlgorithm: v5.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+          isDirty: typeof v5.isDirty === 'boolean' ? v5.isDirty : false,
+          hasCompletedFirstRun: typeof v5.hasCompletedFirstRun === 'boolean' ? v5.hasCompletedFirstRun : true,
+        }),
+      );
+    }
 
     return {
       collections,
       activeCollectionId,
       activePaletteId,
-      config: normalizeConfig(v4.config),
-      nameManuallyEdited: typeof v4.nameManuallyEdited === 'boolean' ? v4.nameManuallyEdited : false,
-      contrastAlgorithm: v4.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-      isDirty: typeof v4.isDirty === 'boolean' ? v4.isDirty : false,
-      hasCompletedFirstRun: typeof v4.hasCompletedFirstRun === 'boolean' ? v4.hasCompletedFirstRun : true,
+      config: normalizeConfig(v5.config),
+      nameManuallyEdited: typeof v5.nameManuallyEdited === 'boolean' ? v5.nameManuallyEdited : false,
+      contrastAlgorithm: v5.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+      isDirty: typeof v5.isDirty === 'boolean' ? v5.isDirty : false,
+      hasCompletedFirstRun: typeof v5.hasCompletedFirstRun === 'boolean' ? v5.hasCompletedFirstRun : true,
     };
   } catch {
     return null;
@@ -400,7 +496,11 @@ export function saveState(state: {
   hasCompletedFirstRun: boolean;
 }): boolean {
   try {
-    const stored: StoredStateV4 = {
+    if (state.collections.some((collection) => hasDuplicatePaletteNames(collection.palettes))) {
+      throw new Error('Duplicate active palette names cannot be persisted');
+    }
+
+    const stored: StoredStateV5 = {
       version: CURRENT_VERSION,
       collections: state.collections.map(collectionToStored),
       activeCollectionId: state.activeCollectionId,
@@ -431,5 +531,6 @@ export function createDefaultCollection(palettes: Palette[] = []): Collection {
     createdAt: now,
     lastModifiedAt: now,
     palettes,
+    conflictedPalettes: [],
   };
 }

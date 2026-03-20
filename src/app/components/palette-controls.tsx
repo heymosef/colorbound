@@ -29,13 +29,18 @@ interface PaletteControlsProps {
   onConfigChange: (partial: Partial<PaletteConfig>) => void;
   onNameChange: (name: string) => void;
   onApplyHex?: (hue: number, chroma: number) => void;
+  paletteNameError?: string | null;
   isDirty?: boolean;
   activePaletteId?: string | null;
   hasPersistedBaseline?: boolean;
-  onSave?: () => void;
-  onAddToCollection?: () => void;
+  onSave?: () => unknown;
+  onAddToCollection?: () => unknown;
   onRevert?: (options?: { silent?: boolean }) => void;
   onClose?: () => void;
+}
+
+function isFailedMutationResult(value: unknown): value is { ok: false } {
+  return typeof value === 'object' && value !== null && 'ok' in value && (value as { ok?: boolean }).ok === false;
 }
 
 function HuePreview({
@@ -140,6 +145,7 @@ export function PaletteControls({
   onConfigChange,
   onNameChange,
   onApplyHex,
+  paletteNameError,
   isDirty,
   activePaletteId,
   hasPersistedBaseline,
@@ -151,6 +157,7 @@ export function PaletteControls({
   const [hexInput, setHexInput] = useState('');
   const [hexError, setHexError] = useState(false);
   const targetColorSpace = config.targetColorSpace ?? 'srgb';
+  const hasPaletteNameError = !!paletteNameError;
 
   // Compute gamut status for the identity swatch (500 step equivalent)
   const midpointGamut = useMemo((): GamutFlag => {
@@ -437,7 +444,13 @@ export function PaletteControls({
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="e.g. Blue, Primary, Slate"
             className="h-8 text-[13px]"
+            aria-invalid={hasPaletteNameError}
           />
+          {hasPaletteNameError && (
+            <p className="text-[11px] text-destructive dark:text-destructive-foreground">
+              {paletteNameError}
+            </p>
+          )}
         </div>
 
         {/* Save / Undo actions */}
@@ -450,10 +463,13 @@ export function PaletteControls({
                 size="sm"
                 className="w-full h-8 text-[12px]"
                 onClick={() => {
-                  (activePaletteId ? onSave : onAddToCollection)?.();
+                  const result = (activePaletteId ? onSave : onAddToCollection)?.();
+                  if (isFailedMutationResult(result)) {
+                    return;
+                  }
                   onClose();
                 }}
-                disabled={activePaletteId ? !isDirty : false}
+                disabled={activePaletteId ? !isDirty || hasPaletteNameError : hasPaletteNameError}
               >
                 Save palette
               </Button>
@@ -481,7 +497,7 @@ export function PaletteControls({
                 size="sm"
                 className="w-full h-8 text-[12px] gap-1.5"
                 onClick={activePaletteId ? onSave : onAddToCollection}
-                disabled={activePaletteId ? !isDirty : false}
+                disabled={activePaletteId ? !isDirty || hasPaletteNameError : hasPaletteNameError}
               >
                 Save palette
               </Button>

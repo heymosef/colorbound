@@ -4,6 +4,8 @@ import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
 import {
   CANONICAL_SHARE_FIELDS,
+  DUPLICATE_PALETTE_NAME_MESSAGE,
+  hasDuplicatePaletteNames,
   LEGACY_LIGHTNESS_FIELDS,
   normalizePaletteEntry,
   type PaletteEntry,
@@ -124,6 +126,10 @@ app.post(`${SHARE_ROUTE_PREFIX}/share/collection`, async (c) => {
       .filter((palette): palette is PaletteEntry => palette !== null);
     if (validPalettes.length === 0) {
       return c.json({ error: "No valid palette entries found in collection" }, 400);
+    }
+
+    if (hasDuplicatePaletteNames(validPalettes)) {
+      return c.json({ error: DUPLICATE_PALETTE_NAME_MESSAGE }, 400);
     }
 
     const id = generateShareId();

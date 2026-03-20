@@ -191,4 +191,22 @@ describe('MoveToCollectionDialog', () => {
 
     expect(handleCopyPalette).toHaveBeenCalledWith('source', 'palette-1', 'created');
   });
+
+  it('shows an inline duplicate-name error and stays on the same route', async () => {
+    handleMovePalette.mockReturnValue({
+      ok: false,
+      reason: 'duplicate_name',
+      message: 'A palette with this name already exists in this collection.',
+    });
+
+    const router = renderDialog('move');
+
+    fireEvent.click(screen.getByRole('button', { name: /target/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('A palette with this name already exists in this collection.')).toBeInTheDocument();
+    });
+
+    expect(router.state.location.pathname).toBe('/source/edit/palette-1');
+  });
 });

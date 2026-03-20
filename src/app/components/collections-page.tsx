@@ -26,6 +26,7 @@ import { ShareCollectionButton, SharePaletteButton } from './share/share-actions
 import { PopoverMenuItem } from './popover-menu-item';
 import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';
+import { DUPLICATE_PALETTE_NAME_MESSAGE } from '../lib/palette-name-validation';
 import { validateCollectionName } from '../lib/collection-name-validation';
 import {
   buildCollectionDraftEditorPath,
@@ -99,15 +100,24 @@ function PaletteCard({
   palette: Palette;
   onSelect: () => void;
   onRemove: () => void;
-  onRename: (name: string) => void;
+  onRename: (name: string) => { ok: boolean; message?: string };
 }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(palette.name);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const handleSave = () => {
-    if (editName.trim()) {
-      onRename(editName.trim());
+    if (!editName.trim()) {
+      setNameError('Palette name is required');
+      return;
     }
+
+    const result = onRename(editName.trim());
+    if (!result.ok) {
+      setNameError(result.message ?? DUPLICATE_PALETTE_NAME_MESSAGE);
+      return;
+    }
+    setNameError(null);
     setEditing(false);
   };
 
@@ -144,7 +154,10 @@ function PaletteCard({
                   <div className="flex gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
                     <Input
                       value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
+                      onChange={(e) => {
+                        setEditName(e.target.value);
+                        setNameError(null);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSave();
                         if (e.key === 'Escape') setEditing(false);
@@ -152,6 +165,7 @@ function PaletteCard({
                       className="h-7 text-[13px] px-2"
                       autoFocus
                       aria-label="Edit palette name"
+                      aria-invalid={!!nameError}
                     />
                     <Button size="sm" variant="ghost" onClick={handleSave} className="h-7 px-2">
                       <Check className="w-3.5 h-3.5" />
@@ -181,6 +195,9 @@ function PaletteCard({
               <span>·</span>
               <span className="tabular-nums">{palette.tokens.length} tokens</span>
             </div>
+            {editing && nameError && (
+              <p className="text-[12px] text-destructive">{nameError}</p>
+            )}
           </div>
         </div>
 
@@ -194,7 +211,10 @@ function PaletteCard({
                   <div className="flex gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
                     <Input
                       value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
+                      onChange={(e) => {
+                        setEditName(e.target.value);
+                        setNameError(null);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSave();
                         if (e.key === 'Escape') setEditing(false);
@@ -202,6 +222,7 @@ function PaletteCard({
                       className="h-7 text-[13px] px-2"
                       autoFocus
                       aria-label="Edit palette name"
+                      aria-invalid={!!nameError}
                     />
                     <Button size="sm" variant="ghost" onClick={handleSave} className="h-7 px-2">
                       <Check className="w-3.5 h-3.5" />
@@ -232,12 +253,85 @@ function PaletteCard({
               <span>·</span>
               <span className="tabular-nums">{palette.tokens.length} tokens</span>
             </div>
+            {editing && nameError && (
+              <p className="text-[12px] text-destructive">{nameError}</p>
+            )}
           </div>
 
           {/* Right: color ramp */}
           <div className="flex-1 min-h-[5rem] overflow-hidden">
             <PaletteColorRamp palette={palette} useBestAvailableColor />
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConflictedPaletteCard({
+  palette,
+  collectionId,
+  onResolve,
+  onDelete,
+}: {
+  palette: Palette;
+  collectionId: string;
+  onResolve: (collectionId: string, paletteId: string, name: string) => { ok: boolean; message?: string };
+  onDelete: (collectionId: string, paletteId: string) => boolean;
+}) {
+  const [name, setName] = useState(palette.name);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleResolve = () => {
+    const result = onResolve(collectionId, palette.id, name);
+    if (!result.ok) {
+      setError(result.message ?? DUPLICATE_PALETTE_NAME_MESSAGE);
+      return;
+    }
+    setError(null);
+  };
+
+  return (
+    <Card className="border-dashed border-amber-300/70 bg-amber-50/40">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[14px] font-medium">{palette.name}</p>
+            <p className="text-[12px] text-muted-foreground">
+              This palette is quarantined until its name is unique.
+            </p>
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {palette.hue}°
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`conflict-name-${palette.id}`} className="text-[13px]">New palette name</Label>
+          <Input
+            id={`conflict-name-${palette.id}`}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
+            placeholder="Enter a unique palette name"
+            aria-invalid={!!error}
+          />
+          {error && (
+            <p className="text-[12px] text-destructive">{error}</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleResolve} disabled={!name.trim()}>
+            Rename and restore
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onDelete(collectionId, palette.id)}
+          >
+            Remove
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -253,6 +347,8 @@ export function CollectionsPage() {
     startDraftPalette,
     handleRemove,
     handleRename,
+    handleResolveConflictedPalette,
+    handleDeleteConflictedPalette,
     handleRenameCollection,
     handleDeleteCollection,
   } = usePaletteContext();
@@ -268,6 +364,8 @@ export function CollectionsPage() {
   const [collectionMenuOpen, setCollectionMenuOpen] = useState(false);
 
   const canDeleteCollection = collections.length > 1;
+  const conflictedPalettes = activeCollection?.conflictedPalettes ?? [];
+  const totalPaletteCount = collection.length + conflictedPalettes.length;
 
   const handleSaveCollectionName = () => {
     if (activeCollection) {
@@ -421,6 +519,28 @@ export function CollectionsPage() {
         </div>
 
         {/* Palette grid */}
+        {activeCollection && conflictedPalettes.length > 0 && (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <h3 className="text-[15px] font-medium">Conflicted palettes</h3>
+              <p className="text-[13px] text-muted-foreground">
+                {conflictedPalettes.length} palette{conflictedPalettes.length !== 1 ? 's' : ''} need unique names before they can be used.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {conflictedPalettes.map((palette) => (
+                <ConflictedPaletteCard
+                  key={palette.id}
+                  palette={palette}
+                  collectionId={activeCollection.id}
+                  onResolve={handleResolveConflictedPalette}
+                  onDelete={handleDeleteConflictedPalette}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {collection.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -460,7 +580,7 @@ export function CollectionsPage() {
             <AlertDialogTitle>Delete "{activeCollection?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently destroy this collection and{' '}
-              <strong>all {collection.length} palette{collection.length !== 1 ? 's' : ''}</strong>{' '}
+              <strong>all {totalPaletteCount} palette{totalPaletteCount !== 1 ? 's' : ''}</strong>{' '}
               inside it. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

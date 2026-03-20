@@ -81,6 +81,7 @@ describe('import collection behavior', () => {
     expect(importResult).toEqual({
       count: 3,
       collectionSlug: 'imported-collection-2',
+      conflictCount: 0,
     });
 
     const collectionSlugs = result.current.collections.map((collection) => collection.slug);
@@ -99,9 +100,62 @@ describe('import collection behavior', () => {
       'Third import',
     ]);
     expect(importedCollection?.palettes.map((palette) => palette.hue)).toEqual([10, 40, 80]);
+    expect(importedCollection?.conflictedPalettes).toEqual([]);
 
     const importedPaletteIds = importedCollection?.palettes.map((palette) => palette.id) ?? [];
     expect(new Set(importedPaletteIds).size).toBe(importedPaletteIds.length);
     expect(importedPaletteIds.every((id) => !existingPaletteIds.has(id))).toBe(true);
+  });
+
+  it('quarantines duplicate imported palette names instead of dropping them', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    let importResult: { count: number; collectionSlug: string; conflictCount: number } | undefined;
+    act(() => {
+      importResult = result.current.handleImportCollection([
+        {
+          name: 'Ocean',
+          hue: 10,
+          chroma: 0.12,
+          lightness50: 0.98,
+          lightness950: 0.03,
+          targetColorSpace: 'srgb',
+          generationVersion: 1,
+        },
+        {
+          name: '  ocean  ',
+          hue: 40,
+          chroma: 0.14,
+          lightness50: 0.97,
+          lightness950: 0.04,
+          targetColorSpace: 'srgb',
+          generationVersion: 1,
+        },
+        {
+          name: 'Forest',
+          hue: 80,
+          chroma: 0.16,
+          lightness50: 0.96,
+          lightness950: 0.05,
+          targetColorSpace: 'srgb',
+          generationVersion: 1,
+        },
+      ], 'Imported Collection');
+    });
+
+    expect(importResult).toEqual({
+      count: 2,
+      collectionSlug: 'imported-collection',
+      conflictCount: 1,
+    });
+
+    const importedCollection = result.current.collections.at(-1);
+    expect(importedCollection?.palettes.map((palette) => palette.name)).toEqual([
+      'Ocean',
+      'Forest',
+    ]);
+    expect(importedCollection?.conflictedPalettes.map((palette) => palette.name)).toEqual([
+      '  ocean  ',
+    ]);
   });
 });

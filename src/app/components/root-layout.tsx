@@ -301,19 +301,23 @@ function HeaderBreadcrumb() {
   );
 
   const handleSaveAndSwitch = useCallback(
-    (targetId: string) => {
-      handleUpdateInCollection();
-      if (!collectionSlug) return;
+    (targetId: string): boolean => {
+      const result = handleUpdateInCollection();
+      if (!result.ok) return false;
+      if (!collectionSlug) return false;
       navigate(buildCollectionSavedEditorPath(collectionSlug, targetId));
+      return true;
     },
     [collectionSlug, handleUpdateInCollection, navigate]
   );
 
   const handleSaveNewAndSwitch = useCallback(
-    (targetId: string) => {
-      handleAddToCollection();
-      if (!collectionSlug) return;
+    (targetId: string): boolean => {
+      const result = handleAddToCollection();
+      if (!result.ok) return false;
+      if (!collectionSlug) return false;
       navigate(buildCollectionSavedEditorPath(collectionSlug, targetId));
+      return true;
     },
     [collectionSlug, handleAddToCollection, navigate]
   );

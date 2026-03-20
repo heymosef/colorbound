@@ -19,7 +19,6 @@ import {
 import { FolderOpen, Plus } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import { cn } from './ui/utils';
-import { toast } from 'sonner';
 import { Button } from './ui/button';
 import {
   buildCollectionSavedEditorPath,
@@ -55,6 +54,7 @@ export function MoveToCollectionDialog({
   } = usePaletteContext();
   const [createdCollectionId, setCreatedCollectionId] = useState<string | null>(null);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const destinationRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const eligibleDestinations = useMemo(
@@ -66,6 +66,7 @@ export function MoveToCollectionDialog({
     if (!open) {
       setCreatedCollectionId(null);
       setIsCreatingCollection(false);
+      setDialogError(null);
     }
   }, [open]);
 
@@ -77,10 +78,11 @@ export function MoveToCollectionDialog({
   }, [createdCollectionId, eligibleDestinations]);
 
   const handleSelect = (targetCollectionId: string) => {
+    setDialogError(null);
     if (mode === 'move') {
       const result = handleMovePalette(sourceCollectionId, paletteId, targetCollectionId);
       if (!result.ok) {
-        toast.error('Unable to move palette');
+        setDialogError(result.message ?? 'Unable to move palette');
         return;
       }
 
@@ -91,7 +93,7 @@ export function MoveToCollectionDialog({
     } else {
       const result = handleCopyPalette(sourceCollectionId, paletteId, targetCollectionId);
       if (!result.ok) {
-        toast.error('Unable to duplicate palette');
+        setDialogError(result.message ?? 'Unable to duplicate palette');
         return;
       }
 
@@ -129,6 +131,12 @@ export function MoveToCollectionDialog({
             {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
+
+        {dialogError && (
+          <p className="text-[12px] text-destructive">
+            {dialogError}
+          </p>
+        )}
 
         <div className="space-y-1 max-h-[240px] overflow-y-auto py-1">
           {eligibleDestinations.length === 0 ? (

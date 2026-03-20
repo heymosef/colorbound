@@ -17,6 +17,8 @@ export const LEGACY_LIGHTNESS_FIELDS = [
   "blackRange",
   "whiteRange",
 ] as const;
+export const DUPLICATE_PALETTE_NAME_MESSAGE =
+  "A palette with this name already exists in this collection.";
 
 export interface PaletteEntry {
   name: string;
@@ -102,4 +104,28 @@ export function sanitizePaletteEntry(e: PaletteEntry): PaletteEntry {
     targetColorSpace: e.targetColorSpace,
     generationVersion: 1,
   };
+}
+
+function normalizePaletteName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function getPaletteNameKey(name: string): string {
+  return normalizePaletteName(name).toLocaleLowerCase();
+}
+
+export function hasDuplicatePaletteNames(
+  palettes: Array<Pick<PaletteEntry, "name">>,
+): boolean {
+  const seen = new Set<string>();
+
+  for (const palette of palettes) {
+    const key = getPaletteNameKey(palette.name);
+    if (!key || seen.has(key)) {
+      return true;
+    }
+    seen.add(key);
+  }
+
+  return false;
 }

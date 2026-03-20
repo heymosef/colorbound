@@ -90,6 +90,8 @@ function CollectionOptionsMenu({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const conflictedPalettes = collection.conflictedPalettes ?? [];
+  const totalPaletteCount = collection.palettes.length + conflictedPalettes.length;
 
   return (
     <>
@@ -125,7 +127,7 @@ function CollectionOptionsMenu({
             <AlertDialogTitle>Delete "{collection.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently destroy this collection and{' '}
-              <strong>all {collection.palettes.length} palette{collection.palettes.length !== 1 ? 's' : ''}</strong>{' '}
+              <strong>all {totalPaletteCount} palette{totalPaletteCount !== 1 ? 's' : ''}</strong>{' '}
               inside it. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -201,6 +203,7 @@ function CollectionCard({
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(collection.name);
   const [nameError, setNameError] = useState<string | null>(null);
+  const conflictedPalettes = collection.conflictedPalettes ?? [];
 
   const handleSave = () => {
     const validation = validateCollectionName(editName, collections, { excludeCollectionId: collection.id });
@@ -273,7 +276,14 @@ function CollectionCard({
                   </Button>
                 </div>
               ) : (
-                <span className="text-[15px] font-medium truncate">{collection.name}</span>
+                <div className="min-w-0 flex items-center gap-2">
+                  <span className="text-[15px] font-medium truncate">{collection.name}</span>
+                  {conflictedPalettes.length > 0 && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                      {conflictedPalettes.length} conflict{conflictedPalettes.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <div
@@ -301,6 +311,14 @@ function CollectionCard({
             <span className="tabular-nums">
               {collection.palettes.length} palette{collection.palettes.length !== 1 ? 's' : ''}
             </span>
+            {conflictedPalettes.length > 0 && (
+              <>
+                <span>·</span>
+                <span className="tabular-nums text-amber-700">
+                  {conflictedPalettes.length} conflict{conflictedPalettes.length !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
             {relativeDate && (
               <>
                 <span>·</span>

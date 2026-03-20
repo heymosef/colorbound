@@ -105,4 +105,95 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.activePaletteId).toBeNull();
     expect(result.current.isDirty).toBe(false);
   });
+
+  it('rejects adding a palette when an active collection already has the same normalized name', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleNameChange('Ocean');
+    });
+
+    let firstPaletteId = '';
+    act(() => {
+      const addResult = result.current.handleAddToCollection();
+      if (!addResult.ok) {
+        throw new Error('Expected the first palette to save');
+      }
+      firstPaletteId = addResult.paletteId;
+    });
+
+    act(() => {
+      result.current.startDraftPalette(result.current.activeCollectionId ?? undefined);
+      result.current.handleNameChange('  ocean  ');
+    });
+
+    let duplicateResult: ReturnType<typeof result.current.handleAddToCollection> | null = null;
+    act(() => {
+      duplicateResult = result.current.handleAddToCollection();
+    });
+
+    expect(duplicateResult).toEqual({
+      ok: false,
+      error: 'duplicate',
+      message: 'A palette with this name already exists in this collection.',
+    });
+    expect(result.current.collection).toHaveLength(1);
+    expect(result.current.collection[0].id).toBe(firstPaletteId);
+    expect(result.current.config.name).toBe('  ocean  ');
+  });
+
+  it('resolves conflicted palettes by renaming them back into the active collection', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleImportCollection([
+        {
+          name: 'Ocean',
+          hue: 210,
+          chroma: 0.12,
+          lightness50: 0.985,
+          lightness950: 0.025,
+          targetColorSpace: 'srgb',
+          generationVersion: 1,
+        },
+        {
+          name: ' ocean ',
+          hue: 220,
+          chroma: 0.15,
+          lightness50: 0.98,
+          lightness950: 0.03,
+          targetColorSpace: 'srgb',
+          generationVersion: 1,
+        },
+      ], 'Imported Collection');
+    });
+
+    const importedCollection = result.current.activeCollection;
+    expect(importedCollection?.palettes).toHaveLength(1);
+    expect(importedCollection?.conflictedPalettes).toHaveLength(1);
+
+    const conflictedPalette = importedCollection!.conflictedPalettes[0];
+
+    let resolveResult: ReturnType<typeof result.current.handleResolveConflictedPalette> | null = null;
+    act(() => {
+      resolveResult = result.current.handleResolveConflictedPalette(
+        importedCollection!.id,
+        conflictedPalette.id,
+        'Ocean Alt',
+      );
+    });
+
+    expect(resolveResult).toEqual({
+      ok: true,
+      collectionId: importedCollection!.id,
+      paletteId: conflictedPalette.id,
+      name: 'Ocean Alt',
+    });
+    expect(result.current.activeCollection?.palettes).toHaveLength(2);
+    expect(result.current.activeCollection?.conflictedPalettes).toHaveLength(0);
+    expect(result.current.activeCollection?.palettes.map((palette) => palette.name)).toEqual([
+      'Ocean',
+      'Ocean Alt',
+    ]);
+  });
 });

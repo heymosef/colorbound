@@ -29,6 +29,7 @@ function makeCollection(name: string, palettes: Palette[] = []): Collection {
     createdAt: now,
     lastModifiedAt: now,
     palettes,
+    conflictedPalettes: [],
   };
 }
 
@@ -99,6 +100,18 @@ describe('movePaletteBetweenCollections', () => {
     const result = movePaletteBetweenCollections([collA, collB], collA.id, 'missing', collB.id);
     expect(result).toEqual({ ok: false, reason: 'palette_not_found' });
   });
+
+  it('returns a duplicate_name error when the target collection already has the same palette name', () => {
+    collB = makeCollection('Collection B', [makePalette(' blue ')]);
+
+    const result = movePaletteBetweenCollections([collA, collB], collA.id, palette1.id, collB.id);
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'duplicate_name',
+      message: 'A palette with this name already exists in this collection.',
+    });
+  });
 });
 
 describe('copyPaletteToCollection', () => {
@@ -150,5 +163,17 @@ describe('copyPaletteToCollection', () => {
   it('returns an error when the source palette is missing', () => {
     const result = copyPaletteToCollection([collA, collB], collA.id, 'missing', collB.id, () => 'copy-id');
     expect(result).toEqual({ ok: false, reason: 'palette_not_found' });
+  });
+
+  it('returns a duplicate_name error when the target collection already has the same palette name', () => {
+    collB = makeCollection('Collection B', [makePalette(' blue ')]);
+
+    const result = copyPaletteToCollection([collA, collB], collA.id, palette1.id, collB.id, () => 'copy-id');
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'duplicate_name',
+      message: 'A palette with this name already exists in this collection.',
+    });
   });
 });

@@ -5,6 +5,7 @@ import type {
   CopyPaletteOperationResult,
   MovePaletteOperationResult,
 } from './collection-operations';
+import type { PaletteNameValidationError } from './palette-name-validation';
 
 export interface PaletteConfig {
   name: string;
@@ -25,9 +26,29 @@ export type CollectionRenameResult =
   | { ok: true; collectionId: string; slug: string; name: string }
   | { ok: false; error: 'empty' | 'duplicate'; message: string };
 
+export type PaletteMutationFailure =
+  | { ok: false; error: PaletteNameValidationError; message: string };
+
 export type AddPaletteToCollectionResult =
   | { ok: true; paletteId: string; collectionId: string }
-  | { ok: false };
+  | PaletteMutationFailure;
+
+export type UpdatePaletteInCollectionResult =
+  | { ok: true; paletteId: string; collectionId: string; name: string }
+  | PaletteMutationFailure;
+
+export type DuplicatePaletteResult =
+  | { ok: true; paletteId: string; collectionId: string; name: string }
+  | PaletteMutationFailure;
+
+export type PaletteRenameResult =
+  | { ok: true; paletteId: string; collectionId: string; name: string }
+  | PaletteMutationFailure;
+
+export type ResolveConflictedPaletteResult =
+  | { ok: true; paletteId: string; collectionId: string; name: string }
+  | PaletteMutationFailure
+  | { ok: false; error: 'palette_not_found'; message: string };
 
 export interface CreateCollectionOptions {
   activate?: boolean;
@@ -54,18 +75,21 @@ export interface PaletteContextValue {
   handleConfigChange: (partial: Partial<PaletteConfig>) => void;
   handleNameChange: (name: string) => void;
   handleRandomize: () => void;
+  paletteNameError: string | null;
   startDraftPalette: (collectionId?: string) => void;
   handleAddToCollection: () => AddPaletteToCollectionResult;
-  handleUpdateInCollection: () => void;
+  handleUpdateInCollection: () => UpdatePaletteInCollectionResult;
   handleSelectFromCollection: (id: string) => void;
   selectPaletteInCollection: (collectionId: string, paletteId: string) => boolean;
   handleRevertChanges: (options?: { silent?: boolean }) => void;
   handleRemove: (id: string) => void;
-  handleRename: (id: string, name: string) => void;
+  handleRename: (id: string, name: string) => PaletteRenameResult;
   handleReorder: (fromIndex: number, toIndex: number) => void;
   handleImportPalette: (config: PaletteConfig) => string;
-  handleImportCollection: (entries: PaletteConfig[], collectionName?: string) => { count: number; collectionSlug: string };
-  handleDuplicatePalette: (name: string) => string;
+  handleImportCollection: (entries: PaletteConfig[], collectionName?: string) => { count: number; collectionSlug: string; conflictCount: number };
+  handleDuplicatePalette: (name: string) => DuplicatePaletteResult;
+  handleResolveConflictedPalette: (collectionId: string, paletteId: string, name: string) => ResolveConflictedPaletteResult;
+  handleDeleteConflictedPalette: (collectionId: string, paletteId: string) => boolean;
   handleApplyHex: (hue: number, chroma: number) => void;
   activeCollection: Collection | null;
   handleCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };

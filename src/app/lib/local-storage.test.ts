@@ -249,12 +249,75 @@ describe('first-run completion flag', () => {
   });
 });
 
+describe('duplicate palette migration', () => {
+  it('moves duplicate palette names into conflictedPalettes when loading v4 state', () => {
+    const defaultCol = createDefaultCollection();
+
+    localStorage.setItem('color-token-generator', JSON.stringify({
+      version: 4,
+      collections: [
+        {
+          ...defaultCol,
+          palettes: [
+            {
+              id: 'pal-1',
+              name: 'Ocean',
+              hue: 210,
+              chroma: 0.12,
+              lightness50: 0.985,
+              lightness950: 0.025,
+              targetColorSpace: 'srgb',
+              generationVersion: 1,
+            },
+            {
+              id: 'pal-2',
+              name: ' ocean ',
+              hue: 220,
+              chroma: 0.16,
+              lightness50: 0.98,
+              lightness950: 0.03,
+              targetColorSpace: 'srgb',
+              generationVersion: 1,
+            },
+          ],
+        },
+      ],
+      activeCollectionId: defaultCol.id,
+      activePaletteId: 'pal-1',
+      config: {
+        name: 'Ocean',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+        targetColorSpace: 'srgb',
+        generationVersion: 1,
+      },
+      nameManuallyEdited: true,
+      contrastAlgorithm: 'wcag',
+      isDirty: false,
+      hasCompletedFirstRun: true,
+    }));
+
+    const loaded = loadState();
+
+    expect(loaded?.collections[0].palettes.map((palette) => palette.name)).toEqual(['Ocean']);
+    expect(loaded?.collections[0].conflictedPalettes.map((palette) => palette.name)).toEqual([' ocean ']);
+
+    const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
+    expect(raw.version).toBe(5);
+    expect(raw.collections[0].palettes).toHaveLength(1);
+    expect(raw.collections[0].conflictedPalettes).toHaveLength(1);
+  });
+});
+
 describe('createDefaultCollection', () => {
   it('creates a collection with expected defaults', () => {
     const col = createDefaultCollection();
     expect(col.name).toBe('My Collection');
     expect(col.slug).toBe('my-collection');
     expect(col.palettes).toHaveLength(0);
+    expect(col.conflictedPalettes).toEqual([]);
     expect(col.id).toBeTruthy();
     expect(col.createdAt).toBeTruthy();
     expect(col.lastModifiedAt).toBeTruthy();

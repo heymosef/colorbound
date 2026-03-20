@@ -18,8 +18,12 @@ import type {
   CollectionsContextValue,
   ContrastAlgorithm,
   CreateCollectionOptions,
+  DuplicatePaletteResult,
   PaletteConfig,
+  PaletteRenameResult,
   PaletteContextValue,
+  ResolveConflictedPaletteResult,
+  UpdatePaletteInCollectionResult,
 } from './palette-context-types';
 import { toSlug, deduplicateSlug, deduplicateName } from './slug-utils';
 import { announce, announcePolite } from '../components/aria-live-announcer';
@@ -31,6 +35,11 @@ import {
   type MovePaletteOperationResult,
 } from './collection-operations';
 import { validateCollectionName } from './collection-name-validation';
+import {
+  buildPaletteNameIndex,
+  partitionPalettesByUniqueName,
+  validatePaletteName,
+} from './palette-name-validation';
 export type {
   CollectionRenameResult,
   CollectionSortBy,
@@ -143,6 +152,11 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     [collections, activeCollectionId]
   );
 
+  const activePaletteNameIndex = useMemo(
+    () => buildPaletteNameIndex(activeCollection?.palettes ?? []),
+    [activeCollection],
+  );
+
   // Backward compat: `collection` = palettes in the active collection
   const collection = useMemo(
     () => activeCollection?.palettes ?? [],
@@ -161,6 +175,19 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     [config, savedBaselinePalette?.id]
   );
   const darkPalette = useMemo(() => buildDarkPalette(config), [config]);
+
+  const paletteNameValidation = useMemo(
+    () =>
+      validatePaletteName(config.name, activeCollection?.palettes ?? [], {
+        excludePaletteId: activePaletteId ?? undefined,
+        index: activePaletteNameIndex,
+      }),
+    [activeCollection?.palettes, activePaletteId, activePaletteNameIndex, config.name],
+  );
+
+  const paletteNameError = paletteNameValidation.valid
+    ? null
+    : paletteNameValidation.message ?? 'Palette name is required';
 
   // ─── Helper to update palettes within the active collection ───
   const updateActiveCollectionPalettes = useCallback(
@@ -248,36 +275,90 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     }, 0);
   }, []);
 
+  const validateNameInCollection = useCallback((
+    collection: Collection | null,
+    name: string,
+    options?: { excludePaletteId?: string },
+  ) => {
+    return validatePaletteName(name, collection?.palettes ?? [], {
+      excludePaletteId: options?.excludePaletteId,
+      index: buildPaletteNameIndex(collection?.palettes ?? []),
+    });
+  }, []);
+
   const handleAddToCollection = useCallback((): AddPaletteToCollectionResult => {
-    if (!activeCollectionId) {
-      return { ok: false };
+    if (!activeCollectionId || !activeCollection) {
+      return {
+        ok: false,
+        error: 'empty',
+        message: 'Palette name is required',
+      };
+    }
+
+    const validation = validateNameInCollection(activeCollection, config.name);
+    if (!validation.valid) {
+      return {
+        ok: false,
+        error: validation.error ?? 'empty',
+        message: validation.message ?? 'Palette name is required',
+      };
     }
 
     const snapshot: Palette = {
       ...currentPalette,
       id: generateId(),
+      name: validation.normalizedName,
       tokens: [...currentPalette.tokens],
     };
     updateActiveCollectionPalettes((prev) => [...prev, snapshot]);
+    setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
     setActivePaletteId(snapshot.id);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-    toast.success(`Added "${config.name}" to collection`, { duration: 2000 });
-    announcePolite(`Added ${config.name} to collection`);
+    toast.success(`Added "${validation.normalizedName}" to collection`, { duration: 2000 });
+    announcePolite(`Added ${validation.normalizedName} to collection`);
     return { ok: true, paletteId: snapshot.id, collectionId: activeCollectionId };
-  }, [activeCollectionId, currentPalette, config.name, updateActiveCollectionPalettes]);
+  }, [activeCollection, activeCollectionId, config.name, currentPalette, updateActiveCollectionPalettes, validateNameInCollection]);
 
-  const handleUpdateInCollection = useCallback(() => {
-    if (!savedBaselinePalette) return;
-    const updated = buildPalette(config, savedBaselinePalette.id);
+  const handleUpdateInCollection = useCallback((): UpdatePaletteInCollectionResult => {
+    if (!savedBaselinePalette || !activeCollectionId || !activeCollection) {
+      return {
+        ok: false,
+        error: 'empty',
+        message: 'Palette name is required',
+      };
+    }
+
+    const validation = validateNameInCollection(activeCollection, config.name, {
+      excludePaletteId: savedBaselinePalette.id,
+    });
+    if (!validation.valid) {
+      return {
+        ok: false,
+        error: validation.error ?? 'empty',
+        message: validation.message ?? 'Palette name is required',
+      };
+    }
+
+    const updated = buildPalette(
+      { ...config, name: validation.normalizedName },
+      savedBaselinePalette.id,
+    );
     updateActiveCollectionPalettes((prev) =>
       prev.map((p) => (p.id === savedBaselinePalette.id ? updated : p))
     );
+    setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-    toast.success(`Updated "${config.name}" in collection`, { duration: 2000 });
-    announcePolite(`Saved ${config.name}`);
-  }, [savedBaselinePalette, config, updateActiveCollectionPalettes]);
+    toast.success(`Updated "${validation.normalizedName}" in collection`, { duration: 2000 });
+    announcePolite(`Saved ${validation.normalizedName}`);
+    return {
+      ok: true,
+      paletteId: savedBaselinePalette.id,
+      collectionId: activeCollectionId,
+      name: validation.normalizedName,
+    };
+  }, [activeCollection, activeCollectionId, config, savedBaselinePalette, updateActiveCollectionPalettes, validateNameInCollection]);
 
   const selectPaletteInCollection = useCallback((collectionId: string, paletteId: string): boolean => {
     const sourceCollection = collections.find((candidate) => candidate.id === collectionId);
@@ -321,9 +402,41 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     [activePaletteId, updateActiveCollectionPalettes, collection]
   );
 
-  const handleRename = useCallback((id: string, name: string) => {
-    updateActiveCollectionPalettes((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
-  }, [updateActiveCollectionPalettes]);
+  const handleRename = useCallback((id: string, name: string): PaletteRenameResult => {
+    if (!activeCollectionId || !activeCollection) {
+      return {
+        ok: false,
+        error: 'empty',
+        message: 'Palette name is required',
+      };
+    }
+
+    const validation = validateNameInCollection(activeCollection, name, {
+      excludePaletteId: id,
+    });
+    if (!validation.valid) {
+      return {
+        ok: false,
+        error: validation.error ?? 'empty',
+        message: validation.message ?? 'Palette name is required',
+      };
+    }
+
+    updateActiveCollectionPalettes((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, name: validation.normalizedName } : p)),
+    );
+
+    if (activePaletteId === id) {
+      setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
+    }
+
+    return {
+      ok: true,
+      paletteId: id,
+      collectionId: activeCollectionId,
+      name: validation.normalizedName,
+    };
+  }, [activeCollection, activeCollectionId, activePaletteId, updateActiveCollectionPalettes, validateNameInCollection]);
 
   const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
     updateActiveCollectionPalettes((prev) => {
@@ -347,10 +460,10 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     return '';
   }, []);
 
-  const handleImportCollection = useCallback((entries: PaletteConfig[], collectionName?: string): { count: number; collectionSlug: string } => {
+  const handleImportCollection = useCallback((entries: PaletteConfig[], collectionName?: string): { count: number; collectionSlug: string; conflictCount: number } => {
     if (entries.length === 0) {
       toast.info('No palettes to import', { duration: 2000 });
-      return { count: 0, collectionSlug: '' };
+      return { count: 0, collectionSlug: '', conflictCount: 0 };
     }
 
     // Build palettes from entries
@@ -368,6 +481,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     const existingSlugs = new Set(collections.map((c) => c.slug));
     const finalSlug = deduplicateSlug(baseSlug, existingSlugs);
 
+    const partitionedPalettes = partitionPalettesByUniqueName(newPalettes);
+
     const now = new Date().toISOString();
     const newCollection: Collection = {
       id: generateId(),
@@ -375,7 +490,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       slug: finalSlug,
       createdAt: now,
       lastModifiedAt: now,
-      palettes: newPalettes,
+      palettes: partitionedPalettes.activePalettes,
+      conflictedPalettes: partitionedPalettes.conflictedPalettes,
     };
 
     setCollections((prev) => [...prev, newCollection]);
@@ -384,17 +500,44 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setIsDirty(false);
     setHasCompletedFirstRun(true);
 
-    toast.success(`Imported ${newPalettes.length} palette${newPalettes.length !== 1 ? 's' : ''} into "${finalName}"`, {
-      duration: 3000,
-    });
-    announcePolite(`Imported ${newPalettes.length} palette${newPalettes.length !== 1 ? 's' : ''} into ${finalName}`);
+    const importedCount = partitionedPalettes.activePalettes.length;
+    const conflictCount = partitionedPalettes.conflictedPalettes.length;
 
-    return { count: newPalettes.length, collectionSlug: finalSlug };
+    toast.success(
+      conflictCount > 0
+        ? `Imported ${importedCount} palette${importedCount !== 1 ? 's' : ''} into "${finalName}" — ${conflictCount} need name fixes`
+        : `Imported ${importedCount} palette${importedCount !== 1 ? 's' : ''} into "${finalName}"`,
+      { duration: 3000 },
+    );
+    announcePolite(
+      conflictCount > 0
+        ? `Imported ${importedCount} palettes into ${finalName} with ${conflictCount} conflicts`
+        : `Imported ${importedCount} palette${importedCount !== 1 ? 's' : ''} into ${finalName}`,
+    );
+
+    return { count: importedCount, collectionSlug: finalSlug, conflictCount };
   }, [collections]);
 
-  const handleDuplicatePalette = useCallback((name: string) => {
+  const handleDuplicatePalette = useCallback((name: string): DuplicatePaletteResult => {
+    if (!activeCollectionId || !activeCollection) {
+      return {
+        ok: false,
+        error: 'empty',
+        message: 'Palette name is required',
+      };
+    }
+
+    const validation = validateNameInCollection(activeCollection, name);
+    if (!validation.valid) {
+      return {
+        ok: false,
+        error: validation.error ?? 'empty',
+        message: validation.message ?? 'Palette name is required',
+      };
+    }
+
     const newId = generateId();
-    const dupConfig = { ...config, name };
+    const dupConfig = { ...config, name: validation.normalizedName };
     const newPalette = buildPalette(dupConfig, newId);
     updateActiveCollectionPalettes((prev) => [...prev, newPalette]);
     setConfig(dupConfig);
@@ -402,12 +545,96 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setActivePaletteId(newId);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-    toast.success(`Duplicated as "${name}"`, {
+    toast.success(`Duplicated as "${validation.normalizedName}"`, {
       duration: 2000,
     });
-    announcePolite(`Duplicated as ${name}`);
-    return newId;
-  }, [config, updateActiveCollectionPalettes]);
+    announcePolite(`Duplicated as ${validation.normalizedName}`);
+    return {
+      ok: true,
+      paletteId: newId,
+      collectionId: activeCollectionId,
+      name: validation.normalizedName,
+    };
+  }, [activeCollection, activeCollectionId, config, updateActiveCollectionPalettes, validateNameInCollection]);
+
+  const handleResolveConflictedPalette = useCallback((
+    collectionId: string,
+    paletteId: string,
+    name: string,
+  ): ResolveConflictedPaletteResult => {
+    const targetCollection = collections.find((candidate) => candidate.id === collectionId);
+    const conflictedPalette = targetCollection?.conflictedPalettes.find((candidate) => candidate.id === paletteId);
+
+    if (!targetCollection || !conflictedPalette) {
+      return {
+        ok: false,
+        error: 'palette_not_found',
+        message: 'Palette conflict not found',
+      };
+    }
+
+    const validation = validateNameInCollection(targetCollection, name);
+    if (!validation.valid) {
+      return {
+        ok: false,
+        error: validation.error ?? 'empty',
+        message: validation.message ?? 'Palette name is required',
+      };
+    }
+
+    const now = new Date().toISOString();
+    setCollections((prev) =>
+      prev.map((collection) => {
+        if (collection.id !== collectionId) {
+          return collection;
+        }
+
+        return {
+          ...collection,
+          palettes: [
+            ...collection.palettes,
+            { ...conflictedPalette, name: validation.normalizedName },
+          ],
+          conflictedPalettes: collection.conflictedPalettes.filter((candidate) => candidate.id !== paletteId),
+          lastModifiedAt: now,
+        };
+      }),
+    );
+
+    toast.success(`Resolved "${validation.normalizedName}"`, { duration: 2000 });
+    announcePolite(`Resolved palette conflict for ${validation.normalizedName}`);
+
+    return {
+      ok: true,
+      paletteId,
+      collectionId,
+      name: validation.normalizedName,
+    };
+  }, [collections, validateNameInCollection]);
+
+  const handleDeleteConflictedPalette = useCallback((collectionId: string, paletteId: string): boolean => {
+    const targetCollection = collections.find((candidate) => candidate.id === collectionId);
+    if (!targetCollection?.conflictedPalettes.some((candidate) => candidate.id === paletteId)) {
+      return false;
+    }
+
+    const now = new Date().toISOString();
+    setCollections((prev) =>
+      prev.map((collection) =>
+        collection.id === collectionId
+          ? {
+              ...collection,
+              conflictedPalettes: collection.conflictedPalettes.filter((candidate) => candidate.id !== paletteId),
+              lastModifiedAt: now,
+            }
+          : collection,
+      ),
+    );
+
+    toast('Conflicted palette removed', { duration: 2000 });
+    announce('Conflicted palette removed');
+    return true;
+  }, [collections]);
 
   const handleApplyHex = useCallback((hue: number, chroma: number) => {
     setConfig((prev) => {
@@ -439,6 +666,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       createdAt: now,
       lastModifiedAt: now,
       palettes: [],
+      conflictedPalettes: [],
     };
 
     setCollections((prev) => [...prev, newCollection]);
@@ -524,7 +752,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     const operation = movePaletteBetweenCollections(collections, sourceCollectionId, paletteId, targetCollectionId);
 
     if (!operation.ok) {
-      toast.error('Unable to move palette', { duration: 2000 });
+      toast.error(operation.message ?? 'Unable to move palette', { duration: 2000 });
       return operation;
     }
 
@@ -544,7 +772,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     const operation = copyPaletteToCollection(collections, sourceCollectionId, paletteId, targetCollectionId, generateId);
 
     if (!operation.ok) {
-      toast.error('Unable to duplicate palette', { duration: 2000 });
+      toast.error(operation.message ?? 'Unable to duplicate palette', { duration: 2000 });
       return operation;
     }
 
@@ -649,6 +877,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       isDirty,
       currentPalette,
       darkPalette,
+      paletteNameError,
       contrastAlgorithm,
       setContrastAlgorithm,
       handleConfigChange,
@@ -666,6 +895,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleImportPalette,
       handleImportCollection,
       handleDuplicatePalette,
+      handleResolveConflictedPalette,
+      handleDeleteConflictedPalette,
       handleApplyHex,
       activeCollection,
       handleCreateCollection,
@@ -689,6 +920,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       isDirty,
       currentPalette,
       darkPalette,
+      paletteNameError,
       contrastAlgorithm,
       setContrastAlgorithm,
       handleConfigChange,
@@ -706,6 +938,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleImportPalette,
       handleImportCollection,
       handleDuplicatePalette,
+      handleResolveConflictedPalette,
+      handleDeleteConflictedPalette,
       handleApplyHex,
       activeCollection,
       handleCreateCollection,

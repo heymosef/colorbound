@@ -257,7 +257,12 @@ export function SharedCollectionPage() {
       const importEntries = Array.from(selected)
         .sort((a, b) => a - b)
         .map((idx) => entries[idx].config);
-      const { collectionSlug } = handleImportCollection(importEntries, collectionName);
+      const { collectionSlug, conflictCount } = handleImportCollection(importEntries, collectionName);
+      if (conflictCount > 0) {
+        toast.info(`${conflictCount} imported palette${conflictCount !== 1 ? 's' : ''} need unique names before they can be used.`, {
+          duration: 4000,
+        });
+      }
       navigate(collectionSlug ? `/${collectionSlug}` : '/');
     }
   };

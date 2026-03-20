@@ -17,7 +17,7 @@ interface PaletteActionDialogsProps {
   dupOpen: boolean;
   shareOpen: boolean;
   deleteOpen: boolean;
-  onDuplicate?: (name: string) => void;
+  onDuplicate?: (name: string) => { ok: boolean; message?: string };
   onDelete?: () => void;
   onDupOpenChange: (open: boolean) => void;
   onShareOpenChange: (open: boolean) => void;

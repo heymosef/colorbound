@@ -1,5 +1,10 @@
 import type { Palette } from './color-utils';
 import type { Collection } from './collection-types';
+import {
+  DUPLICATE_PALETTE_NAME_MESSAGE,
+  buildPaletteNameIndex,
+  validatePaletteName,
+} from './palette-name-validation';
 
 export interface PaletteLocation {
   collection: Collection;
@@ -12,13 +17,15 @@ export type MovePaletteFailureReason =
   | 'source_collection_not_found'
   | 'target_collection_not_found'
   | 'palette_not_found'
-  | 'same_collection';
+  | 'same_collection'
+  | 'duplicate_name';
 
 export type CopyPaletteFailureReason =
   | 'source_collection_not_found'
   | 'target_collection_not_found'
   | 'palette_not_found'
-  | 'same_collection';
+  | 'same_collection'
+  | 'duplicate_name';
 
 export interface MovePaletteSuccess {
   ok: true;
@@ -33,6 +40,7 @@ export interface MovePaletteSuccess {
 export interface MovePaletteFailure {
   ok: false;
   reason: MovePaletteFailureReason;
+  message?: string;
 }
 
 export type MovePaletteOperationResult = MovePaletteSuccess | MovePaletteFailure;
@@ -51,6 +59,7 @@ export interface CopyPaletteSuccess {
 export interface CopyPaletteFailure {
   ok: false;
   reason: CopyPaletteFailureReason;
+  message?: string;
 }
 
 export type CopyPaletteOperationResult = CopyPaletteSuccess | CopyPaletteFailure;
@@ -97,6 +106,21 @@ export function movePaletteBetweenCollections(
   const palette = sourceCollection.palettes.find((candidate) => candidate.id === paletteId);
   if (!palette) {
     return { ok: false, reason: 'palette_not_found' };
+  }
+
+  const targetNameIndex = buildPaletteNameIndex(targetCollection.palettes);
+  const nameValidation = validatePaletteName(
+    palette.name,
+    targetCollection.palettes,
+    { index: targetNameIndex },
+  );
+
+  if (!nameValidation.valid) {
+    return {
+      ok: false,
+      reason: 'duplicate_name',
+      message: nameValidation.message ?? DUPLICATE_PALETTE_NAME_MESSAGE,
+    };
   }
 
   const updatedCollections = collections.map((collection) => {
@@ -155,6 +179,21 @@ export function copyPaletteToCollection(
   const sourcePalette = sourceCollection.palettes.find((candidate) => candidate.id === paletteId);
   if (!sourcePalette) {
     return { ok: false, reason: 'palette_not_found' };
+  }
+
+  const targetNameIndex = buildPaletteNameIndex(targetCollection.palettes);
+  const nameValidation = validatePaletteName(
+    sourcePalette.name,
+    targetCollection.palettes,
+    { index: targetNameIndex },
+  );
+
+  if (!nameValidation.valid) {
+    return {
+      ok: false,
+      reason: 'duplicate_name',
+      message: nameValidation.message ?? DUPLICATE_PALETTE_NAME_MESSAGE,
+    };
   }
 
   const newPaletteId = createPaletteId();

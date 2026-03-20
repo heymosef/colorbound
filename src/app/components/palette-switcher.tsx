@@ -156,8 +156,8 @@ export interface PaletteSwitcherProps {
   isDirty: boolean;
   currentName: string;
   onSelectPalette: (id: string) => void;
-  onSaveAndSwitch: (targetId: string) => void;
-  onSaveNewAndSwitch: (targetId: string) => void;
+  onSaveAndSwitch: (targetId: string) => boolean;
+  onSaveNewAndSwitch: (targetId: string) => boolean;
   onNewPalette: () => void;
   onNavigateToCollection: () => void;
   /** Called after a switch completes — e.g. close mobile Sheet */
@@ -245,10 +245,12 @@ export function PaletteSwitcher({
 
   const handleSaveAndSwitch = useCallback(() => {
     if (!pendingSwitchId) return;
-    if (isUnsaved) {
-      onSaveNewAndSwitch(pendingSwitchId);
-    } else {
-      onSaveAndSwitch(pendingSwitchId);
+    const didSwitch = isUnsaved
+      ? onSaveNewAndSwitch(pendingSwitchId)
+      : onSaveAndSwitch(pendingSwitchId);
+
+    if (!didSwitch) {
+      return;
     }
     setPendingSwitchId(null);
     setOpen(false);
