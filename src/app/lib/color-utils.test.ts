@@ -17,6 +17,7 @@ import {
   get500Oklch,
   SCALE_STEPS,
   exportAsCSS,
+  exportAsFigmaTokens,
   exportAsFigmaVariables,
   exportAsJSON,
   formatHsl,
@@ -632,5 +633,51 @@ describe('exportAsFigmaVariables', () => {
     expect(variables.every((variable: { modeValues: Record<string, unknown> }) => 'dark' in variable.modeValues)).toBe(true);
     expect(variables.some((variable: { name: string }) => variable.name === 'blue/500')).toBe(true);
     expect(variables.some((variable: { name: string }) => variable.name === 'rose/500')).toBe(true);
+  });
+});
+
+describe('exportAsFigmaTokens', () => {
+  it('produces palette-keyed token files that match the Figma import contract', () => {
+    const palette = {
+      id: 'primary',
+      name: 'Primary',
+      tokens: generatePalette(110, 0.18, 0.985, 0.025),
+      hue: 110,
+      chroma: 0.18,
+      lightness50: 0.985,
+      lightness950: 0.025,
+    };
+
+    const json = exportAsFigmaTokens([palette]);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.primary[500].$type).toBe('color');
+    expect(parsed.primary[500].$value.colorSpace).toBe('srgb');
+    expect(parsed.primary[500].$value.components).toHaveLength(3);
+    expect(parsed.primary[500].$value.components.every((component: number) => component >= 0 && component <= 1)).toBe(true);
+    expect(parsed.primary[500].$value.alpha).toBe(1);
+    expect(parsed.primary[500].$value.hex).toMatch(/^#[0-9A-F]{6}$/);
+    expect(parsed.primary[500].$description).toBe('Primary 500');
+    expect(parsed).not.toHaveProperty('$schema');
+    expect(parsed).not.toHaveProperty('collections');
+  });
+
+  it('can export a dark-mode token file separately', () => {
+    const palette = {
+      id: 'primary',
+      name: 'Primary',
+      tokens: generatePalette(110, 0.18, 0.985, 0.025),
+      hue: 110,
+      chroma: 0.18,
+      lightness50: 0.985,
+      lightness950: 0.025,
+    };
+
+    const json = exportAsFigmaTokens([deriveDarkPalette(palette)]);
+    const parsed = JSON.parse(json);
+
+    expect(parsed.primary[500].$type).toBe('color');
+    expect(parsed.primary[500].$value.colorSpace).toBe('srgb');
+    expect(parsed.primary[500].$description).toBe('Primary 500');
   });
 });

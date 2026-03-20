@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
 import { PopoverSelect } from './popover-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import {
   Copy,
@@ -22,11 +22,11 @@ import type { Palette } from '../lib/color-utils';
 import {
   deriveDarkPalette,
   exportAsCSS,
+  exportAsFigmaTokens,
   exportAsTailwind,
   exportAsSCSS,
   exportAsJSON,
   exportAsW3C,
-  exportAsFigmaVariables,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
 import { usePaletteContext } from '../lib/palette-context';
@@ -34,11 +34,18 @@ import { usePaletteContext } from '../lib/palette-context';
 type ExportFormat = 'css' | 'tailwind' | 'scss' | 'json' | 'dtcg' | 'figma';
 type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'hsl' | 'p3';
 type ExportScope = 'palette' | 'collection';
-type FigmaMode = 'light' | 'dark';
 
 interface ExportPanelProps {
   /** When true, renders in a compact inline layout (for tab content) */
   inlineMode?: boolean;
+}
+
+interface ExportArtifact {
+  id: string;
+  label: string;
+  code: string;
+  language: string;
+  filename: string;
 }
 
 const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; ext: string; desc: string }> = {
@@ -75,22 +82,8 @@ const FORMAT_INFO: Record<ExportFormat, { label: string; icon: React.ReactNode; 
   figma: {
     label: 'Figma',
     icon: <Figma className="w-3.5 h-3.5" />,
-<<<<<<< ours
-<<<<<<< ours
     ext: '.tokens.json',
-<<<<<<< ours
-    desc: 'Figma Variables import JSON. Turn on dark mode to download light and dark files together.',
-=======
-    ext: '.figma.json',
-    desc: 'Figma Variables API-compatible JSON',
->>>>>>> theirs
-=======
-    ext: '.figma.json',
-    desc: 'Figma Variables API-compatible JSON',
->>>>>>> theirs
-=======
-    desc: 'Figma Variables import JSON (DTCG, one mode per file)',
->>>>>>> theirs
+    desc: 'Figma token files split into light and optional dark mode exports',
   },
 };
 
@@ -101,6 +94,45 @@ const COLOR_FORMAT_OPTIONS = [
   { value: 'hsl', label: 'HSL' },
   { value: 'p3', label: 'Display P3' },
 ];
+
+const ALL_COLOR_FORMATS = COLOR_FORMAT_OPTIONS.map((item) => item.value as ColorFormat);
+
+const EXPORT_TARGET_CONFIG: Record<ExportFormat, {
+  showColorFormat: boolean;
+  showPrefix: boolean;
+  allowedColorFormats: ColorFormat[];
+}> = {
+  css: {
+    showColorFormat: true,
+    showPrefix: true,
+    allowedColorFormats: ALL_COLOR_FORMATS,
+  },
+  tailwind: {
+    showColorFormat: true,
+    showPrefix: true,
+    allowedColorFormats: ALL_COLOR_FORMATS,
+  },
+  scss: {
+    showColorFormat: true,
+    showPrefix: false,
+    allowedColorFormats: ALL_COLOR_FORMATS,
+  },
+  json: {
+    showColorFormat: true,
+    showPrefix: false,
+    allowedColorFormats: ALL_COLOR_FORMATS,
+  },
+  dtcg: {
+    showColorFormat: false,
+    showPrefix: false,
+    allowedColorFormats: ALL_COLOR_FORMATS,
+  },
+  figma: {
+    showColorFormat: true,
+    showPrefix: false,
+    allowedColorFormats: ['hex', 'rgb', 'hsl'],
+  },
+};
 
 function CodeBlock({
   code,
@@ -151,7 +183,7 @@ function CodeBlock({
             <TooltipTrigger
               className="inline-flex items-center justify-center rounded-md h-6 w-6 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               onClick={handleCopy}
-              aria-label="Copy code"
+              aria-label={`Copy ${filename}`}
             >
               {copied ? <Check className="w-3 h-3 text-green-600 dark:text-green-400" /> : <Copy className="w-3 h-3" />}
             </TooltipTrigger>
@@ -161,7 +193,7 @@ function CodeBlock({
             <TooltipTrigger
               className="inline-flex items-center justify-center rounded-md h-6 w-6 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               onClick={handleDownload}
-              aria-label="Download file"
+              aria-label={`Download ${filename}`}
             >
               <Download className="w-3 h-3" />
             </TooltipTrigger>
@@ -175,7 +207,7 @@ function CodeBlock({
         <pre
           className="p-3 text-[10px] font-mono text-foreground/80 overflow-auto max-h-[320px] whitespace-pre leading-relaxed"
           role="region"
-          aria-label={`${language} export code`}
+          aria-label={`${language} export code for ${filename}`}
           tabIndex={0}
         >
           {code}
@@ -194,10 +226,10 @@ function ExportSettings({
   onPrefixChange,
   includeDark,
   onIncludeDarkChange,
-  figmaMode,
-  onFigmaModeChange,
   collectionCount,
   activeFormat,
+  onActiveFormatChange,
+  formatItems,
 }: {
   scope: ExportScope;
   onScopeChange: (v: ExportScope) => void;
@@ -207,15 +239,15 @@ function ExportSettings({
   onPrefixChange: (v: string) => void;
   includeDark: boolean;
   onIncludeDarkChange: (v: boolean) => void;
-  figmaMode: FigmaMode;
-  onFigmaModeChange: (v: FigmaMode) => void;
   collectionCount: number;
   activeFormat: ExportFormat;
+  onActiveFormatChange: (v: ExportFormat) => void;
+  formatItems: Array<{ value: ExportFormat; label: string; icon: React.ReactNode }>;
 }) {
-  const showColorFormat = activeFormat !== 'dtcg' && activeFormat !== 'figma';
-  const showPrefix = activeFormat === 'css' || activeFormat === 'tailwind';
-  const showIncludeDark = activeFormat !== 'figma';
-  const showFigmaMode = activeFormat === 'figma';
+  const exportConfig = EXPORT_TARGET_CONFIG[activeFormat];
+  const colorFormatItems = COLOR_FORMAT_OPTIONS.filter((item) =>
+    exportConfig.allowedColorFormats.includes(item.value as ColorFormat),
+  );
 
   const scopeItems = [
     { value: 'palette', label: 'Current Palette' },
@@ -223,20 +255,56 @@ function ExportSettings({
   ];
 
   return (
-    <div className="space-y-3">
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
-      {/* Include dark mode */}
->>>>>>> theirs
-=======
-      {/* Include dark mode */}
->>>>>>> theirs
-      <div className="flex items-center justify-between">
-        <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
-          Include dark mode
-        </Label>
+    <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-3">
+      <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Output</Label>
+      <PopoverSelect
+        value={activeFormat}
+        onValueChange={(v) => onActiveFormatChange(v as ExportFormat)}
+        items={formatItems}
+        ariaLabel="Output"
+        triggerClassName="h-8 text-[13px]"
+      />
+
+      {exportConfig.showColorFormat && (
+        <>
+          <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Format</Label>
+          <PopoverSelect
+            value={colorFormat}
+            onValueChange={(v) => onColorFormatChange(v as ColorFormat)}
+            items={colorFormatItems}
+            ariaLabel="Color format"
+            triggerClassName="h-8 text-[13px]"
+          />
+        </>
+      )}
+
+      <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Scope</Label>
+      <PopoverSelect
+        value={scope}
+        onValueChange={(v) => onScopeChange(v as ExportScope)}
+        items={scopeItems}
+        ariaLabel="Export scope"
+        triggerClassName="h-8 text-[13px]"
+      />
+
+      {exportConfig.showPrefix && (
+        <>
+          <Label htmlFor="prefix" className="text-[11px] text-muted-foreground whitespace-nowrap">Prefix</Label>
+          <Input
+            id="prefix"
+            value={prefix}
+            onChange={(e) => onPrefixChange(e.target.value.replace(/[^a-z0-9-]/gi, '').toLowerCase())}
+            placeholder="color"
+            className="h-8 text-[13px] font-mono w-full"
+            aria-label="Variable prefix"
+          />
+        </>
+      )}
+
+      <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
+        Include dark mode
+      </Label>
+      <div className="flex justify-end">
         <Switch
           id="include-dark"
           checked={includeDark}
@@ -244,76 +312,6 @@ function ExportSettings({
           className="origin-left"
           aria-label="Include dark mode"
         />
-      </div>
-=======
-      {showIncludeDark && (
-        <div className="flex items-center justify-between">
-          <Label htmlFor="include-dark" className="text-[11px] text-muted-foreground whitespace-nowrap">
-            Include dark mode
-          </Label>
-          <Switch
-            id="include-dark"
-            checked={includeDark}
-            onCheckedChange={onIncludeDarkChange}
-            className="origin-left"
-            aria-label="Include dark mode"
-          />
-        </div>
-      )}
->>>>>>> theirs
-      
-      {/* Scope, Format, Prefix — grid for consistent widths */}
-      <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-3">
-        <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Scope</Label>
-        <PopoverSelect
-          value={scope}
-          onValueChange={(v) => onScopeChange(v as ExportScope)}
-          items={scopeItems}
-          ariaLabel="Export scope"
-          triggerClassName="h-8 text-[13px]"
-        />
-
-        {showColorFormat && (
-          <>
-            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Format</Label>
-            <PopoverSelect
-              value={colorFormat}
-              onValueChange={(v) => onColorFormatChange(v as ColorFormat)}
-              items={COLOR_FORMAT_OPTIONS}
-              ariaLabel="Color format"
-              triggerClassName="h-8 text-[13px]"
-            />
-          </>
-        )}
-
-        {showPrefix && (
-          <>
-            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Prefix</Label>
-            <Input
-              value={prefix}
-              onChange={(e) => onPrefixChange(e.target.value.replace(/[^a-z0-9-]/gi, '').toLowerCase())}
-              placeholder="color"
-              className="h-8 text-[13px] font-mono w-full"
-              aria-label="Variable prefix"
-            />
-          </>
-        )}
-
-        {showFigmaMode && (
-          <>
-            <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Mode</Label>
-            <PopoverSelect
-              value={figmaMode}
-              onValueChange={(v) => onFigmaModeChange(v as FigmaMode)}
-              items={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-              ]}
-              ariaLabel="Figma mode"
-              triggerClassName="h-8 text-[13px]"
-            />
-          </>
-        )}
       </div>
     </div>
   );
@@ -327,7 +325,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
   const [colorFormat, setColorFormat] = useState<ColorFormat>('oklch');
   const [prefix, setPrefix] = useState('');
   const [includeDark, setIncludeDark] = useState(true);
-  const [figmaMode, setFigmaMode] = useState<FigmaMode>('light');
+  const [activePreviewId, setActivePreviewId] = useState('default');
 
   const palettes: Palette[] = useMemo(() => {
     if (scope === 'collection' && collection.length > 0) return collection;
@@ -341,122 +339,104 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     return undefined;
   }, [includeDark, scope, darkPalette, collection]);
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-  const figmaLightCode = useMemo(() => exportAsFigmaTokens(palettes), [palettes]);
-  const figmaDarkCode = useMemo(() => {
-    if (!darkPalettes || darkPalettes.length === 0) return '';
-    return exportAsFigmaTokens(darkPalettes);
-  }, [darkPalettes]);
-=======
-  const figmaPalettes: Palette[] = useMemo(() => {
-    if (figmaMode === 'light') return palettes;
-    if (scope === 'palette') return darkPalette ? [darkPalette] : [];
-    return collection.map(deriveDarkPalette);
-  }, [figmaMode, palettes, scope, darkPalette, collection]);
->>>>>>> theirs
+  useEffect(() => {
+    const allowedFormats = EXPORT_TARGET_CONFIG[activeFormat].allowedColorFormats;
+    if (EXPORT_TARGET_CONFIG[activeFormat].showColorFormat && !allowedFormats.includes(colorFormat)) {
+      setColorFormat(allowedFormats[0]);
+    }
+  }, [activeFormat, colorFormat]);
 
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   const exportOptions = useMemo(() => ({
     prefix,
     colorFormat,
     darkPalettes,
   }), [prefix, colorFormat, darkPalettes]);
 
-  const generatedCode = useMemo(() => {
-    if (palettes.length === 0) return '';
-
-    switch (activeFormat) {
-      case 'css':
-        return exportAsCSS(palettes, exportOptions);
-      case 'tailwind':
-        return exportAsTailwind(palettes, exportOptions);
-      case 'scss':
-        return exportAsSCSS(palettes, { colorFormat, darkPalettes });
-      case 'json':
-        return exportAsJSON(palettes, { colorFormat, darkPalettes });
-      case 'dtcg':
-        return exportAsW3C(palettes, { darkPalettes });
-      case 'figma':
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-        return figmaLightCode;
-      default:
-        return '';
-    }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, figmaLightCode]);
-=======
-        return exportAsFigmaVariables(palettes, { darkPalettes });
-      default:
-        return '';
-    }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes]);
->>>>>>> theirs
-=======
-        return exportAsFigmaVariables(palettes, { darkPalettes });
-      default:
-        return '';
-    }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes]);
->>>>>>> theirs
-=======
-        return exportAsFigmaTokens(figmaPalettes);
-      default:
-        return '';
-    }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, figmaPalettes]);
->>>>>>> theirs
-
   const paletteName = useMemo(() => {
     if (scope === 'collection') return 'collection';
     return currentPalette?.name.toLowerCase().replace(/\s+/g, '-') || 'palette';
   }, [scope, currentPalette]);
 
-<<<<<<< ours
-  const filename = `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
-<<<<<<< ours
-<<<<<<< ours
-  const figmaDownloadFiles = useMemo(() => {
-    if (activeFormat !== 'figma') return undefined;
+  const exportArtifacts = useMemo<ExportArtifact[]>(() => {
+    if (palettes.length === 0) return [];
 
-    const files = [
-      {
-        filename: `${paletteName}-light${FORMAT_INFO.figma.ext}`,
-        code: figmaLightCode,
-      },
-    ];
+    switch (activeFormat) {
+      case 'css':
+        return [{
+          id: 'default',
+          label: FORMAT_INFO.css.label,
+          code: exportAsCSS(palettes, exportOptions),
+          language: 'CSS',
+          filename: `${paletteName}-tokens${FORMAT_INFO.css.ext}`,
+        }];
+      case 'tailwind':
+        return [{
+          id: 'default',
+          label: FORMAT_INFO.tailwind.label,
+          code: exportAsTailwind(palettes, exportOptions),
+          language: 'CSS',
+          filename: `${paletteName}-tokens${FORMAT_INFO.tailwind.ext}`,
+        }];
+      case 'scss':
+        return [{
+          id: 'default',
+          label: FORMAT_INFO.scss.label,
+          code: exportAsSCSS(palettes, { colorFormat, darkPalettes }),
+          language: 'SCSS',
+          filename: `${paletteName}-tokens${FORMAT_INFO.scss.ext}`,
+        }];
+      case 'json':
+        return [{
+          id: 'default',
+          label: FORMAT_INFO.json.label,
+          code: exportAsJSON(palettes, { colorFormat, darkPalettes }),
+          language: 'JSON',
+          filename: `${paletteName}-tokens${FORMAT_INFO.json.ext}`,
+        }];
+      case 'dtcg':
+        return [{
+          id: 'default',
+          label: FORMAT_INFO.dtcg.label,
+          code: exportAsW3C(palettes, { darkPalettes }),
+          language: 'JSON',
+          filename: `${paletteName}-tokens${FORMAT_INFO.dtcg.ext}`,
+        }];
+      case 'figma': {
+        const artifacts: ExportArtifact[] = [{
+          id: 'light',
+          label: 'Light',
+          code: exportAsFigmaTokens(palettes),
+          language: 'JSON',
+          filename: `${paletteName}-light${FORMAT_INFO.figma.ext}`,
+        }];
 
-    if (includeDark && figmaDarkCode) {
-      files.push({
-        filename: `${paletteName}-dark${FORMAT_INFO.figma.ext}`,
-        code: figmaDarkCode,
-      });
+        if (includeDark && darkPalettes && darkPalettes.length > 0) {
+          artifacts.push({
+            id: 'dark',
+            label: 'Dark',
+            code: exportAsFigmaTokens(darkPalettes),
+            language: 'JSON',
+            filename: `${paletteName}-dark${FORMAT_INFO.figma.ext}`,
+          });
+        }
+
+        return artifacts;
+      }
+      default:
+        return [];
+    }
+  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, includeDark, paletteName]);
+
+  useEffect(() => {
+    if (exportArtifacts.length === 0) {
+      setActivePreviewId('default');
+      return;
     }
 
-    return files;
-  }, [activeFormat, paletteName, figmaLightCode, includeDark, figmaDarkCode]);
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
-  const filename = activeFormat === 'figma'
-    ? `${paletteName}-${figmaMode}${FORMAT_INFO[activeFormat].ext}`
-    : `${paletteName}-tokens${FORMAT_INFO[activeFormat].ext}`;
->>>>>>> theirs
-  const languageMap: Record<ExportFormat, string> = {
-    css: 'CSS',
-    tailwind: 'CSS',
-    scss: 'SCSS',
-    json: 'JSON',
-    dtcg: 'JSON',
-    figma: 'JSON',
-  };
+    if (!exportArtifacts.some((artifact) => artifact.id === activePreviewId)) {
+      setActivePreviewId(exportArtifacts[0].id);
+    }
+  }, [exportArtifacts, activePreviewId]);
 
   const formatItems = (Object.keys(FORMAT_INFO) as ExportFormat[]).map((key) => ({
     value: key,
@@ -485,46 +465,52 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
           onPrefixChange={setPrefix}
           includeDark={includeDark}
           onIncludeDarkChange={setIncludeDark}
-          figmaMode={figmaMode}
-          onFigmaModeChange={setFigmaMode}
           collectionCount={collection.length}
           activeFormat={activeFormat}
+          onActiveFormatChange={setActiveFormat}
+          formatItems={formatItems}
         />
 
-        <Separator />
+        {/* Code output */}
+        <div className="min-w-0">
+          {exportArtifacts.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground text-center py-4">
+              No palette available for export
+            </p>
+          ) : exportArtifacts.length === 1 ? (
+            <CodeBlock
+              code={exportArtifacts[0].code}
+              language={exportArtifacts[0].language}
+              filename={exportArtifacts[0].filename}
+            />
+          ) : (
+            <Tabs value={activePreviewId} onValueChange={setActivePreviewId} className="gap-3">
+              <TabsList className="w-full">
+                {exportArtifacts.map((artifact) => (
+                  <TabsTrigger key={artifact.id} value={artifact.id} className="text-[12px]">
+                    {artifact.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-      <div className="space-y-2 min-w-0">
-        {/* Format selector dropdown */}
-      <PopoverSelect
-        value={activeFormat}
-        onValueChange={(v) => setActiveFormat(v as ExportFormat)}
-        items={formatItems}
-        ariaLabel="Export format"
-        triggerClassName="h-8 text-[13px]"
-      />
+              {exportArtifacts.map((artifact) => (
+                <TabsContent key={artifact.id} value={artifact.id} className="mt-0">
+                  <CodeBlock
+                    code={artifact.code}
+                    language={artifact.language}
+                    filename={artifact.filename}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </div>
 
-        {/* Format description */}
         <div className="flex items-start gap-1.5">
           <Info className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
           <p className="text-[10px] text-muted-foreground leading-relaxed">
             {FORMAT_INFO[activeFormat].desc}
           </p>
-        </div>
-      </div>
-
-        {/* Code output */}
-        <div className="min-w-0">
-          {palettes.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground text-center py-4">
-              No palette available for export
-            </p>
-          ) : (
-            <CodeBlock
-              code={generatedCode}
-              language={languageMap[activeFormat]}
-              filename={filename}
-            />
-          )}
         </div>
     </div>
   );
