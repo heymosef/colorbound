@@ -17,7 +17,7 @@ vi.mock('../lib/use-document-title', () => ({
   useDocumentTitle: vi.fn(),
 }));
 
-vi.mock('./share-dialog', () => ({
+vi.mock('./share/share-actions', () => ({
   ShareCollectionButton: () => null,
   SharePaletteButton: () => null,
 }));

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import type { Palette } from '../lib/color-utils';
-import { ShareCollectionButton, SharePaletteButton } from './share-dialog';
+import { ShareCollectionButton, SharePaletteButton } from './share/share-actions';
 import { PopoverMenuItem } from './popover-menu-item';
 import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';

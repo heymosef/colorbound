@@ -44,12 +44,14 @@ vi.mock('./ui-preview', () => ({
   UIPreview: () => <div>UI preview</div>,
 }));
 
-vi.mock('./share-dialog', () => ({
-  SharePaletteButton: () => null,
-}));
-
-vi.mock('./duplicate-dialog', () => ({
-  DuplicateDialog: () => null,
+vi.mock('./palette-action-dialogs', () => ({
+  PaletteActionDialogs: ({ dupOpen, shareOpen, deleteOpen }: { dupOpen: boolean; shareOpen: boolean; deleteOpen: boolean }) => (
+    <div>
+      {dupOpen && <div>Duplicate dialog</div>}
+      {shareOpen && <div>Share dialog</div>}
+      {deleteOpen && <div>Delete dialog</div>}
+    </div>
+  ),
 }));
 
 vi.mock('../lib/use-supports-p3', () => ({
@@ -122,5 +124,42 @@ describe('Palette workspace collection actions', () => {
     fireEvent.click(duplicateButton);
 
     expect(onCollectionAction).toHaveBeenCalledWith('copy', palette);
+  });
+
+  it('loads the duplicate dialog only after the action is selected', async () => {
+    const palette = makePalette();
+
+    render(
+      <PaletteWorkspace
+        palette={palette}
+        darkPalette={palette}
+        onDuplicate={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Duplicate dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('More actions'));
+    fireEvent.click(await screen.findByRole('button', { name: /duplicate palette/i }));
+
+    expect(await screen.findByText('Duplicate dialog')).toBeInTheDocument();
+  });
+
+  it('loads the share dialog only after the action is selected', async () => {
+    const palette = makePalette();
+
+    render(
+      <PaletteWorkspace
+        palette={palette}
+        darkPalette={palette}
+      />,
+    );
+
+    expect(screen.queryByText('Share dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('More actions'));
+    fireEvent.click(await screen.findByRole('button', { name: /share palette/i }));
+
+    expect(await screen.findByText('Share dialog')).toBeInTheDocument();
   });
 });

@@ -279,3 +279,32 @@ describe('EditPalettePage draft save flow', () => {
     expect(startDraftPalette).toHaveBeenCalledWith('collection-1');
   });
 });
+
+describe('EditPalettePage deferred collection panel loading', () => {
+  beforeEach(() => {
+    breakpoint = 'desktop';
+    paletteContextValue = buildContext();
+  });
+
+  it('keeps the collection panel out of the mobile preview tab until a side panel tab is selected', async () => {
+    breakpoint = 'mobile';
+
+    renderAt('/my-collection/edit');
+
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.queryByText('Collection panel')).not.toBeInTheDocument();
+
+    const exportTab = screen.getByRole('tab', { name: /export/i });
+    exportTab.focus();
+    fireEvent.keyDown(exportTab, { key: 'Enter' });
+
+    expect(await screen.findByText('Collection panel')).toBeInTheDocument();
+  });
+
+  it('renders the collection panel in the desktop side rail', async () => {
+    renderAt('/my-collection/edit');
+
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Collection panel')).toBeInTheDocument();
+  });
+});

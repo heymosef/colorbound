@@ -11,7 +11,7 @@
  * by EditPalettePage's top bar and More menu.
  */
 
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
@@ -23,22 +23,10 @@ import type { Palette } from '../lib/color-utils';
 import { oklchToRgb } from '../lib/color-utils';
 import { UIPreview } from './ui-preview';
 import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
-import { DuplicateDialog } from './duplicate-dialog';
-import { SharePaletteButton } from './share-dialog';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from './ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from './ui/alert-dialog';
 import { usePaletteContext } from '../lib/palette-context';
 import { PopoverMenuItem } from './popover-menu-item';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
@@ -62,6 +50,11 @@ interface PaletteWorkspaceProps {
   viewMode?: ViewMode;
   onViewModeChange?: (v: ViewMode) => void;
 }
+
+const LazyPaletteActionDialogs = lazy(async () => {
+  const module = await import('./palette-action-dialogs');
+  return { default: module.PaletteActionDialogs };
+});
 
 function PaletteRow({
   palette,
@@ -109,42 +102,6 @@ function PaletteRow({
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── Inline AlertDialog for delete confirmation ───
-
-function DeleteConfirmDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-  paletteName,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onConfirm: () => void;
-  paletteName: string;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete palette?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently remove &ldquo;{paletteName}&rdquo; from your collection. This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="text-[13px]">Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            className="text-[13px] bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
 
@@ -236,33 +193,20 @@ function PaletteMoreMenu({
         </PopoverContent>
       </Popover>
 
-      {/* Duplicate dialog */}
-      {onDuplicate && (
-        <DuplicateDialog
-          currentName={palette.name}
-          onDuplicate={onDuplicate}
-          open={dupOpen}
-          onOpenChange={setDupOpen}
-          hideTrigger
-        />
-      )}
-
-      {/* Share dialog */}
-      <SharePaletteButton
-        palette={palette}
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        hideTrigger
-      />
-
-      {/* Delete confirmation */}
-      {deleteOpen && onDelete && (
-        <DeleteConfirmDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          onConfirm={() => { onDelete(); setDeleteOpen(false); }}
-          paletteName={palette.name}
-        />
+      {(dupOpen || shareOpen || deleteOpen) && (
+        <Suspense fallback={null}>
+          <LazyPaletteActionDialogs
+            palette={palette}
+            dupOpen={dupOpen}
+            shareOpen={shareOpen}
+            deleteOpen={deleteOpen}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            onDupOpenChange={setDupOpen}
+            onShareOpenChange={setShareOpen}
+            onDeleteOpenChange={setDeleteOpen}
+          />
+        </Suspense>
       )}
     </>
   );

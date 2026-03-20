@@ -19,7 +19,7 @@
  *   - Right sidebar: CollectionPanel (a11y + export tabs)
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useBlocker, useLocation } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -35,7 +35,6 @@ import { PaletteControls } from './palette-controls';
 import { PaletteWorkspace, MobileMoreMenu } from './palette-workspace';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { AlgorithmToggle } from './contrast-indicator';
-import { CollectionPanel } from './collection-panel';
 import { usePaletteContext } from '../lib/palette-context';
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { PaletteSwitcher } from './palette-switcher';
@@ -67,6 +66,43 @@ interface PendingCollectionAction {
   sourceCollectionId: string;
   paletteId: string;
   paletteName: string;
+}
+
+const LazyCollectionPanel = lazy(async () => {
+  const module = await import('./collection-panel');
+  return { default: module.CollectionPanel };
+});
+
+function CollectionPanelFallback({ inlineMode = false }: { inlineMode?: boolean }) {
+  if (inlineMode) {
+    return (
+      <div
+        className="rounded-xl border border-border/60 bg-card/60 p-4"
+        role="status"
+        aria-label="Loading panel"
+      >
+        <div className="h-4 w-28 rounded bg-muted" />
+        <div className="mt-4 space-y-3">
+          <div className="h-16 rounded-lg bg-muted/70" />
+          <div className="h-24 rounded-lg bg-muted/50" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="h-full border-l border-border bg-card px-4 pt-4"
+      role="status"
+      aria-label="Loading panel"
+    >
+      <div className="h-9 rounded-xl bg-muted/80" />
+      <div className="mt-4 space-y-3">
+        <div className="h-24 rounded-xl bg-muted/60" />
+        <div className="h-36 rounded-xl bg-muted/40" />
+      </div>
+    </div>
+  );
 }
 
 // ─── Desktop Layout ───
@@ -129,7 +165,9 @@ function DesktopLayout({
         role="complementary"
         aria-label="Accessibility and export"
       >
-        <CollectionPanel collection={collection} currentPalette={currentPalette} />
+        <Suspense fallback={<CollectionPanelFallback />}>
+          <LazyCollectionPanel collection={collection} currentPalette={currentPalette} />
+        </Suspense>
       </aside>
     </div>
   );
@@ -206,20 +244,24 @@ function TabletLayout({
             />
           </TabsContent>
           <TabsContent value="accessibility" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
-            <CollectionPanel
-              collection={collection}
-              currentPalette={currentPalette}
-              inlineMode
-              defaultTab="a11y"
-            />
+            <Suspense fallback={<CollectionPanelFallback inlineMode />}>
+              <LazyCollectionPanel
+                collection={collection}
+                currentPalette={currentPalette}
+                inlineMode
+                defaultTab="a11y"
+              />
+            </Suspense>
           </TabsContent>
           <TabsContent value="export" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
-            <CollectionPanel
-              collection={collection}
-              currentPalette={currentPalette}
-              inlineMode
-              defaultTab="export"
-            />
+            <Suspense fallback={<CollectionPanelFallback inlineMode />}>
+              <LazyCollectionPanel
+                collection={collection}
+                currentPalette={currentPalette}
+                inlineMode
+                defaultTab="export"
+              />
+            </Suspense>
           </TabsContent>
         </Tabs>
 
@@ -402,20 +444,24 @@ function MobileLayout({
           />
         </TabsContent>
         <TabsContent value="accessibility" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
-          <CollectionPanel
-            collection={collection}
-            currentPalette={currentPalette}
-            inlineMode
-            defaultTab="a11y"
-          />
+          <Suspense fallback={<CollectionPanelFallback inlineMode />}>
+            <LazyCollectionPanel
+              collection={collection}
+              currentPalette={currentPalette}
+              inlineMode
+              defaultTab="a11y"
+            />
+          </Suspense>
         </TabsContent>
         <TabsContent value="export" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
-          <CollectionPanel
-            collection={collection}
-            currentPalette={currentPalette}
-            inlineMode
-            defaultTab="export"
-          />
+          <Suspense fallback={<CollectionPanelFallback inlineMode />}>
+            <LazyCollectionPanel
+              collection={collection}
+              currentPalette={currentPalette}
+              inlineMode
+              defaultTab="export"
+            />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
