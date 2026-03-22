@@ -79,7 +79,7 @@ function PaletteRow({
       )}
       {/* Desktop/tablet: flex row. Mobile: horizontal scroll */}
       <div
-        className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory"
+        className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 snap-x snap-mandatory"
       >
         <div className="space-y-1.5 min-w-max">
           <div
@@ -331,7 +331,7 @@ export function PaletteWorkspace({
               <p className="text-[12px] text-muted-foreground">Dark-mode optimized palette</p>
             </div>
             {darkPalette && (
-              <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+              <div className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 snap-x snap-mandatory">
                 <div className="space-y-1.5 min-w-max">
                   <div className="flex gap-1.5" role="list" aria-label="Dark palette token swatches">
                     {visibleDarkPaletteTokens.map((token) => (
@@ -356,7 +356,7 @@ export function PaletteWorkspace({
               <Sun className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="text-[12px] text-muted-foreground">Light-mode optimized palette</p>
             </div>
-            <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
+            <div className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 snap-x snap-mandatory">
               <div className="space-y-1.5 min-w-max">
                 <div className="flex gap-1.5" role="list" aria-label="Color token swatches">
                   {visiblePaletteTokens.map((token) => (

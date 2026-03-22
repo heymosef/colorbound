@@ -197,4 +197,21 @@ describe('Palette workspace collection actions', () => {
     expect(screen.queryByRole('columnheader', { name: 'Authored Gamut' })).not.toBeInTheDocument();
     expect(screen.getByText(/OKLCH is the main color value for this palette and is designed for Display P3/i)).toBeInTheDocument();
   });
+
+  it('adds top clearance to the swatch rail without changing the swatch layout', () => {
+    const palette = makePalette();
+
+    const { container } = render(
+      <PaletteWorkspace
+        palette={palette}
+        darkPalette={palette}
+      />,
+    );
+
+    const swatchRail = container.querySelector('div.overflow-x-auto.pt-2.pb-2');
+    expect(swatchRail).toBeInTheDocument();
+    expect(swatchRail).toHaveClass('pt-2');
+    expect(swatchRail).toHaveClass('pb-2');
+    expect(screen.getByText('Token swatch')).toBeInTheDocument();
+  });
 });

@@ -35,7 +35,6 @@ import { usePaletteContext } from '../lib/palette-context';
 type ExportFormat = 'css' | 'tailwind' | 'scss' | 'json' | 'dtcg' | 'figma';
 type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'p3';
 type ExportScope = 'palette' | 'collection';
-type ExportScale = 'canonical' | 'visible';
 
 interface ExportPanelProps {
   /** When true, renders in a compact inline layout (for tab content) */
@@ -227,8 +226,6 @@ function ExportSettings({
   onPrefixChange,
   includeDark,
   onIncludeDarkChange,
-  exportScale,
-  onExportScaleChange,
   collectionCount,
   activeFormat,
   onActiveFormatChange,
@@ -242,8 +239,6 @@ function ExportSettings({
   onPrefixChange: (v: string) => void;
   includeDark: boolean;
   onIncludeDarkChange: (v: boolean) => void;
-  exportScale: ExportScale;
-  onExportScaleChange: (v: ExportScale) => void;
   collectionCount: number;
   activeFormat: ExportFormat;
   onActiveFormatChange: (v: ExportFormat) => void;
@@ -257,10 +252,6 @@ function ExportSettings({
   const scopeItems = [
     { value: 'palette', label: 'Current Palette' },
     { value: 'collection', label: `Collection (${collectionCount})`, disabled: collectionCount === 0 },
-  ];
-  const exportScaleItems = [
-    { value: 'canonical', label: 'Full canonical scale' },
-    { value: 'visible', label: 'Visible density only' },
   ];
 
   return (
@@ -293,15 +284,6 @@ function ExportSettings({
         onValueChange={(v) => onScopeChange(v as ExportScope)}
         items={scopeItems}
         ariaLabel="Export scope"
-        triggerClassName="h-8 text-[13px]"
-      />
-
-      <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Scale</Label>
-      <PopoverSelect
-        value={exportScale}
-        onValueChange={(v) => onExportScaleChange(v as ExportScale)}
-        items={exportScaleItems}
-        ariaLabel="Export scale"
         triggerClassName="h-8 text-[13px]"
       />
 
@@ -340,7 +322,6 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
 
   const [activeFormat, setActiveFormat] = useState<ExportFormat>('css');
   const [scope, setScope] = useState<ExportScope>('palette');
-  const [exportScale, setExportScale] = useState<ExportScale>('canonical');
   const [colorFormat, setColorFormat] = useState<ColorFormat>('oklch');
   const [prefix, setPrefix] = useState('');
   const [includeDark, setIncludeDark] = useState(true);
@@ -359,13 +340,13 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
   }, [includeDark, scope, darkPalette, collection]);
 
   const selectedPalettes = useMemo(
-    () => exportScale === 'visible' ? palettes.map(getPaletteWithVisibleTokens) : palettes,
-    [exportScale, palettes],
+    () => palettes.map(getPaletteWithVisibleTokens),
+    [palettes],
   );
 
   const selectedDarkPalettes = useMemo(
-    () => exportScale === 'visible' ? darkPalettes?.map(getPaletteWithVisibleTokens) : darkPalettes,
-    [darkPalettes, exportScale],
+    () => darkPalettes?.map(getPaletteWithVisibleTokens),
+    [darkPalettes],
   );
 
   useEffect(() => {
@@ -398,13 +379,11 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
       const base = primaryTarget === 'p3'
         ? 'Represents the sRGB fallback for Figma parity. Use OKLCH or CSS exports for the Display P3 target.'
         : 'Represents the palette target directly in Figma-compatible sRGB values.';
-      return exportScale === 'visible' ? `${base} Exporting visible density only.` : base;
+      return base;
     }
 
-    return exportScale === 'visible'
-      ? `${FORMAT_INFO[activeFormat].desc} Exporting visible density only.`
-      : FORMAT_INFO[activeFormat].desc;
-  }, [activeFormat, exportScale, primaryTarget]);
+    return FORMAT_INFO[activeFormat].desc;
+  }, [activeFormat, primaryTarget]);
 
   const exportArtifacts = useMemo<ExportArtifact[]>(() => {
     if (selectedPalettes.length === 0) return [];
@@ -516,8 +495,6 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
           onPrefixChange={setPrefix}
           includeDark={includeDark}
           onIncludeDarkChange={setIncludeDark}
-          exportScale={exportScale}
-          onExportScaleChange={setExportScale}
           collectionCount={collection.length}
           activeFormat={activeFormat}
           onActiveFormatChange={setActiveFormat}

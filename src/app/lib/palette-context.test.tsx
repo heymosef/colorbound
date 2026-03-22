@@ -75,6 +75,26 @@ function seedHydratedState(options: {
   return collection;
 }
 
+function seedCollectionsState(options: {
+  collections: ReturnType<typeof createDefaultCollection>[];
+  activeCollectionId?: string | null;
+  activePaletteId?: string | null;
+  lastViewedSavedPaletteId?: string | null;
+  config?: ReturnType<typeof makeConfig>;
+}) {
+  saveState({
+    collections: options.collections,
+    activeCollectionId: options.activeCollectionId ?? options.collections[0]?.id ?? null,
+    activePaletteId: options.activePaletteId ?? null,
+    lastViewedSavedPaletteId: options.lastViewedSavedPaletteId ?? null,
+    config: options.config ?? makeConfig(),
+    nameManuallyEdited: true,
+    contrastAlgorithm: 'wcag',
+    isDirty: false,
+    hasCompletedFirstRun: true,
+  });
+}
+
 describe('PaletteProvider naming behavior', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -473,6 +493,104 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.chroma).toBe(0.18);
     expect(result.current.config.lightness50).toBe(0.985);
     expect(result.current.config.lightness950).toBe(0.025);
+  });
+
+  it('imports a shared palette into the selected collection and activates it', () => {
+    const destinationCollection = createDefaultCollection([makeSavedPalette('existing-1', { name: 'Ocean' })]);
+    destinationCollection.name = 'Marketing';
+    destinationCollection.slug = 'marketing';
+
+    seedCollectionsState({
+      collections: [destinationCollection],
+      activeCollectionId: destinationCollection.id,
+      config: makeConfig(),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    let importResult: ReturnType<typeof result.current.handleImportPaletteToCollection> | null = null;
+    act(() => {
+      importResult = result.current.handleImportPaletteToCollection({
+        name: 'Ocean',
+        hue: 220,
+        chroma: 0.18,
+        lightness50: 0.985,
+        lightness950: 0.025,
+        density: 7,
+        targetColorSpace: 'srgb',
+        generationVersion: GENERATION_VERSION,
+      }, destinationCollection.id);
+    });
+
+    expect(importResult).toMatchObject({
+      ok: true,
+      collectionId: destinationCollection.id,
+      collectionSlug: 'marketing',
+      name: 'Ocean (Imported)',
+    });
+    expect(result.current.activeCollectionId).toBe(destinationCollection.id);
+    expect(result.current.activePaletteId).toBe(importResult && importResult.ok ? importResult.paletteId : null);
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.activeCollection?.palettes.map((palette) => palette.name)).toEqual([
+      'Ocean',
+      'Ocean (Imported)',
+    ]);
+    expect(result.current.config.name).toBe('Ocean (Imported)');
+    expect(result.current.config.density).toBe(7);
+  });
+
+  it('includes conflicted palette names when resolving imported collisions', () => {
+    const destinationCollection = createDefaultCollection([makeSavedPalette('existing-1', { name: 'Ocean' })]);
+    destinationCollection.name = 'Marketing';
+    destinationCollection.slug = 'marketing';
+    destinationCollection.conflictedPalettes = [makeSavedPalette('conflict-1', { name: 'Ocean (Imported)' })];
+
+    seedCollectionsState({
+      collections: [destinationCollection],
+      activeCollectionId: destinationCollection.id,
+      config: makeConfig(),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleImportPaletteToCollection({
+        name: 'Ocean',
+        hue: 220,
+        chroma: 0.18,
+        lightness50: 0.985,
+        lightness950: 0.025,
+        density: 11,
+        targetColorSpace: 'srgb',
+        generationVersion: GENERATION_VERSION,
+      }, destinationCollection.id);
+    });
+
+    expect(result.current.activeCollection?.palettes.map((palette) => palette.name)).toContain('Ocean (Imported) (2)');
+  });
+
+  it('returns an error when importing into a missing collection', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    let importResult: ReturnType<typeof result.current.handleImportPaletteToCollection> | null = null;
+    act(() => {
+      importResult = result.current.handleImportPaletteToCollection({
+        name: 'Ocean',
+        hue: 220,
+        chroma: 0.18,
+        lightness50: 0.985,
+        lightness950: 0.025,
+        density: 11,
+        targetColorSpace: 'srgb',
+        generationVersion: GENERATION_VERSION,
+      }, 'missing-collection');
+    });
+
+    expect(importResult).toEqual({
+      ok: false,
+      error: 'collection_not_found',
+      message: 'Collection not found',
+    });
   });
 
   it('clears active selection and falls back to defaults when the remembered palette collection is deleted', () => {

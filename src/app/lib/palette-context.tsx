@@ -20,6 +20,7 @@ import type {
   ContrastAlgorithm,
   CreateCollectionOptions,
   DuplicatePaletteResult,
+  ImportPaletteToCollectionResult,
   PaletteConfig,
   PaletteRenameResult,
   PaletteContextValue,
@@ -39,6 +40,7 @@ import { validateCollectionName } from './collection-name-validation';
 import {
   buildPaletteNameIndex,
   partitionPalettesByUniqueName,
+  resolveImportedPaletteName,
   validatePaletteName,
 } from './palette-name-validation';
 export type {
@@ -503,6 +505,61 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     });
     return '';
   }, []);
+
+  const handleImportPaletteToCollection = useCallback((
+    importedConfig: PaletteConfig,
+    targetCollectionId: string,
+  ): ImportPaletteToCollectionResult => {
+    const targetCollection = collections.find((collection) => collection.id === targetCollectionId);
+    if (!targetCollection) {
+      return {
+        ok: false,
+        error: 'collection_not_found',
+        message: 'Collection not found',
+      };
+    }
+
+    const resolvedName = resolveImportedPaletteName(
+      importedConfig.name,
+      [...targetCollection.palettes, ...(targetCollection.conflictedPalettes ?? [])],
+    );
+    const newPalette = buildPalette(
+      {
+        ...importedConfig,
+        name: resolvedName,
+        density: importedConfig.density ?? DEFAULT_PALETTE_DENSITY,
+      },
+      generateId(),
+    );
+    const now = new Date().toISOString();
+
+    setCollections((prev) =>
+      prev.map((collection) =>
+        collection.id === targetCollectionId
+          ? {
+              ...collection,
+              palettes: [...collection.palettes, newPalette],
+              lastModifiedAt: now,
+            }
+          : collection,
+      ),
+    );
+    setEditorFromPalette(newPalette, targetCollectionId);
+    setHasCompletedFirstRun(true);
+    toast.success(`Imported "${resolvedName}"`, {
+      description: `Saved to ${targetCollection.name}`,
+      duration: 3000,
+    });
+    announcePolite(`Imported ${resolvedName} to ${targetCollection.name}`);
+
+    return {
+      ok: true,
+      paletteId: newPalette.id,
+      collectionId: targetCollectionId,
+      collectionSlug: targetCollection.slug,
+      name: resolvedName,
+    };
+  }, [collections, setEditorFromPalette]);
 
   const handleImportCollection = useCallback((entries: PaletteConfig[], collectionName?: string): { count: number; collectionSlug: string; conflictCount: number } => {
     if (entries.length === 0) {
@@ -973,6 +1030,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleRename,
       handleReorder,
       handleImportPalette,
+      handleImportPaletteToCollection,
       handleImportCollection,
       handleDuplicatePalette,
       handleResolveConflictedPalette,
@@ -1016,6 +1074,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleRename,
       handleReorder,
       handleImportPalette,
+      handleImportPaletteToCollection,
       handleImportCollection,
       handleDuplicatePalette,
       handleResolveConflictedPalette,

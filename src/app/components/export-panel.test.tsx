@@ -10,15 +10,29 @@ const { copyToClipboard, toastSuccess } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
 }));
 
-const palette: Palette = {
-  id: 'primary',
-  name: 'Primary',
-  tokens: generatePalette(110, 0.18, 0.985, 0.025),
-  hue: 110,
-  chroma: 0.18,
-  lightness50: 0.985,
-  lightness950: 0.025,
-};
+function makePalette(overrides: Partial<Palette> = {}): Palette {
+  return {
+    id: overrides.id ?? 'primary',
+    name: overrides.name ?? 'Primary',
+    tokens: overrides.tokens ?? generatePalette(110, 0.18, 0.985, 0.025),
+    hue: overrides.hue ?? 110,
+    chroma: overrides.chroma ?? 0.18,
+    lightness50: overrides.lightness50 ?? 0.985,
+    lightness950: overrides.lightness950 ?? 0.025,
+    density: overrides.density ?? 11,
+    targetColorSpace: overrides.targetColorSpace ?? 'srgb',
+    generationVersion: overrides.generationVersion ?? 1,
+  };
+}
+
+const palette = makePalette();
+const compactPalette = makePalette({
+  id: 'compact',
+  name: 'Compact',
+  hue: 220,
+  density: 5,
+  tokens: generatePalette(220, 0.18, 0.985, 0.025),
+});
 
 let paletteContextValue = {
   currentPalette: palette,
@@ -92,8 +106,48 @@ describe('ExportPanel', () => {
       label.textContent?.trim(),
     );
 
-    expect(labels.slice(0, 4)).toEqual(['Output', 'Scope', 'Scale', 'Include dark mode']);
+    expect(labels.slice(0, 3)).toEqual(['Output', 'Scope', 'Include dark mode']);
+    expect(screen.queryByText('Scale')).not.toBeInTheDocument();
+    expect(screen.queryByText(/visible density only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/full canonical scale/i)).not.toBeInTheDocument();
     expect(container.querySelector('[data-slot="separator-root"]')).not.toBeInTheDocument();
+  });
+
+  it('uses each palette density when exporting a collection, including derived dark palettes', async () => {
+    paletteContextValue = {
+      currentPalette: palette,
+      darkPalette: deriveDarkPalette(palette),
+      collection: [palette, compactPalette],
+    };
+
+    render(<ExportPanel inlineMode />);
+
+    fireEvent.change(screen.getByLabelText('Output'), { target: { value: 'json' } });
+    fireEvent.change(screen.getByLabelText('Export scope'), { target: { value: 'collection' } });
+
+    const parsed = JSON.parse(screen.getByRole('region', { name: /collection-tokens\.json/i }).textContent ?? '{}');
+
+    expect(Object.keys(parsed.light.primary)).toHaveLength(11);
+    expect(Object.keys(parsed.light.compact)).toHaveLength(5);
+    expect(Object.keys(parsed.dark.primary)).toHaveLength(11);
+    expect(Object.keys(parsed.dark.compact)).toHaveLength(5);
+  });
+
+  it('uses the current palette density for single-palette exports', async () => {
+    paletteContextValue = {
+      currentPalette: compactPalette,
+      darkPalette: deriveDarkPalette(compactPalette),
+      collection: [compactPalette],
+    };
+
+    render(<ExportPanel inlineMode />);
+
+    fireEvent.change(screen.getByLabelText('Output'), { target: { value: 'json' } });
+
+    const parsed = JSON.parse(screen.getByRole('region', { name: /compact-tokens\.json/i }).textContent ?? '{}');
+
+    expect(Object.keys(parsed.light.compact)).toHaveLength(5);
+    expect(Object.keys(parsed.dark.compact)).toHaveLength(5);
   });
 
   it('shows separate Light and Dark Figma previews with independent copy actions when dark mode is enabled', async () => {

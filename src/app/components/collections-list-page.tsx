@@ -19,7 +19,6 @@ import {
 } from './ui/popover';
 import {
   Plus,
-  FolderOpen,
   MoreVertical,
   Pencil,
   Trash2,
@@ -45,6 +44,7 @@ import { getCollectionPreviewColors } from '../lib/palette-preview';
 import { PopoverMenuItem } from './popover-menu-item';
 import { validateCollectionName } from '../lib/collection-name-validation';
 import { buildCollectionPath } from '../lib/editor-routes';
+import { CollectionIcon } from './collection-icon';
 
 // ─── Color swatches from a collection's palettes ───
 
@@ -249,7 +249,7 @@ function CollectionCard({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                <CollectionIcon className="w-4 h-4 text-muted-foreground" />
               </div>
               {editing ? (
                 <div className="flex gap-1 flex-1" onClick={(e) => e.stopPropagation()}>

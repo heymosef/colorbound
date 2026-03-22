@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { PaletteSwitcher } from './palette-switcher';
 import type { Palette, ColorToken } from '../lib/color-utils';
 import { SCALE_STEPS } from '../lib/color-utils';
@@ -333,6 +333,20 @@ describe('PaletteSwitcher', () => {
     expect(screen.queryByLabelText('Filter palettes')).not.toBeInTheDocument();
   });
 
+  it('uses a 216px max-height viewport when collection has 5 or fewer palettes', () => {
+    const collection = Array.from({ length: 5 }, (_, i) =>
+      makePalette({ id: `p${i}`, name: `Palette ${i}` })
+    );
+    render(<PaletteSwitcher {...defaultProps({ collection })} />);
+    fireEvent.click(screen.getByLabelText(/Switch palette/));
+
+    const listbox = screen.getByRole('listbox', { name: 'Saved palettes' });
+    const viewport = listbox.parentElement;
+    expect(viewport).not.toBeNull();
+    expect(viewport).toHaveClass('max-h-[216px]');
+    expect(viewport).toHaveClass('overflow-y-auto');
+  });
+
   it('shows filter input when collection has more than 5 palettes', () => {
     const collection = Array.from({ length: 6 }, (_, i) =>
       makePalette({ id: `p${i}`, name: `Palette ${i}` })
@@ -340,6 +354,20 @@ describe('PaletteSwitcher', () => {
     render(<PaletteSwitcher {...defaultProps({ collection })} />);
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     expect(screen.getByLabelText('Filter palettes')).toBeInTheDocument();
+  });
+
+  it('uses a 216px max-height viewport when collection has more than 5 palettes', () => {
+    const collection = Array.from({ length: 6 }, (_, i) =>
+      makePalette({ id: `p${i}`, name: `Palette ${i}` })
+    );
+    render(<PaletteSwitcher {...defaultProps({ collection })} />);
+    fireEvent.click(screen.getByLabelText(/Switch palette/));
+
+    const listbox = screen.getByRole('listbox', { name: 'Saved palettes' });
+    const viewport = listbox.parentElement;
+    expect(viewport).not.toBeNull();
+    expect(viewport).toHaveClass('max-h-[216px]');
+    expect(viewport).toHaveClass('overflow-y-auto');
   });
 
   it('filters palettes by name', () => {

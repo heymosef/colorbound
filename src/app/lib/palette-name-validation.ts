@@ -109,3 +109,27 @@ export function hasDuplicatePaletteNames(
   const { conflictedPalettes } = partitionPalettesByUniqueName(palettes);
   return conflictedPalettes.length > 0;
 }
+
+export function resolveImportedPaletteName(
+  baseName: string,
+  palettes: Pick<Palette, 'name'>[],
+): string {
+  const normalizedBase = normalizePaletteName(baseName) || 'Untitled';
+  const existingKeys = new Set(palettes.map((palette) => getPaletteNameKey(palette.name)));
+
+  if (!existingKeys.has(getPaletteNameKey(normalizedBase))) {
+    return normalizedBase;
+  }
+
+  const importedBase = `${normalizedBase} (Imported)`;
+  if (!existingKeys.has(getPaletteNameKey(importedBase))) {
+    return importedBase;
+  }
+
+  let suffix = 2;
+  while (existingKeys.has(getPaletteNameKey(`${importedBase} (${suffix})`))) {
+    suffix += 1;
+  }
+
+  return `${importedBase} (${suffix})`;
+}

@@ -39,6 +39,8 @@ import { CopyableTokenSwatch } from './copyable-token-swatch';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
+import { buildCollectionSavedEditorPath } from '../lib/editor-routes';
+import { CollectionTargetDialog } from './collection-target-dialog';
 
 // ─── Palette strip ───
 
@@ -110,7 +112,11 @@ function ConfigSpec({ entry }: { entry: SharedPaletteEntry }) {
 export function SharedPalettePage() {
   const { shareId } = useParams<{ shareId: string }>();
   const navigate = useNavigate();
-  const { handleImportPalette, activeCollection } = usePaletteContext();
+  const {
+    collections,
+    handleCreateCollection,
+    handleImportPaletteToCollection,
+  } = usePaletteContext();
   const data = useLoaderData() as SharedPaletteResponse;
 
   const entry = data.palette;
@@ -120,6 +126,7 @@ export function SharedPalettePage() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('light');
   const [linkCopied, setLinkCopied] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const supportsP3 = useSupportsP3();
 
   // Deserialize through the trust boundary, then build light + dark palettes
@@ -163,9 +170,21 @@ export function SharedPalettePage() {
 
   const handleImport = () => {
     if (!deserialized) return;
-    handleImportPalette(deserialized.config);
-    const basePath = activeCollection?.slug ? `/${activeCollection.slug}` : '';
-    navigate(`${basePath}/edit`);
+    setImportDialogOpen(true);
+  };
+
+  const handleSelectCollection = (collectionId: string) => {
+    if (!deserialized) {
+      return { ok: false, message: 'Palette import is unavailable' };
+    }
+
+    const result = handleImportPaletteToCollection(deserialized.config, collectionId);
+    if (!result.ok) {
+      return { ok: false, message: result.message };
+    }
+
+    navigate(buildCollectionSavedEditorPath(result.collectionSlug, result.paletteId));
+    return { ok: true };
   };
 
   // Deserialization failed for the fetched entry
@@ -310,6 +329,21 @@ export function SharedPalettePage() {
           </Link>
         </div>
       </div>
+      <CollectionTargetDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title={`Import "${entry.name}"`}
+        description="Choose which collection to add this palette to before opening it in the editor."
+        collections={collections.map((collection) => ({
+          id: collection.id,
+          name: collection.name,
+          paletteCount: collection.palettes.length,
+        }))}
+        emptyTitle="No collections yet"
+        emptyDescription="Create a collection to import this shared palette and continue editing."
+        onSelect={handleSelectCollection}
+        onCreateCollection={handleCreateCollection}
+      />
     </div>
   );
 }

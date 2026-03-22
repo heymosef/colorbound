@@ -4,6 +4,7 @@ import {
   getPaletteNameKey,
   normalizePaletteName,
   partitionPalettesByUniqueName,
+  resolveImportedPaletteName,
   validatePaletteName,
 } from './palette-name-validation';
 
@@ -49,5 +50,19 @@ describe('palette-name-validation', () => {
 
     expect(partitioned.activePalettes.map((palette) => palette.id)).toEqual(['a', 'c']);
     expect(partitioned.conflictedPalettes.map((palette) => palette.id)).toEqual(['b', 'd']);
+  });
+
+  it('resolves imported palette names deterministically', () => {
+    expect(resolveImportedPaletteName('  Ocean Blue  ', [{ name: 'Forest' }])).toBe('Ocean Blue');
+    expect(resolveImportedPaletteName('Ocean Blue', [{ name: ' ocean blue ' }])).toBe('Ocean Blue (Imported)');
+    expect(resolveImportedPaletteName('Ocean Blue', [
+      { name: 'Ocean Blue' },
+      { name: 'Ocean Blue (Imported)' },
+      { name: 'Ocean Blue (Imported) (2)' },
+    ])).toBe('Ocean Blue (Imported) (3)');
+    expect(resolveImportedPaletteName('Ocean Blue (Imported)', [
+      { name: 'Ocean Blue (Imported)' },
+    ])).toBe('Ocean Blue (Imported) (Imported)');
+    expect(resolveImportedPaletteName('   ', [])).toBe('Untitled');
   });
 });

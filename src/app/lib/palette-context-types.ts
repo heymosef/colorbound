@@ -43,6 +43,10 @@ export type DuplicatePaletteResult =
   | { ok: true; paletteId: string; collectionId: string; name: string }
   | PaletteMutationFailure;
 
+export type ImportPaletteToCollectionResult =
+  | { ok: true; paletteId: string; collectionId: string; collectionSlug: string; name: string }
+  | { ok: false; error: 'collection_not_found'; message: string };
+
 export type PaletteRenameResult =
   | { ok: true; paletteId: string; collectionId: string; name: string }
   | PaletteMutationFailure;
@@ -88,6 +92,7 @@ export interface PaletteContextValue {
   handleRename: (id: string, name: string) => PaletteRenameResult;
   handleReorder: (fromIndex: number, toIndex: number) => void;
   handleImportPalette: (config: PaletteConfig) => string;
+  handleImportPaletteToCollection: (config: PaletteConfig, collectionId: string) => ImportPaletteToCollectionResult;
   handleImportCollection: (entries: PaletteConfig[], collectionName?: string) => { count: number; collectionSlug: string; conflictCount: number };
   handleDuplicatePalette: (name: string) => DuplicatePaletteResult;
   handleResolveConflictedPalette: (collectionId: string, paletteId: string, name: string) => ResolveConflictedPaletteResult;

@@ -17,11 +17,11 @@ import {
   Pencil,
   Check,
   Palette as PaletteIcon,
-  SwatchBook,
   ArrowLeft,
 } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import type { Palette } from '../lib/color-utils';
+import { CollectionIcon } from './collection-icon';
 import { ShareCollectionButton, SharePaletteButton } from './share/share-actions';
 import { PopoverMenuItem } from './popover-menu-item';
 import { useDocumentTitle } from '../lib/use-document-title';
@@ -423,7 +423,7 @@ export function CollectionsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <SwatchBook className="w-5 h-5 text-muted-foreground" />
+              <CollectionIcon className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
               {editingCollectionName ? (

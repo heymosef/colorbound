@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getRampDisplayColors } from '../lib/palette-preview';
+import { getPaletteSwitcherViewportClass } from './switcher-viewport';
 export {
   getRampColors,
   getRampDisplayColors,
@@ -362,7 +363,7 @@ export function PaletteSwitcher({
         )}
 
         {/* Palette list */}
-        <div className="p-1 max-h-[240px] overflow-y-auto">
+        <div className={`p-1 ${getPaletteSwitcherViewportClass()} overflow-y-auto`}>
           {hasCollection ? (
             <div role="listbox" aria-label="Saved palettes">
               {filteredCollection.length > 0 ? (

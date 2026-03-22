@@ -7,11 +7,13 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
 } from './ui/breadcrumb';
-import { Sun, Moon, Monitor, ChevronDown, SwatchBook, Plus, Check, LayoutGrid } from 'lucide-react';
+import { Sun, Moon, Monitor, ChevronDown, Plus, Check, LayoutGrid } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import { PaletteSwitcher } from './palette-switcher';
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { Separator } from './ui/separator';
+import { CollectionIcon } from './collection-icon';
+import { getCollectionSwitcherViewportClass } from './switcher-viewport';
 import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
@@ -182,12 +184,12 @@ export function CollectionSwitcher({
         className="inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
         aria-label={`Collection: ${collectionName}. Click to switch.`}
       >
-        <SwatchBook className="w-3.5 h-3.5 shrink-0" />
+        <CollectionIcon className="w-3.5 h-3.5 shrink-0" />
         <span className={`${showNameOnMobile ? 'inline' : 'hidden sm:inline'} text-[13px] font-medium truncate max-w-[160px] sm:max-w-[200px]`}>{collectionName}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${showNameOnMobile ? 'block' : 'hidden sm:block'}`} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-0 flex flex-col overflow-hidden">
-        <div className="p-1 max-h-[240px] overflow-y-auto">
+        <div className={`p-1 ${getCollectionSwitcherViewportClass()} overflow-y-auto`}>
           {collections.map((col) => {
             const isActive = col.id === activeCollectionId;
             return (
@@ -204,7 +206,7 @@ export function CollectionSwitcher({
                   setOpen(false);
                 }}
               >
-                <SwatchBook className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                <CollectionIcon className="w-3.5 h-3.5 shrink-0 opacity-60" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] truncate">{col.name}</span>
