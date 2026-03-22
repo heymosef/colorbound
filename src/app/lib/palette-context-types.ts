@@ -1,6 +1,7 @@
 import type { TargetColorSpace } from './color-utils';
 import type { Palette } from './color-utils';
 import type { Collection } from './collection-types';
+import type { PaletteDensity } from './palette-density';
 import type {
   CopyPaletteOperationResult,
   MovePaletteOperationResult,
@@ -15,6 +16,7 @@ export interface PaletteConfig {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
+  density: PaletteDensity;
   targetColorSpace: TargetColorSpace;
   generationVersion: number;
 }

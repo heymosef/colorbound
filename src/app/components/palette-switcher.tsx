@@ -70,7 +70,7 @@ function PaletteRow({
       type="button"
       role="option"
       aria-selected={isActive}
-      aria-label={`${palette.name}, ${palette.tokens.length} tokens${isActive ? ', currently active' : ''}`}
+      aria-label={`${palette.name}, density ${palette.density ?? 11}${isActive ? ', currently active' : ''}`}
       className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors outline-none select-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
         isActive
           ? 'bg-accent text-accent-foreground'
@@ -86,7 +86,7 @@ function PaletteRow({
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[10px] text-muted-foreground tabular-nums">
-            {palette.tokens.length} tokens
+            Density {palette.density ?? 11}
           </span>
         </div>
       </div>

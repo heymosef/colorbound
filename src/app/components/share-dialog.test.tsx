@@ -97,6 +97,7 @@ describe('Share dialog flows', () => {
           chroma: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
+          density: 11,
         }}
       />,
     );
@@ -108,6 +109,7 @@ describe('Share dialog flows', () => {
       chroma: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: 11,
       targetColorSpace: 'srgb',
       generationVersion: 1,
     });
@@ -132,6 +134,7 @@ describe('Share dialog flows', () => {
           chroma: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
+          density: 11,
         }]}
       />,
     );
@@ -145,6 +148,7 @@ describe('Share dialog flows', () => {
         chroma: 0.12,
         lightness50: 0.985,
         lightness950: 0.025,
+        density: 11,
         targetColorSpace: 'srgb',
         generationVersion: 1,
       }], 'Brand Colors');

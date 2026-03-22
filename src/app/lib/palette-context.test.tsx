@@ -115,6 +115,48 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.name).toBe('Manual Name');
   });
 
+  it('preserves the current name when applying hex to a saved palette', () => {
+    const savedPalette = makeSavedPalette('saved-1', { name: 'Ocean' });
+    const collection = seedHydratedState({
+      palettes: [savedPalette],
+      activePaletteId: savedPalette.id,
+      lastViewedSavedPaletteId: savedPalette.id,
+      config: makeConfig(savedPalette),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.selectPaletteInCollection(collection.id, savedPalette.id);
+    });
+
+    act(() => {
+      result.current.handleApplyHex(120, 0.222);
+    });
+
+    expect(result.current.config.name).toBe('Ocean');
+    expect(result.current.config.hue).toBe(120);
+    expect(result.current.config.chroma).toBe(0.222);
+
+    act(() => {
+      result.current.handleConfigChange({ hue: 140 });
+    });
+
+    expect(result.current.config.name).toBe('Ocean');
+  });
+
+  it('keeps auto-naming drafts when applying hex', () => {
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.handleApplyHex(120, 0.222);
+    });
+
+    expect(result.current.config.name).toBe(
+      suggestPaletteName(120, 0.222, 0.985, 0.025),
+    );
+  });
+
   it('creates a collection without changing editor selection when activate is false', () => {
     const { result } = renderHook(() => usePaletteContext(), { wrapper });
 
@@ -433,7 +475,7 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.lightness950).toBe(0.025);
   });
 
-  it('falls back to defaults when the remembered palette collection is deleted', () => {
+  it('clears active selection and falls back to defaults when the remembered palette collection is deleted', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const otherCollectionPalette = makeSavedPalette('other-palette');
     const rememberedPalette = makeSavedPalette('saved-p3', {
@@ -460,6 +502,9 @@ describe('PaletteProvider naming behavior', () => {
     act(() => {
       result.current.handleDeleteCollection(secondCollection.id);
     });
+
+    expect(result.current.activeCollectionId).toBeNull();
+    expect(result.current.activePaletteId).toBeNull();
 
     act(() => {
       result.current.startDraftPalette(firstCollection.id);

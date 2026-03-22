@@ -92,7 +92,7 @@ describe('ExportPanel', () => {
       label.textContent?.trim(),
     );
 
-    expect(labels.slice(0, 3)).toEqual(['Output', 'Scope', 'Include dark mode']);
+    expect(labels.slice(0, 4)).toEqual(['Output', 'Scope', 'Scale', 'Include dark mode']);
     expect(container.querySelector('[data-slot="separator-root"]')).not.toBeInTheDocument();
   });
 

@@ -1,6 +1,8 @@
 // OKLCH Color Utilities for Design System Token Generation
 // Includes CSS Color Level 4 gamut mapping and Display P3 wide-gamut support.
 
+import type { PaletteDensity } from './palette-density';
+
 export interface OklchColor {
   l: number; // Lightness 0-1
   c: number; // Chroma 0-0.4
@@ -55,6 +57,7 @@ export interface Palette {
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
   lightness950: number;
+  density: PaletteDensity;
   targetColorSpace: TargetColorSpace;
   generationVersion: number;
 }

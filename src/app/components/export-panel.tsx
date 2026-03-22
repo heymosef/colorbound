@@ -29,11 +29,13 @@ import {
   exportAsW3C,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
+import { getPaletteWithVisibleTokens } from '../lib/palette-density';
 import { usePaletteContext } from '../lib/palette-context';
 
 type ExportFormat = 'css' | 'tailwind' | 'scss' | 'json' | 'dtcg' | 'figma';
 type ColorFormat = 'oklch' | 'hex' | 'rgb' | 'p3';
 type ExportScope = 'palette' | 'collection';
+type ExportScale = 'canonical' | 'visible';
 
 interface ExportPanelProps {
   /** When true, renders in a compact inline layout (for tab content) */
@@ -225,6 +227,8 @@ function ExportSettings({
   onPrefixChange,
   includeDark,
   onIncludeDarkChange,
+  exportScale,
+  onExportScaleChange,
   collectionCount,
   activeFormat,
   onActiveFormatChange,
@@ -238,6 +242,8 @@ function ExportSettings({
   onPrefixChange: (v: string) => void;
   includeDark: boolean;
   onIncludeDarkChange: (v: boolean) => void;
+  exportScale: ExportScale;
+  onExportScaleChange: (v: ExportScale) => void;
   collectionCount: number;
   activeFormat: ExportFormat;
   onActiveFormatChange: (v: ExportFormat) => void;
@@ -251,6 +257,10 @@ function ExportSettings({
   const scopeItems = [
     { value: 'palette', label: 'Current Palette' },
     { value: 'collection', label: `Collection (${collectionCount})`, disabled: collectionCount === 0 },
+  ];
+  const exportScaleItems = [
+    { value: 'canonical', label: 'Full canonical scale' },
+    { value: 'visible', label: 'Visible density only' },
   ];
 
   return (
@@ -283,6 +293,15 @@ function ExportSettings({
         onValueChange={(v) => onScopeChange(v as ExportScope)}
         items={scopeItems}
         ariaLabel="Export scope"
+        triggerClassName="h-8 text-[13px]"
+      />
+
+      <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Scale</Label>
+      <PopoverSelect
+        value={exportScale}
+        onValueChange={(v) => onExportScaleChange(v as ExportScale)}
+        items={exportScaleItems}
+        ariaLabel="Export scale"
         triggerClassName="h-8 text-[13px]"
       />
 
@@ -321,6 +340,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
 
   const [activeFormat, setActiveFormat] = useState<ExportFormat>('css');
   const [scope, setScope] = useState<ExportScope>('palette');
+  const [exportScale, setExportScale] = useState<ExportScale>('canonical');
   const [colorFormat, setColorFormat] = useState<ColorFormat>('oklch');
   const [prefix, setPrefix] = useState('');
   const [includeDark, setIncludeDark] = useState(true);
@@ -338,6 +358,16 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     return undefined;
   }, [includeDark, scope, darkPalette, collection]);
 
+  const selectedPalettes = useMemo(
+    () => exportScale === 'visible' ? palettes.map(getPaletteWithVisibleTokens) : palettes,
+    [exportScale, palettes],
+  );
+
+  const selectedDarkPalettes = useMemo(
+    () => exportScale === 'visible' ? darkPalettes?.map(getPaletteWithVisibleTokens) : darkPalettes,
+    [darkPalettes, exportScale],
+  );
+
   useEffect(() => {
     const allowedFormats = EXPORT_TARGET_CONFIG[activeFormat].allowedColorFormats;
     if (EXPORT_TARGET_CONFIG[activeFormat].showColorFormat && !allowedFormats.includes(colorFormat)) {
@@ -348,8 +378,8 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
   const exportOptions = useMemo(() => ({
     prefix,
     colorFormat,
-    darkPalettes,
-  }), [prefix, colorFormat, darkPalettes]);
+    darkPalettes: selectedDarkPalettes,
+  }), [prefix, colorFormat, selectedDarkPalettes]);
 
   const paletteName = useMemo(() => {
     if (scope === 'collection') return 'collection';
@@ -365,23 +395,26 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     }
 
     if (activeFormat === 'figma') {
-      return primaryTarget === 'p3'
+      const base = primaryTarget === 'p3'
         ? 'Represents the sRGB fallback for Figma parity. Use OKLCH or CSS exports for the Display P3 target.'
         : 'Represents the palette target directly in Figma-compatible sRGB values.';
+      return exportScale === 'visible' ? `${base} Exporting visible density only.` : base;
     }
 
-    return FORMAT_INFO[activeFormat].desc;
-  }, [activeFormat, primaryTarget]);
+    return exportScale === 'visible'
+      ? `${FORMAT_INFO[activeFormat].desc} Exporting visible density only.`
+      : FORMAT_INFO[activeFormat].desc;
+  }, [activeFormat, exportScale, primaryTarget]);
 
   const exportArtifacts = useMemo<ExportArtifact[]>(() => {
-    if (palettes.length === 0) return [];
+    if (selectedPalettes.length === 0) return [];
 
     switch (activeFormat) {
       case 'css':
         return [{
           id: 'default',
           label: FORMAT_INFO.css.label,
-          code: exportAsCSS(palettes, exportOptions),
+          code: exportAsCSS(selectedPalettes, exportOptions),
           language: 'CSS',
           filename: `${paletteName}-tokens${FORMAT_INFO.css.ext}`,
         }];
@@ -389,7 +422,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         return [{
           id: 'default',
           label: FORMAT_INFO.tailwind.label,
-          code: exportAsTailwind(palettes, exportOptions),
+          code: exportAsTailwind(selectedPalettes, exportOptions),
           language: 'CSS',
           filename: `${paletteName}-tokens${FORMAT_INFO.tailwind.ext}`,
         }];
@@ -397,7 +430,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         return [{
           id: 'default',
           label: FORMAT_INFO.scss.label,
-          code: exportAsSCSS(palettes, { colorFormat, darkPalettes }),
+          code: exportAsSCSS(selectedPalettes, { colorFormat, darkPalettes: selectedDarkPalettes }),
           language: 'SCSS',
           filename: `${paletteName}-tokens${FORMAT_INFO.scss.ext}`,
         }];
@@ -405,7 +438,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         return [{
           id: 'default',
           label: FORMAT_INFO.json.label,
-          code: exportAsJSON(palettes, { colorFormat, darkPalettes }),
+          code: exportAsJSON(selectedPalettes, { colorFormat, darkPalettes: selectedDarkPalettes }),
           language: 'JSON',
           filename: `${paletteName}-tokens${FORMAT_INFO.json.ext}`,
         }];
@@ -413,7 +446,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         return [{
           id: 'default',
           label: FORMAT_INFO.dtcg.label,
-          code: exportAsW3C(palettes, { darkPalettes }),
+          code: exportAsW3C(selectedPalettes, { darkPalettes: selectedDarkPalettes }),
           language: 'JSON',
           filename: `${paletteName}-tokens${FORMAT_INFO.dtcg.ext}`,
         }];
@@ -421,16 +454,16 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
         const artifacts: ExportArtifact[] = [{
           id: 'light',
           label: 'Light',
-          code: exportAsFigmaTokens(palettes),
+          code: exportAsFigmaTokens(selectedPalettes),
           language: 'JSON',
           filename: `${paletteName}-light${FORMAT_INFO.figma.ext}`,
         }];
 
-        if (includeDark && darkPalettes && darkPalettes.length > 0) {
+        if (includeDark && selectedDarkPalettes && selectedDarkPalettes.length > 0) {
           artifacts.push({
             id: 'dark',
             label: 'Dark',
-            code: exportAsFigmaTokens(darkPalettes),
+            code: exportAsFigmaTokens(selectedDarkPalettes),
             language: 'JSON',
             filename: `${paletteName}-dark${FORMAT_INFO.figma.ext}`,
           });
@@ -441,7 +474,7 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
       default:
         return [];
     }
-  }, [activeFormat, palettes, exportOptions, colorFormat, darkPalettes, includeDark, paletteName]);
+  }, [activeFormat, selectedPalettes, exportOptions, colorFormat, selectedDarkPalettes, includeDark, paletteName]);
 
   useEffect(() => {
     if (exportArtifacts.length === 0) {
@@ -483,6 +516,8 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
           onPrefixChange={setPrefix}
           includeDark={includeDark}
           onIncludeDarkChange={setIncludeDark}
+          exportScale={exportScale}
+          onExportScaleChange={setExportScale}
           collectionCount={collection.length}
           activeFormat={activeFormat}
           onActiveFormatChange={setActiveFormat}

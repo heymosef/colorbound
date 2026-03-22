@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadState, saveState, createDefaultCollection } from './local-storage';
 import { GENERATION_VERSION } from './color-utils';
+import { DEFAULT_PALETTE_DENSITY } from './palette-density';
 
 // ─── Helpers ───
 
@@ -56,6 +57,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     chroma: 0.15,
     lightness50: 0.985,
     lightness950: 0.025,
+    density: DEFAULT_PALETTE_DENSITY,
     targetColorSpace: 'srgb',
     generationVersion: GENERATION_VERSION,
     ...overrides,
@@ -70,6 +72,7 @@ function makeStoredPaletteEntry(overrides: Record<string, unknown> = {}) {
     chroma: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
+    density: DEFAULT_PALETTE_DENSITY,
     targetColorSpace: 'srgb',
     generationVersion: GENERATION_VERSION,
     ...overrides,
@@ -259,7 +262,7 @@ describe('legacy migrations', () => {
     const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
 
     expect(loaded?.lastViewedSavedPaletteId).toBe('pal-p3');
-    expect(raw.version).toBe(6);
+    expect(raw.version).toBe(7);
     expect(raw.lastViewedSavedPaletteId).toBe('pal-p3');
   });
 
@@ -413,7 +416,7 @@ describe('duplicate palette migration', () => {
     expect(loaded?.collections[0].conflictedPalettes.map((palette) => palette.name)).toEqual([' ocean ']);
 
     const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
-    expect(raw.version).toBe(6);
+    expect(raw.version).toBe(7);
     expect(raw.collections[0].palettes).toHaveLength(1);
     expect(raw.collections[0].conflictedPalettes).toHaveLength(1);
   });

@@ -20,6 +20,7 @@ import {
   CopyPlus, Trash2, Share2, FolderInput, FolderOutput,
 } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
+import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { UIPreview } from './ui-preview';
 import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
@@ -63,6 +64,7 @@ function PaletteRow({
   label?: string;
 }) {
   const isDarkMode = label === 'Dark Palette';
+  const visibleTokens = getVisiblePaletteTokens(palette);
   return (
     <div className="space-y-1.5">
       {label && (
@@ -85,7 +87,7 @@ function PaletteRow({
             role="list"
             aria-label={`${label ?? 'Palette'} token swatches`}
           >
-            {palette.tokens.map((token) => (
+            {visibleTokens.map((token) => (
               <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
                 <CopyableTokenSwatch
                   token={token}
@@ -97,7 +99,7 @@ function PaletteRow({
             ))}
           </div>
           {/* WCAG contrast indicators */}
-          <ContrastRow tokens={palette.tokens} isDarkMode={isDarkMode} />
+          <ContrastRow tokens={visibleTokens} isDarkMode={isDarkMode} />
         </div>
       </div>
     </div>
@@ -279,6 +281,9 @@ export function PaletteWorkspace({
   }
 
   const activePalette = viewMode === 'dark' && darkPalette ? darkPalette : palette;
+  const visiblePaletteTokens = getVisiblePaletteTokens(palette);
+  const visibleDarkPaletteTokens = darkPalette ? getVisiblePaletteTokens(darkPalette) : [];
+  const visibleActivePaletteTokens = getVisiblePaletteTokens(activePalette);
   const previewLimited = palette.targetColorSpace === 'p3' && !supportsP3;
 
   return (
@@ -329,7 +334,7 @@ export function PaletteWorkspace({
               <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
                 <div className="space-y-1.5 min-w-max">
                   <div className="flex gap-1.5" role="list" aria-label="Dark palette token swatches">
-                    {darkPalette.tokens.map((token) => (
+                    {visibleDarkPaletteTokens.map((token) => (
                       <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
                         <CopyableTokenSwatch
                           token={token}
@@ -340,7 +345,7 @@ export function PaletteWorkspace({
                       </div>
                     ))}
                   </div>
-                  <ContrastRow tokens={darkPalette.tokens} isDarkMode />
+                  <ContrastRow tokens={visibleDarkPaletteTokens} isDarkMode />
                 </div>
               </div>
             )}
@@ -354,7 +359,7 @@ export function PaletteWorkspace({
             <div className="overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory">
               <div className="space-y-1.5 min-w-max">
                 <div className="flex gap-1.5" role="list" aria-label="Color token swatches">
-                  {palette.tokens.map((token) => (
+                  {visiblePaletteTokens.map((token) => (
                     <div key={token.step} className="flex-1 min-w-[72px] snap-start" role="listitem">
                       <CopyableTokenSwatch
                         token={token}
@@ -365,7 +370,7 @@ export function PaletteWorkspace({
                     </div>
                   ))}
                 </div>
-                <ContrastRow tokens={palette.tokens} isDarkMode={false} />
+                <ContrastRow tokens={visiblePaletteTokens} isDarkMode={false} />
               </div>
             </div>
           </div>
@@ -400,7 +405,7 @@ export function PaletteWorkspace({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activePalette.tokens.map((token) => {
+                    {visibleActivePaletteTokens.map((token) => {
                       return (
                         <TableRow key={token.step}>
                           <TableCell className="px-3 py-1.5 font-mono">{token.step}</TableCell>

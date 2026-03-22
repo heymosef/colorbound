@@ -11,6 +11,7 @@ import {
 import type { PaletteConfig } from './palette-context-types';
 import type { SharedPaletteEntry } from './share-api';
 import { GENERATION_VERSION } from './color-utils';
+import { DEFAULT_PALETTE_DENSITY } from './palette-density';
 
 const VALID_CONFIG: PaletteConfig = {
   name: 'Ocean Blue',
@@ -18,6 +19,7 @@ const VALID_CONFIG: PaletteConfig = {
   chroma: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
+  density: DEFAULT_PALETTE_DENSITY,
   targetColorSpace: 'srgb',
   generationVersion: GENERATION_VERSION,
 };
@@ -75,6 +77,7 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: DEFAULT_PALETTE_DENSITY,
       targetColorSpace: 'srgb',
       generationVersion: GENERATION_VERSION,
     });
@@ -106,6 +109,7 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 1,
       lightness950: 0,
+      density: DEFAULT_PALETTE_DENSITY,
       targetColorSpace: 'srgb',
       generationVersion: GENERATION_VERSION,
     });
@@ -123,6 +127,7 @@ describe('deserializePaletteConfig', () => {
       chroma: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: DEFAULT_PALETTE_DENSITY,
       targetColorSpace: 'srgb',
       generationVersion: GENERATION_VERSION,
     });
@@ -210,6 +215,7 @@ describe('deserializeCollection', () => {
           chroma: 0.18,
           lightness50: 0.985,
           lightness950: 0.025,
+          density: DEFAULT_PALETTE_DENSITY,
           targetColorSpace: 'srgb',
           generationVersion: GENERATION_VERSION,
         },

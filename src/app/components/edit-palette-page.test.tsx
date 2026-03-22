@@ -5,10 +5,16 @@ import { RouterProvider, createMemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditPalettePage } from './edit-palette-page';
 
+const { toastInfo } = vi.hoisted(() => ({
+  toastInfo: vi.fn(),
+}));
+
 const startDraftPalette = vi.fn();
 const handleAddToCollection = vi.fn();
 const handleUpdateInCollection = vi.fn();
 const selectPaletteInCollection = vi.fn();
+const handleDuplicatePalette = vi.fn();
+const handleRemove = vi.fn();
 let breakpoint: 'mobile' | 'tablet' | 'desktop' = 'desktop';
 
 let paletteContextValue: any;
@@ -78,12 +84,12 @@ function buildContext(overrides: Record<string, unknown> = {}) {
     handleSelectFromCollection: vi.fn(),
     selectPaletteInCollection,
     handleRevertChanges: vi.fn(),
-    handleRemove: vi.fn(),
+    handleRemove,
     handleRename: vi.fn(),
     handleReorder: vi.fn(),
     handleImportPalette: vi.fn(),
     handleImportCollection: vi.fn(),
-    handleDuplicatePalette: vi.fn(),
+    handleDuplicatePalette,
     handleApplyHex: vi.fn(),
     activeCollection: {
       id: 'collection-1',
@@ -128,8 +134,19 @@ vi.mock('./palette-controls', () => ({
 }));
 
 vi.mock('./palette-workspace', () => ({
-  PaletteWorkspace: () => <div>Workspace</div>,
-  MobileMoreMenu: () => null,
+  PaletteWorkspace: ({ onDuplicate, onDelete }: any) => (
+    <div>
+      <div>Workspace</div>
+      {onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Duplicate palette</button> : null}
+      {onDelete ? <button onClick={onDelete}>Delete palette</button> : null}
+    </div>
+  ),
+  MobileMoreMenu: ({ onDuplicate, onDelete }: any) => (
+    <div>
+      {onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Mobile duplicate palette</button> : null}
+      {onDelete ? <button onClick={onDelete}>Mobile delete palette</button> : null}
+    </div>
+  ),
 }));
 
 vi.mock('./palette-switcher', () => ({
@@ -152,13 +169,15 @@ vi.mock('./palette-view-mode-toggle', () => ({
 
 vi.mock('sonner', () => ({
   toast: {
-    info: vi.fn(),
+    info: toastInfo,
   },
 }));
 
 function renderAt(pathname: string) {
   const router = createMemoryRouter(
     [
+      { path: '/', element: <div>Collections page</div> },
+      { path: '/:collectionSlug', element: <div>Collection page</div> },
       { path: '/:collectionSlug/edit', element: <EditPalettePage /> },
       { path: '/:collectionSlug/edit/:paletteId', element: <EditPalettePage /> },
     ],
@@ -176,6 +195,9 @@ describe('EditPalettePage draft save flow', () => {
     handleAddToCollection.mockReset();
     handleUpdateInCollection.mockReset();
     selectPaletteInCollection.mockReset();
+    handleDuplicatePalette.mockReset();
+    handleRemove.mockReset();
+    toastInfo.mockReset();
     paletteContextValue = buildContext();
   });
 
@@ -277,6 +299,211 @@ describe('EditPalettePage draft save flow', () => {
     });
 
     expect(startDraftPalette).toHaveBeenCalledWith('collection-1');
+  });
+
+  it('navigates to the duplicated palette route instead of staying on the source palette', async () => {
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const duplicatedPalette = makePalette('saved-2', 'Cyan Copy');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: false,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    handleDuplicatePalette.mockImplementation(() => {
+      paletteContextValue = buildContext({
+        collection: [savedPalette, duplicatedPalette],
+        collections: [
+          {
+            id: 'collection-1',
+            name: 'My Collection',
+            slug: 'my-collection',
+            palettes: [savedPalette, duplicatedPalette],
+          },
+        ],
+        activePaletteId: 'saved-2',
+        savedBaselinePalette: duplicatedPalette,
+        hasPersistedBaseline: true,
+        isDirty: false,
+        currentPalette: duplicatedPalette,
+        config: {
+          name: 'Cyan Copy',
+          hue: 210,
+          chroma: 0.12,
+          lightness50: 0.985,
+          lightness950: 0.025,
+        },
+      });
+
+      return { ok: true, paletteId: 'saved-2', collectionId: 'collection-1', name: 'Cyan Copy' };
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Duplicate palette'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(router.state.historyAction).toBe('PUSH');
+    expect(handleDuplicatePalette).toHaveBeenCalledWith('Cyan Copy');
+    expect(selectPaletteInCollection).not.toHaveBeenCalledWith('collection-1', 'saved-1');
+  });
+
+  it('uses the same duplicate navigation on mobile', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const duplicatedPalette = makePalette('saved-2', 'Cyan Copy');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: false,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    handleDuplicatePalette.mockImplementation(() => {
+      paletteContextValue = buildContext({
+        collection: [savedPalette, duplicatedPalette],
+        collections: [
+          {
+            id: 'collection-1',
+            name: 'My Collection',
+            slug: 'my-collection',
+            palettes: [savedPalette, duplicatedPalette],
+          },
+        ],
+        activePaletteId: 'saved-2',
+        savedBaselinePalette: duplicatedPalette,
+        hasPersistedBaseline: true,
+        isDirty: false,
+        currentPalette: duplicatedPalette,
+        config: {
+          name: 'Cyan Copy',
+          hue: 210,
+          chroma: 0.12,
+          lightness50: 0.985,
+          lightness950: 0.025,
+        },
+      });
+
+      return { ok: true, paletteId: 'saved-2', collectionId: 'collection-1', name: 'Cyan Copy' };
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Mobile duplicate palette'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(router.state.historyAction).toBe('PUSH');
+  });
+
+  it('suppresses the extra not-found toast after deleting the current palette', async () => {
+    const savedPalette = makePalette('saved-1', 'Cyan');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: false,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    handleRemove.mockImplementation(() => {
+      paletteContextValue = buildContext({
+        collection: [],
+        collections: [
+          {
+            id: 'collection-1',
+            name: 'My Collection',
+            slug: 'my-collection',
+            palettes: [],
+          },
+        ],
+        activePaletteId: null,
+        savedBaselinePalette: null,
+        hasPersistedBaseline: false,
+        isDirty: false,
+        currentPalette: makePalette('draft-1', 'Draft Cyan'),
+      });
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Delete palette'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection');
+    });
+
+    expect(handleRemove).toHaveBeenCalledWith('saved-1');
+    expect(toastInfo).not.toHaveBeenCalled();
+  });
+
+  it('still shows not-found feedback for a real invalid palette URL', async () => {
+    const router = renderAt('/my-collection/edit/missing');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection');
+    });
+
+    expect(toastInfo).toHaveBeenCalledWith('Palette not found');
   });
 });
 

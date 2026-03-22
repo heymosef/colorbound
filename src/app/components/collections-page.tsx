@@ -28,6 +28,7 @@ import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';
 import { DUPLICATE_PALETTE_NAME_MESSAGE } from '../lib/palette-name-validation';
 import { validateCollectionName } from '../lib/collection-name-validation';
+import { serializePaletteConfig } from '../lib/share-serialization';
 import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
@@ -193,7 +194,7 @@ function PaletteCard({
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono">{palette.hue}°</span>
               <span>·</span>
-              <span className="tabular-nums">{palette.tokens.length} tokens</span>
+              <span className="tabular-nums">Density {palette.density ?? 11}</span>
             </div>
             {editing && nameError && (
               <p className="text-[12px] text-destructive">{nameError}</p>
@@ -251,7 +252,7 @@ function PaletteCard({
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono">{palette.hue}°</span>
               <span>·</span>
-              <span className="tabular-nums">{palette.tokens.length} tokens</span>
+              <span className="tabular-nums">Density {palette.density ?? 11}</span>
             </div>
             {editing && nameError && (
               <p className="text-[12px] text-destructive">{nameError}</p>
@@ -388,8 +389,7 @@ export function CollectionsPage() {
   };
 
   const handleDeleteCurrentCollection = () => {
-    if (activeCollection) {
-      handleDeleteCollection(activeCollection.id);
+    if (activeCollection && handleDeleteCollection(activeCollection.id)) {
       navigate('/');
     }
   };
@@ -501,13 +501,7 @@ export function CollectionsPage() {
           <div className="flex items-center gap-2 shrink-0">
             {collection.length > 0 && (
               <ShareCollectionButton
-                palettes={collection.map((p) => ({
-                  name: p.name,
-                  hue: p.hue,
-                  chroma: p.chroma,
-                  lightness50: p.lightness50,
-                  lightness950: p.lightness950,
-                }))}
+                palettes={collection.map((palette) => serializePaletteConfig(palette))}
                 name={activeCollection?.name ?? 'My Collection'}
               />
             )}

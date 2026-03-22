@@ -38,11 +38,13 @@ import { PaletteColorRamp } from './palette-color-ramp';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
+import { getVisiblePaletteTokens } from '../lib/palette-density';
 
 // ─── Palette strip ───
 
 function PaletteStrip({ palette, label }: { palette: Palette; label?: string }) {
   const isDark = label === 'Dark';
+  const visibleTokens = getVisiblePaletteTokens(palette);
   return (
     <div className="space-y-1.5">
       {label && (
@@ -60,7 +62,7 @@ function PaletteStrip({ palette, label }: { palette: Palette; label?: string }) 
         role="list"
         aria-label={`${label ?? 'Palette'} token swatches`}
       >
-        {palette.tokens.map((token) => (
+        {visibleTokens.map((token) => (
           <div
             key={token.step}
             className="flex-1 min-w-0 max-md:flex-none max-md:w-[72px] max-md:snap-start"
@@ -74,7 +76,7 @@ function PaletteStrip({ palette, label }: { palette: Palette; label?: string }) 
           </div>
         ))}
       </div>
-      <ContrastRow tokens={palette.tokens} isDarkMode={isDark} />
+      <ContrastRow tokens={visibleTokens} isDarkMode={isDark} />
     </div>
   );
 }
@@ -88,6 +90,7 @@ function ConfigSpec({ entry }: { entry: SharedPaletteEntry }) {
     { label: 'Chroma', value: entry.chroma.toFixed(3) },
     { label: 'Lightness 50', value: entry.lightness50.toFixed(3) },
     { label: 'Lightness 950', value: entry.lightness950.toFixed(3) },
+    { label: 'Density', value: String(entry.density ?? 11) },
   ];
 
   return (

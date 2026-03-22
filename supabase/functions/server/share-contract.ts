@@ -3,13 +3,14 @@ import {
   normalizeLegacyLightnessFields,
 } from "../../../src/app/lib/legacy-palette-compat.ts";
 
-export const SHARE_SCHEMA_VERSION = 3;
+export const SHARE_SCHEMA_VERSION = 4;
 export const CANONICAL_SHARE_FIELDS = [
   "name",
   "hue",
   "chroma",
   "lightness50",
   "lightness950",
+  "density",
   "targetColorSpace",
   "generationVersion",
 ] as const;
@@ -26,8 +27,13 @@ export interface PaletteEntry {
   chroma: number;
   lightness50: number;
   lightness950: number;
+  density: 5 | 7 | 9 | 11;
   targetColorSpace: "srgb" | "p3";
   generationVersion: number;
+}
+
+function isValidDensity(v: unknown): v is PaletteEntry["density"] {
+  return v === 5 || v === 7 || v === 9 || v === 11;
 }
 
 export function isValidNumber(v: unknown, min: number, max: number): boolean {
@@ -86,6 +92,7 @@ export function normalizePaletteEntry(e: unknown): PaletteEntry | null {
       chroma: obj.chroma,
       lightness50,
       lightness950,
+      density: isValidDensity(obj.density) ? obj.density : 11,
       targetColorSpace: obj.targetColorSpace === "p3" ? "p3" : "srgb",
       generationVersion: 1,
     };
@@ -101,6 +108,7 @@ export function sanitizePaletteEntry(e: PaletteEntry): PaletteEntry {
     chroma: e.chroma,
     lightness50: e.lightness50,
     lightness950: e.lightness950,
+    density: isValidDensity(e.density) ? e.density : 11,
     targetColorSpace: e.targetColorSpace,
     generationVersion: 1,
   };

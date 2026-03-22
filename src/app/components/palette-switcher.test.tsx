@@ -404,7 +404,7 @@ describe('PaletteSwitcher', () => {
     expect(dot).not.toBeInTheDocument();
   });
 
-  it('displays token count with tabular-nums', () => {
+  it('displays density with tabular-nums', () => {
     render(
       <PaletteSwitcher
         {...defaultProps({
@@ -414,7 +414,7 @@ describe('PaletteSwitcher', () => {
       />
     );
     fireEvent.click(screen.getByLabelText(/Switch palette/));
-    const tokenCount = screen.getByText('11 tokens');
-    expect(tokenCount.className).toContain('tabular-nums');
+    const densityLabel = screen.getByText('Density 11');
+    expect(densityLabel.className).toContain('tabular-nums');
   });
 });

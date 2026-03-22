@@ -21,6 +21,7 @@ export interface SharedPaletteEntry {
   chroma: number;
   lightness50: number;
   lightness950: number;
+  density: 5 | 7 | 9 | 11;
   targetColorSpace: 'srgb' | 'p3';
   generationVersion: number;
 }

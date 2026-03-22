@@ -34,6 +34,7 @@ import { ContrastRow } from './contrast-indicator';
 import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
+import { getVisiblePaletteTokens } from '../lib/palette-density';
 
 // ─── Config spec (inline) ───
 
@@ -44,6 +45,7 @@ function InlineConfigSpec({ config }: { config: PaletteConfig }) {
     { label: 'Chroma', value: config.chroma.toFixed(3) },
     { label: 'L 950', value: config.lightness950.toFixed(3) },
     { label: 'L 50', value: config.lightness50.toFixed(3) },
+    { label: 'Density', value: String(config.density) },
   ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -77,6 +79,7 @@ function SharedPaletteCard({
   expanded: boolean;
   onToggleExpand: () => void;
 }) {
+  const visibleTokens = getVisiblePaletteTokens(entry.palette);
   return (
     <Card
       className={`group transition-all overflow-hidden gap-0 ${
@@ -111,7 +114,7 @@ function SharedPaletteCard({
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono">{entry.config.hue.toFixed(0)}°</span>
               <span>·</span>
-              <span className="tabular-nums">11 tokens</span>
+              <span className="tabular-nums">Density {entry.config.density ?? 11}</span>
             </div>
           </div>
         </div>
@@ -132,7 +135,7 @@ function SharedPaletteCard({
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="font-mono">{entry.config.hue.toFixed(0)}°</span>
                   <span>·</span>
-                  <span className="tabular-nums">11 tokens</span>
+                  <span className="tabular-nums">Density {entry.config.density ?? 11}</span>
                 </div>
                 <button
                   onClick={onToggleExpand}
@@ -160,7 +163,7 @@ function SharedPaletteCard({
               role="list"
               aria-label={`${entry.config.name} token swatches`}
             >
-              {entry.palette.tokens.map((token) => (
+              {visibleTokens.map((token) => (
                 <div key={token.step} className="flex-1 min-w-0 max-md:flex-none max-md:w-[60px] max-md:snap-start" role="listitem">
                   <CopyableTokenSwatch
                     token={token}
@@ -172,7 +175,7 @@ function SharedPaletteCard({
               ))}
             </div>
             {/* Contrast indicators */}
-            <ContrastRow tokens={entry.palette.tokens} isDarkMode={false} />
+            <ContrastRow tokens={visibleTokens} isDarkMode={false} />
             {/* Config spec */}
             <InlineConfigSpec config={entry.config} />
           </div>

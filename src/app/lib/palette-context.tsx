@@ -7,6 +7,7 @@ import {
   suggestPaletteName,
   type Palette,
 } from './color-utils';
+import { DEFAULT_PALETTE_DENSITY } from './palette-density';
 import { toast } from 'sonner';
 import { PaletteContext, CollectionsContext } from './palette-context-value';
 import { loadState, saveState, createDefaultCollection } from './local-storage';
@@ -62,6 +63,7 @@ function createDefaultConfig(hue?: number): PaletteConfig {
     chroma: DEFAULT_CHROMA,
     lightness50: DEFAULT_LIGHTNESS_50,
     lightness950: DEFAULT_LIGHTNESS_950,
+    density: DEFAULT_PALETTE_DENSITY,
     targetColorSpace: DEFAULT_TARGET_COLOR_SPACE,
     generationVersion: GENERATION_VERSION,
   };
@@ -73,6 +75,7 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
   const chroma = seedPalette?.chroma ?? DEFAULT_CHROMA;
   const lightness50 = seedPalette?.lightness50 ?? DEFAULT_LIGHTNESS_50;
   const lightness950 = seedPalette?.lightness950 ?? DEFAULT_LIGHTNESS_950;
+  const density = seedPalette?.density ?? DEFAULT_PALETTE_DENSITY;
 
   return {
     name: suggestPaletteName(h, chroma, lightness50, lightness950),
@@ -80,12 +83,14 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
     chroma,
     lightness50,
     lightness950,
+    density,
     targetColorSpace,
     generationVersion: GENERATION_VERSION,
   };
 }
 
 function buildPalette(config: PaletteConfig, id?: string): Palette {
+  const density = config.density ?? DEFAULT_PALETTE_DENSITY;
   const tokens = generatePalette(
     config.hue,
     config.chroma,
@@ -101,12 +106,14 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    density,
     targetColorSpace: config.targetColorSpace,
     generationVersion: config.generationVersion,
   };
 }
 
 function buildDarkPalette(config: PaletteConfig): Palette {
+  const density = config.density ?? DEFAULT_PALETTE_DENSITY;
   const tokens = generateDarkPalette(
     config.hue,
     config.chroma,
@@ -122,6 +129,7 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    density,
     targetColorSpace: config.targetColorSpace,
     generationVersion: config.generationVersion,
   };
@@ -242,6 +250,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       chroma: palette.chroma,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
+      density: palette.density ?? DEFAULT_PALETTE_DENSITY,
       targetColorSpace: palette.targetColorSpace,
       generationVersion: palette.generationVersion,
     });
@@ -480,7 +489,10 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   }, [updateActiveCollectionPalettes]);
 
   const handleImportPalette = useCallback((importedConfig: PaletteConfig) => {
-    setConfig(importedConfig);
+    setConfig({
+      ...importedConfig,
+      density: importedConfig.density ?? DEFAULT_PALETTE_DENSITY,
+    });
     setNameManuallyEdited(true);
     setActivePaletteId(null);
     setIsDirty(false);
@@ -672,12 +684,14 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const handleApplyHex = useCallback((hue: number, chroma: number) => {
     setConfig((prev) => {
       const next = { ...prev, hue, chroma };
-      next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
+      if (!hasPersistedBaseline) {
+        next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
+      }
       return next;
     });
-    setNameManuallyEdited(false);
+    setNameManuallyEdited(hasPersistedBaseline);
     setIsDirty(true);
-  }, []);
+  }, [hasPersistedBaseline]);
 
   // ─── Collection Management ───
 
@@ -745,34 +759,39 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     };
   }, [collections]);
 
-  // ─── Fix #1: handleDeleteCollection stale closure ───
-  // Move "pick next active" logic inside setCollections updater
-  // so it reads from the latest state, not a stale closure.
-
   const handleDeleteCollection = useCallback((collectionId: string): boolean => {
     if (collections.length <= 1) {
       toast.error('Cannot delete the last collection', { duration: 2000 });
       return false;
     }
 
-    setCollections((prev) => {
-      const remaining = prev.filter((c) => c.id !== collectionId);
-      // Side-effect: update active collection if the deleted one was active.
-      // We read activeCollectionId from the ref to avoid closure staleness.
-      // React batches these state updates together with setCollections.
-      if (activeCollectionId === collectionId) {
-        const next = remaining[0];
-        setActiveCollectionId(next?.id ?? null);
-        setActivePaletteId(null);
-        setIsDirty(false);
-      }
-      return remaining;
-    });
+    const deletedCollection = collections.find((collection) => collection.id === collectionId);
+    const deletedPaletteIds = new Set(deletedCollection?.palettes.map((palette) => palette.id) ?? []);
+
+    setCollections((prev) => prev.filter((collection) => collection.id !== collectionId));
+
+    if (activeCollectionId === collectionId) {
+      setActiveCollectionId(null);
+      setActivePaletteId(null);
+      setIsDirty(false);
+    }
+
+    if (
+      activePaletteId !== null && deletedPaletteIds.has(activePaletteId)
+    ) {
+      setActivePaletteId(null);
+    }
+
+    if (
+      lastViewedSavedPaletteId !== null && deletedPaletteIds.has(lastViewedSavedPaletteId)
+    ) {
+      setLastViewedSavedPaletteId(null);
+    }
 
     toast.success('Collection deleted', { duration: 2000 });
     announce('Collection deleted');
     return true;
-  }, [collections.length, activeCollectionId]);
+  }, [activeCollectionId, activePaletteId, collections, lastViewedSavedPaletteId]);
 
   const handleSelectCollection = useCallback((collectionId: string) => {
     setActiveCollectionId(collectionId);

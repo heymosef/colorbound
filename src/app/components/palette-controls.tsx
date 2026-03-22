@@ -23,6 +23,7 @@ import type { OklchColor, GamutFlag } from "../lib/color-utils";
 import { oklchToRgb, rgbToHex, hexToOklch, classifyGamut, maxSrgbChromaForHue, maxP3ChromaForHue, gamutMapToSrgb, formatOklch } from "../lib/color-utils";
 import { suggestPaletteName } from "../lib/color-utils";
 import type { PaletteConfig } from "../lib/palette-context";
+import { DEFAULT_PALETTE_DENSITY, PALETTE_DENSITY_OPTIONS } from "../lib/palette-density";
 
 interface PaletteControlsProps {
   config: PaletteConfig;
@@ -157,6 +158,7 @@ export function PaletteControls({
   const [hexInput, setHexInput] = useState('');
   const [hexError, setHexError] = useState(false);
   const targetColorSpace = config.targetColorSpace ?? 'srgb';
+  const currentDensity = config.density ?? DEFAULT_PALETTE_DENSITY;
   const hasPaletteNameError = !!paletteNameError;
 
   // Compute gamut status for the identity swatch (500 step equivalent)
@@ -202,7 +204,9 @@ export function PaletteControls({
     } else {
       onConfigChange({ hue, chroma });
     }
-    const name = suggestPaletteName(hue, chroma, config.lightness50, config.lightness950);
+    const name = hasPersistedBaseline
+      ? config.name
+      : suggestPaletteName(hue, chroma, config.lightness50, config.lightness950);
     toast.success(`Applied hex #${raw.replace('#', '').toUpperCase()}`, {
       description: `Hue ${hue}°, Chroma ${chroma.toFixed(3)} — "${name}"`,
       duration: 2500,
@@ -430,6 +434,44 @@ export function PaletteControls({
           tooltip="Target OKLCH lightness for the darkest token (step 950). Lower = closer to black."
           displayValue={`L ${config.lightness950.toFixed(3)}`}
         />
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-[13px]">Density</Label>
+            <Tooltip>
+              <TooltipTrigger
+                className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                aria-label="Info about Density"
+              >
+                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-[220px]">
+                <p className="text-[12px]">
+                  Controls how many canonical steps are shown. The palette still generates on the full 50-950 scale.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5" role="radiogroup" aria-label="Density">
+            {PALETTE_DENSITY_OPTIONS.map((density) => (
+              <button
+                key={density}
+                role="radio"
+                aria-checked={density === currentDensity}
+                onClick={() => onConfigChange({ density })}
+                className={`flex-1 px-2 py-0.5 rounded-sm text-[11px]! font-medium! leading-tight transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
+                  density === currentDensity
+                    ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {density}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <Separator />
 

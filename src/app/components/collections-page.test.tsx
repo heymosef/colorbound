@@ -1,11 +1,12 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, RouterProvider, createMemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CollectionsPage } from './collections-page';
 
 const handleRenameCollection = vi.fn();
+const handleDeleteCollection = vi.fn();
 const startDraftPalette = vi.fn();
 let paletteContextValue: any;
 
@@ -29,6 +30,7 @@ vi.mock('./palette-color-ramp', () => ({
 describe('CollectionsPage rename validation', () => {
   beforeEach(() => {
     handleRenameCollection.mockReset();
+    handleDeleteCollection.mockReset();
     startDraftPalette.mockReset();
     paletteContextValue = {
       collection: [],
@@ -45,7 +47,7 @@ describe('CollectionsPage rename validation', () => {
       handleRemove: vi.fn(),
       handleRename: vi.fn(),
       handleRenameCollection,
-      handleDeleteCollection: vi.fn(),
+      handleDeleteCollection,
     };
   });
 
@@ -111,5 +113,29 @@ describe('CollectionsPage rename validation', () => {
 
     expect(screen.getAllByText('210°').length).toBeGreaterThan(0);
     expect(screen.queryByText('Neutral')).not.toBeInTheDocument();
+  });
+
+  it('returns to the collections index after deleting the active collection', async () => {
+    handleDeleteCollection.mockReturnValue(true);
+
+    const router = createMemoryRouter(
+      [
+        { path: '/', element: <div>All collections</div> },
+        { path: '/:collectionSlug', element: <CollectionsPage /> },
+      ],
+      { initialEntries: ['/marketing'] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    fireEvent.click(screen.getByLabelText('Options for Marketing'));
+    fireEvent.click(screen.getByText('Delete collection'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete collection' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/');
+    });
+
+    expect(handleDeleteCollection).toHaveBeenCalledWith('collection-1');
   });
 });

@@ -19,7 +19,7 @@
  *   - Right sidebar: CollectionPanel (a11y + export tabs)
  */
 
-import React, { Suspense, lazy, useState, useCallback, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useBlocker, useLocation } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -48,6 +48,7 @@ import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
   buildCollectionSavedEditorPath,
+  getEditorNavigationMode,
 } from '../lib/editor-routes';
 import {
   AlertDialog,
@@ -509,6 +510,7 @@ export function EditPalettePage() {
   } = usePaletteContext();
   const [pendingCollectionAction, setPendingCollectionAction] = useState<PendingCollectionAction | null>(null);
   const [mobileControlsOpenSignal, setMobileControlsOpenSignal] = useState(0);
+  const expectedDeletedPaletteIdRef = useRef<string | null>(null);
 
   const openMobileControls = useCallback(() => {
     setMobileControlsOpenSignal((value) => value + 1);
@@ -533,6 +535,12 @@ export function EditPalettePage() {
             buildCollectionSavedEditorPath(matchedPaletteLocation.collectionSlug, matchedPaletteLocation.palette.id),
             { replace: true },
           );
+          return;
+        }
+
+        if (expectedDeletedPaletteIdRef.current === paletteId) {
+          expectedDeletedPaletteIdRef.current = null;
+          navigate(activeCollection ? buildCollectionPath(activeCollection.slug) : '/', { replace: true });
           return;
         }
 
@@ -581,6 +589,12 @@ export function EditPalettePage() {
     }
 
     if (!matchedPaletteLocation) {
+      if (expectedDeletedPaletteIdRef.current === paletteId) {
+        expectedDeletedPaletteIdRef.current = null;
+        navigate(buildCollectionPath(matchedCollection.slug), { replace: true });
+        return;
+      }
+
       toast.info('Palette not found');
       navigate(buildCollectionPath(matchedCollection.slug), { replace: true });
       return;
@@ -620,9 +634,20 @@ export function EditPalettePage() {
 
   const handleDeletePalette = useCallback(() => {
     if (!activePaletteId) return;
+    expectedDeletedPaletteIdRef.current = activePaletteId;
     handleRemove(activePaletteId);
     navigate(basePath);
   }, [activePaletteId, handleRemove, navigate, basePath]);
+
+  const handleDuplicateAndNavigate = useCallback((name: string) => {
+    const result = handleDuplicatePalette(name);
+    if (result.ok && activeCollection) {
+      navigate(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), {
+        replace: getEditorNavigationMode('copy') === 'replace',
+      });
+    }
+    return result;
+  }, [activeCollection, handleDuplicatePalette, navigate]);
 
   // ─── PaletteSwitcher callbacks for mobile ───
   const handleSelectPalette = useCallback(
@@ -722,7 +747,7 @@ export function EditPalettePage() {
     onRevert: handleRevertChanges,
     onSave: handleUpdateInCollection,
     onAddToCollection: handleSaveDraftPalette,
-    onDuplicate: handleDuplicatePalette,
+    onDuplicate: handleDuplicateAndNavigate,
     onDelete: handleDeletePalette,
     onCollectionAction: handleCollectionAction,
     collection,

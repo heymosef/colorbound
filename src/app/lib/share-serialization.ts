@@ -5,6 +5,7 @@
 
 import type { PaletteConfig } from './palette-context-types';
 import { GENERATION_VERSION, generatePalette, generateDarkPalette, type Palette } from './color-utils';
+import { DEFAULT_PALETTE_DENSITY, isPaletteDensity } from './palette-density';
 import {
   hasLegacyLightnessFields,
   normalizeLegacyLightnessFields,
@@ -19,6 +20,7 @@ const DEFAULTS: Readonly<PaletteConfig> = {
   chroma: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
+  density: DEFAULT_PALETTE_DENSITY,
   targetColorSpace: 'srgb',
   generationVersion: GENERATION_VERSION,
 };
@@ -53,6 +55,7 @@ export function serializePaletteConfig(config: PaletteConfig): SharedPaletteEntr
     chroma: clamp(config.chroma, 0, 0.4, DEFAULTS.chroma),
     lightness50: clamp(config.lightness50, 0, 1, DEFAULTS.lightness50),
     lightness950: clamp(config.lightness950, 0, 1, DEFAULTS.lightness950),
+    density: isPaletteDensity(config.density) ? config.density : DEFAULTS.density,
     targetColorSpace: config.targetColorSpace === 'p3' ? 'p3' : 'srgb',
     generationVersion: GENERATION_VERSION,
   };
@@ -107,6 +110,7 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
     chroma: clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma),
     lightness50: l50,
     lightness950: l950,
+    density: isPaletteDensity(obj.density) ? obj.density : DEFAULTS.density,
     targetColorSpace: obj.targetColorSpace === 'p3' ? 'p3' : DEFAULTS.targetColorSpace,
     generationVersion: GENERATION_VERSION,
   };
@@ -148,6 +152,7 @@ export function configToPalette(
   config: PaletteConfig,
   id: string,
 ): Palette {
+  const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
   const tokens = generatePalette(
     config.hue,
     config.chroma,
@@ -163,6 +168,7 @@ export function configToPalette(
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    density,
     targetColorSpace: config.targetColorSpace,
     generationVersion: config.generationVersion,
   };
@@ -173,6 +179,7 @@ export function configToDarkPalette(
   config: PaletteConfig,
   id: string,
 ): Palette {
+  const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
   const tokens = generateDarkPalette(
     config.hue,
     config.chroma,
@@ -188,6 +195,7 @@ export function configToDarkPalette(
     chroma: config.chroma,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
+    density,
     targetColorSpace: config.targetColorSpace,
     generationVersion: config.generationVersion,
   };
