@@ -335,7 +335,7 @@ function CollectionCard({
 // ─── Main page ───
 
 export function CollectionsListPage() {
-  useDocumentTitle('Collections');
+  useDocumentTitle('Collections — Colorbound');
   const navigate = useNavigate();
   const {
     collections,

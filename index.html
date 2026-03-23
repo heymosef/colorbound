@@ -4,7 +4,34 @@
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Color Token Generator App</title>
+      <title>Colorbound — Generate OKLCH color palettes</title>
+    <meta name="description" content="Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma." />
+    <meta name="theme-color" content="#09090b" />
+    <meta property="og:title" content="Colorbound — Generate OKLCH color palettes" />
+    <meta property="og:description" content="Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma." />
+    <meta property="og:type" content="website" />
+    <!-- SPA redirect restore for GitHub Pages (matches public/404.html) -->
+    <script>
+      (function () {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+      (function () {
+        var l = window.location;
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function (s) {
+            return s.replace(/~and~/g, '&');
+          }).join('?');
+          sessionStorage.redirect = l.protocol + '//' + l.host + decoded + l.hash;
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      })();
+    </script>
     </head>
 
     <body>

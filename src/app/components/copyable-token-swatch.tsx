@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { relativeLuminance, type ColorToken } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
+import { useCopyFeedback } from '../lib/use-copy-feedback';
 import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
@@ -31,8 +32,7 @@ export function CopyableTokenSwatch({
   preferBestAvailableColor?: boolean;
   stopPropagation?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  const resetTimeoutRef = useRef<number | null>(null);
+  const [copied, triggerCopied] = useCopyFeedback();
   const supportsP3 = useSupportsP3();
   const [r, g, b] = token.hex
     .replace('#', '')
@@ -47,34 +47,17 @@ export function CopyableTokenSwatch({
   const secondaryValue = token.hex;
   const ariaLabel = `${paletteName} ${token.step}: ${targetCss}. ${getAriaLabelSuffix(variant)}`;
 
-  useEffect(() => {
-    return () => {
-      if (resetTimeoutRef.current !== null) {
-        window.clearTimeout(resetTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handleCopy = async (event?: React.MouseEvent) => {
     if (stopPropagation) {
       event?.stopPropagation();
     }
 
     await copyToClipboard(targetCss);
-    setCopied(true);
+    triggerCopied();
     toast.success(`Copied ${paletteName}-${token.step}`, {
       description: targetCss,
       duration: 2000,
     });
-
-    if (resetTimeoutRef.current !== null) {
-      window.clearTimeout(resetTimeoutRef.current);
-    }
-
-    resetTimeoutRef.current = window.setTimeout(() => {
-      setCopied(false);
-      resetTimeoutRef.current = null;
-    }, 2000);
   };
 
   if (variant === 'workspaceCompact') {

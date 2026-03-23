@@ -27,6 +27,7 @@ import {
   type Palette,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
+import { useCopyFeedback } from '../lib/use-copy-feedback';
 import { ContrastRow, ContrastPairSelector } from './contrast-indicator';
 import {
   deserializePaletteEntry,
@@ -122,10 +123,13 @@ export function SharedPalettePage() {
   const entry = data.palette;
   const createdAt = data.createdAt;
 
-  useDocumentTitle(`Shared: ${entry.name}`);
+  useDocumentTitle(
+    `${entry.name} — OKLCH color palette via Colorbound`,
+    `Explore ${entry.name}, a perceptually uniform OKLCH color palette generated with Colorbound. Preview the scale, copy tokens, check contrast, and import it into your workspace.`,
+  );
 
   const [viewMode, setViewMode] = useState<ViewMode>('light');
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [linkCopied, triggerLinkCopied] = useCopyFeedback();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const supportsP3 = useSupportsP3();
 
@@ -163,9 +167,8 @@ export function SharedPalettePage() {
   const handleCopyLink = async () => {
     if (!shareId) return;
     await copyToClipboard(buildShareUrl('palette', shareId));
-    setLinkCopied(true);
+    triggerLinkCopied();
     toast.success('Link copied to clipboard', { duration: 2000 });
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleImport = () => {

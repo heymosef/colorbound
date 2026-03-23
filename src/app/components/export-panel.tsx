@@ -29,6 +29,7 @@ import {
   exportAsW3C,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
+import { useCopyFeedback } from '../lib/use-copy-feedback';
 import { getPaletteWithVisibleTokens } from '../lib/palette-density';
 import { usePaletteContext } from '../lib/palette-context';
 
@@ -143,14 +144,13 @@ function CodeBlock({
   language: string;
   filename: string;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, triggerCopied] = useCopyFeedback();
 
   const handleCopy = useCallback(async () => {
     await copyToClipboard(code);
-    setCopied(true);
+    triggerCopied();
     toast.success('Copied to clipboard', { duration: 2000 });
-    setTimeout(() => setCopied(false), 2000);
-  }, [code]);
+  }, [code, triggerCopied]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([code], { type: 'text/plain' });

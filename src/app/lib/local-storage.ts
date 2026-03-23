@@ -509,13 +509,11 @@ export function loadState(): HydratedState | null {
 
     // ─── Migrate v1 → v2 ───
     if (parsed.version === 1) {
-      console.warn('[legacy-compat] local-storage-v1-migration');
       parsed = migrateV1toV2(parsed as StoredStateV1);
     }
 
     // ─── Migrate v2 → v3 ───
     if (parsed.version === 2) {
-      console.warn('[legacy-compat] local-storage-v2-migration');
       parsed = migrateV2toV3(parsed as StoredStateV2);
       // Persist the migration immediately
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));

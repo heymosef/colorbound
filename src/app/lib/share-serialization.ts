@@ -98,7 +98,6 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
     l50 = clamp(obj.lightness50, 0, 1, DEFAULTS.lightness50);
     l950 = clamp(obj.lightness950, 0, 1, DEFAULTS.lightness950);
   } else if (hasLegacyLightnessFields(obj, isValidNumber)) {
-    console.warn('[legacy-compat] client-deserialized-legacy-share-payload');
     const converted = normalizeLegacyLightnessFields(obj, clamp);
     l50 = converted.lightness50;
     l950 = converted.lightness950;

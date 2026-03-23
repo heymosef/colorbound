@@ -1,19 +1,36 @@
 import { useEffect } from 'react';
 
-const APP_NAME = 'Colorbound';
+const DEFAULT_TITLE = 'Colorbound — Generate OKLCH color palettes';
+const DEFAULT_DESCRIPTION =
+  'Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma.';
+
+function setMetaContent(selector: string, content: string) {
+  const el = document.querySelector(selector) as HTMLMetaElement | null;
+  if (el) el.content = content;
+}
 
 /**
- * Sets `document.title` and restores the default on unmount.
+ * Sets `document.title`, meta description, and OG tags.
+ * Restores defaults on unmount.
  */
-export function useDocumentTitle(title: string | null | undefined) {
+export function useDocumentTitle(
+  title: string | null | undefined,
+  description?: string,
+) {
   useEffect(() => {
-    if (title) {
-      document.title = `${title} — ${APP_NAME}`;
-    } else {
-      document.title = APP_NAME;
-    }
+    const resolvedTitle = title || DEFAULT_TITLE;
+    const resolvedDescription = description || DEFAULT_DESCRIPTION;
+
+    document.title = resolvedTitle;
+    setMetaContent('meta[name="description"]', resolvedDescription);
+    setMetaContent('meta[property="og:title"]', resolvedTitle);
+    setMetaContent('meta[property="og:description"]', resolvedDescription);
+
     return () => {
-      document.title = APP_NAME;
+      document.title = DEFAULT_TITLE;
+      setMetaContent('meta[name="description"]', DEFAULT_DESCRIPTION);
+      setMetaContent('meta[property="og:title"]', DEFAULT_TITLE);
+      setMetaContent('meta[property="og:description"]', DEFAULT_DESCRIPTION);
     };
-  }, [title]);
+  }, [title, description]);
 }

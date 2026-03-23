@@ -354,7 +354,7 @@ export function CollectionsPage() {
     handleDeleteCollection,
   } = usePaletteContext();
 
-  useDocumentTitle(activeCollection?.name ?? 'Collection');
+  useDocumentTitle(`${activeCollection?.name ?? 'Collection'} — Colorbound`);
 
   const collectionSlug = activeCollection?.slug ?? '';
 

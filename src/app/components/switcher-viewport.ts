@@ -1,5 +1,3 @@
-export const SWITCHER_SCROLL_THRESHOLD = 5;
-
 export function getPaletteSwitcherViewportClass(): string {
   return 'max-h-[216px]';
 }

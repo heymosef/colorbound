@@ -26,6 +26,7 @@ import {
   type Palette,
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
+import { useCopyFeedback } from '../lib/use-copy-feedback';
 import {
   deserializeCollection,
   configToPalette,
@@ -197,8 +198,6 @@ export function SharedCollectionPage() {
   const deserialized = useMemo(() => deserializeCollection(data), [data]);
   const collectionName = deserialized?.name ?? 'Shared Collection';
 
-  useDocumentTitle(`Shared: ${collectionName}`);
-
   // Build full palette objects from deserialized entries
   const entries: DeserializedEntry[] = useMemo(() => {
     if (!deserialized) return [];
@@ -208,8 +207,13 @@ export function SharedCollectionPage() {
     }));
   }, [deserialized]);
 
+  useDocumentTitle(
+    `${collectionName} — OKLCH color collection via Colorbound`,
+    `Browse ${entries.length} perceptually uniform OKLCH palettes in ${collectionName}. Preview ramps, compare palettes, copy tokens, and import the collection into Colorbound.`,
+  );
+
   const [selected, setSelected] = useState<Set<number>>(() => new Set(entries.map((_, i) => i)));
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [linkCopied, triggerLinkCopied] = useCopyFeedback();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const toggleSelection = useCallback((index: number) => {
@@ -241,9 +245,8 @@ export function SharedCollectionPage() {
   const handleCopyLink = async () => {
     if (!shareId) return;
     await copyToClipboard(buildShareUrl('collection', shareId));
-    setLinkCopied(true);
+    triggerLinkCopied();
     toast.success('Link copied to clipboard', { duration: 2000 });
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleImportSelected = () => {

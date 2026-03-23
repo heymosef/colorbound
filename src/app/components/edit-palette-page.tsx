@@ -531,6 +531,7 @@ export function EditPalettePage() {
   // Set document title: "PaletteName — CollectionName — Colorbound"
   const titleParts = [config.name];
   if (activeCollection) titleParts.push(activeCollection.name);
+  titleParts.push('Colorbound');
   useDocumentTitle(titleParts.join(' — '));
 
   const matchedCollection = collectionSlug
