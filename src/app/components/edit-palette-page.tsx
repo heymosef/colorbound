@@ -689,8 +689,8 @@ export function EditPalettePage() {
       openMobileControls();
       return;
     }
-    navigate(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), { replace: true });
-  }, [activeCollection, handleAddToCollection, navigate, openMobileControls]);
+    navigateBypassingDirtyGuard(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), { replace: true });
+  }, [activeCollection, handleAddToCollection, navigateBypassingDirtyGuard, openMobileControls]);
 
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
