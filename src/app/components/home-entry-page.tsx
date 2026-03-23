@@ -1,24 +1,25 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLoaderData } from 'react-router';
 import { usePaletteContext } from '../lib/palette-context';
 import { buildCollectionDraftEditorPath, getEditorNavigationMode } from '../lib/editor-routes';
 import { CollectionsListPage } from './collections-list-page';
 
 export function HomeEntryPage() {
+  const { isFirstTime } = useLoaderData() as { isFirstTime: boolean };
   const navigate = useNavigate();
-  const { isFirstRunSession, activeCollection, startDraftPalette } = usePaletteContext();
+  const { activeCollection, startDraftPalette } = usePaletteContext();
 
   useEffect(() => {
-    if (!isFirstRunSession || !activeCollection) return;
+    if (!isFirstTime || !activeCollection) return;
 
     startDraftPalette(activeCollection.id);
     navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
       replace: getEditorNavigationMode('firstRun') === 'replace',
       state: { createDraft: true },
     });
-  }, [isFirstRunSession, activeCollection, navigate, startDraftPalette]);
+  }, [isFirstTime, activeCollection, navigate, startDraftPalette]);
 
-  if (isFirstRunSession) {
+  if (isFirstTime) {
     return null;
   }
 
