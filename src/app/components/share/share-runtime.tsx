@@ -18,6 +18,7 @@ import {
 } from '../../lib/share-api';
 import { copyToClipboard } from '../../lib/clipboard';
 import { serializePaletteConfig } from '../../lib/share-serialization';
+import { track } from '../../lib/analytics';
 
 function ShareContent({
   title,
@@ -170,6 +171,7 @@ export function PaletteShareRuntime({
   const generatePaletteShareLink = useCallback(async () => {
     const sanitized = serializePaletteConfig(palette);
     const result = await createSharedPalette(sanitized);
+    track('palette_shared');
     return buildShareUrl('palette', result.id);
   }, [palette]);
 
@@ -206,6 +208,7 @@ export function CollectionShareRuntime({
   const generateCollectionShareLink = useCallback(async () => {
     const sanitizedPalettes = palettes.map((palette) => serializePaletteConfig(palette));
     const result = await createSharedCollection(sanitizedPalettes, name);
+    track('collection_shared', { palette_count: palettes.length });
     return buildShareUrl('collection', result.id);
   }, [name, palettes]);
 

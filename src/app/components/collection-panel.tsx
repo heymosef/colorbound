@@ -8,6 +8,7 @@ import {
 import type { Palette } from '../lib/color-utils';
 import { ExportPanel } from './export-panel';
 import { ContrastPairSelector } from './contrast-indicator';
+import { track } from '../lib/analytics';
 
 interface RightPanelProps {
   collection: Palette[];
@@ -35,7 +36,9 @@ export function CollectionPanel({
   // Default card mode (desktop right sidebar)
   return (
     <Card className="h-full border-0 border-l border-border rounded-none shadow-none bg-card gap-0">
-      <Tabs defaultValue="a11y" className="h-full flex flex-col">
+      <Tabs defaultValue="a11y" className="h-full flex flex-col" onValueChange={(v) => {
+        if (v === 'export') track('export_panel_opened');
+      }}>
         <CardHeader className="pb-0 px-4 pt-4 shrink-0">
           <div className="flex gap-2">
             <TabsList className="w-full h-9 p-0.5">

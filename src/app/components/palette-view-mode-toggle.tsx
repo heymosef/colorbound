@@ -1,4 +1,5 @@
 import { Moon, Rows2, Sun } from 'lucide-react';
+import { track } from '../lib/analytics';
 
 export type ViewMode = 'light' | 'dark' | 'both';
 
@@ -9,6 +10,10 @@ export function ViewModeToggle({
   value: ViewMode;
   onChange: (value: ViewMode) => void;
 }) {
+  const handleChange = (v: ViewMode) => {
+    onChange(v);
+    track('palette_view_mode_changed', { mode: v });
+  };
   return (
     <div
       className="inline-flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5"
@@ -18,7 +23,7 @@ export function ViewModeToggle({
       <button
         role="radio"
         aria-checked={value === 'light'}
-        onClick={() => onChange('light')}
+        onClick={() => handleChange('light')}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
           value === 'light'
             ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground'
@@ -31,7 +36,7 @@ export function ViewModeToggle({
       <button
         role="radio"
         aria-checked={value === 'dark'}
-        onClick={() => onChange('dark')}
+        onClick={() => handleChange('dark')}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
           value === 'dark'
             ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground'
@@ -44,7 +49,7 @@ export function ViewModeToggle({
       <button
         role="radio"
         aria-checked={value === 'both'}
-        onClick={() => onChange('both')}
+        onClick={() => handleChange('both')}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
           value === 'both'
             ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground'

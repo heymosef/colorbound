@@ -19,6 +19,7 @@ import {
 } from "./ui/tooltip";
 import { Info, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "../lib/analytics";
 import type { OklchColor, GamutFlag } from "../lib/color-utils";
 import { oklchToRgb, rgbToHex, hexToOklch, classifyGamut, maxSrgbChromaForHue, maxP3ChromaForHue, gamutMapToSrgb, formatOklch } from "../lib/color-utils";
 import { suggestPaletteName } from "../lib/color-utils";
@@ -207,6 +208,7 @@ export function PaletteControls({
     const name = hasPersistedBaseline
       ? config.name
       : suggestPaletteName(hue, chroma, config.lightness50, config.lightness950);
+    track('hex_value_entered', { hex: v });
     toast.success(`Applied hex #${raw.replace('#', '').toUpperCase()}`, {
       description: `Hue ${hue}°, Chroma ${chroma.toFixed(3)} — "${name}"`,
       duration: 2500,
@@ -218,6 +220,7 @@ export function PaletteControls({
     if (isValidHex(pasted)) {
       e.preventDefault();
       setHexInput(pasted);
+      track('hex_value_pasted', { hex: pasted });
       // Use setTimeout so state update + apply happen cleanly
       setTimeout(() => applyHex(pasted), 0);
     }
@@ -321,7 +324,7 @@ export function PaletteControls({
             <button
               role="radio"
               aria-checked={targetColorSpace === 'srgb'}
-              onClick={() => onConfigChange({ targetColorSpace: 'srgb' })}
+              onClick={() => { onConfigChange({ targetColorSpace: 'srgb' }); track('color_space_changed', { value: 'srgb' }); }}
               className={`flex-1 px-2 py-0.5 rounded-sm text-[11px]! font-medium! leading-tight transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 targetColorSpace === 'srgb' ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -331,7 +334,7 @@ export function PaletteControls({
             <button
               role="radio"
               aria-checked={targetColorSpace === 'p3'}
-              onClick={() => onConfigChange({ targetColorSpace: 'p3' })}
+              onClick={() => { onConfigChange({ targetColorSpace: 'p3' }); track('color_space_changed', { value: 'p3' }); }}
               className={`flex-1 px-2 py-0.5 rounded-sm text-[11px]! font-medium! leading-tight transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
                 targetColorSpace === 'p3' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 shadow-sm dark:shadow-none' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -418,7 +421,10 @@ export function PaletteControls({
           min={0.5}
           max={1}
           step={0.005}
-          onChange={(v) => onConfigChange({ lightness50: v })}
+          onChange={(v) => {
+            onConfigChange({ lightness50: v });
+            if (v === 1) track('lightness_endpoint_set', { step: 50, value: v });
+          }}
           tooltip="Target OKLCH lightness for the lightest token (step 50). Higher = closer to white."
           displayValue={`L ${config.lightness50.toFixed(3)}`}
         />
@@ -430,7 +436,10 @@ export function PaletteControls({
           min={0}
           max={0.5}
           step={0.005}
-          onChange={(v) => onConfigChange({ lightness950: v })}
+          onChange={(v) => {
+            onConfigChange({ lightness950: v });
+            if (v === 0) track('lightness_endpoint_set', { step: 950, value: v });
+          }}
           tooltip="Target OKLCH lightness for the darkest token (step 950). Lower = closer to black."
           displayValue={`L ${config.lightness950.toFixed(3)}`}
         />

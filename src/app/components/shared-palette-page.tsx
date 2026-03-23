@@ -42,6 +42,7 @@ import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { buildCollectionSavedEditorPath } from '../lib/editor-routes';
 import { CollectionTargetDialog } from './collection-target-dialog';
+import { track } from '../lib/analytics';
 
 // ─── Palette strip ───
 
@@ -133,6 +134,10 @@ export function SharedPalettePage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const supportsP3 = useSupportsP3();
 
+  useEffect(() => {
+    track('shared_palette_viewed', { share_id: shareId });
+  }, [shareId]);
+
   // Deserialize through the trust boundary, then build light + dark palettes
   const deserialized = useMemo(() => {
     const config = deserializePaletteEntry(entry);
@@ -186,6 +191,7 @@ export function SharedPalettePage() {
       return { ok: false, message: result.message };
     }
 
+    track('shared_palette_imported', { share_id: shareId });
     navigate(buildCollectionSavedEditorPath(result.collectionSlug, result.paletteId));
     return { ok: true };
   };
