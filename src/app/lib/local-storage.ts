@@ -637,7 +637,7 @@ export function saveState(state: {
       throw new Error('Duplicate active palette names cannot be persisted');
     }
 
-    const stored: StoredStateV6 = {
+    const stored: StoredStateV7 = {
       version: CURRENT_VERSION,
       collections: state.collections.map(collectionToStored),
       activeCollectionId: state.activeCollectionId,

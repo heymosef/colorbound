@@ -66,7 +66,6 @@ export async function createSharedPalette(palette: SharedPaletteEntry): Promise<
 
   const data = await res.json();
   if (!res.ok) {
-    console.error('Failed to create shared palette:', data);
     throw new ShareError(data.error || 'Failed to create shared palette', res.status);
   }
 
@@ -85,7 +84,6 @@ export async function createSharedCollection(
 
   const data = await res.json();
   if (!res.ok) {
-    console.error('Failed to create shared collection:', data);
     throw new ShareError(data.error || 'Failed to create shared collection', res.status);
   }
 
@@ -99,7 +97,6 @@ export async function getSharedPalette(id: string): Promise<SharedPaletteRespons
 
   const data = await res.json();
   if (!res.ok) {
-    console.error(`Failed to fetch shared palette ${id}:`, data);
     throw new ShareError(data.error || 'Failed to fetch shared palette', res.status);
   }
 
@@ -113,7 +110,6 @@ export async function getSharedCollection(id: string): Promise<SharedCollectionR
 
   const data = await res.json();
   if (!res.ok) {
-    console.error(`Failed to fetch shared collection ${id}:`, data);
     throw new ShareError(data.error || 'Failed to fetch shared collection', res.status);
   }
 
@@ -125,7 +121,7 @@ export async function getSharedCollection(id: string): Promise<SharedCollectionR
 /** Build the full shareable URL for a palette or collection */
 export function buildShareUrl(type: 'palette' | 'collection', id: string): string {
   const prefix = type === 'palette' ? '/p/' : '/c/';
-  return `${window.location.origin}${prefix}${id}`;
+  return `${window.location.origin}${prefix}${encodeURIComponent(id)}`;
 }
 
 /** How many days until a share link expires */
