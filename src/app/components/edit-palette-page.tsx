@@ -52,8 +52,7 @@ import {
 } from '../lib/editor-routes';
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
+  AlertDialogClose,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -67,6 +66,25 @@ interface PendingCollectionAction {
   sourceCollectionId: string;
   paletteId: string;
   paletteName: string;
+}
+
+interface EditorRouteState {
+  createDraft?: boolean;
+  bypassDirtyGuard?: boolean;
+}
+
+function hasEditorRouteFlag(
+  state: unknown,
+  key: keyof EditorRouteState,
+): boolean {
+  return !!state
+    && typeof state === 'object'
+    && key in state
+    && (state as EditorRouteState)[key] === true;
+}
+
+function buildBypassDirtyGuardState(): EditorRouteState {
+  return { bypassDirtyGuard: true };
 }
 
 const LazyCollectionPanel = lazy(async () => {
@@ -289,8 +307,6 @@ function MobileLayout({
   onCollectionAction,
   collection,
   onSelectPalette,
-  onSaveAndSwitch,
-  onSaveNewAndSwitch,
   onNewPalette,
   onNavigateToCollection,
   controlsOpenSignal,
@@ -310,8 +326,6 @@ function MobileLayout({
   onCollectionAction: (mode: 'move' | 'copy', palette: Palette) => void;
   collection: any[];
   onSelectPalette: (id: string) => void;
-  onSaveAndSwitch: (targetId: string) => boolean;
-  onSaveNewAndSwitch: (targetId: string) => boolean;
   onNewPalette: () => void;
   onNavigateToCollection: () => void;
   controlsOpenSignal: number;
@@ -321,7 +335,7 @@ function MobileLayout({
   const [mobileTab, setMobileTab] = useState('preview');
 
   const { theme, setTheme } = useThemeContext();
-  const { contrastAlgorithm, setContrastAlgorithm, collections, activeCollection, handleSelectCollection, handleCreateCollection } = usePaletteContext();
+  const { contrastAlgorithm, setContrastAlgorithm, collections, activeCollection, handleCreateCollection } = usePaletteContext();
 
   const navigate = useNavigate();
   const collectionName = activeCollection?.name ?? 'Collection';
@@ -343,12 +357,11 @@ function MobileLayout({
             activeCollectionId={activeCollection?.id ?? null}
             collectionName={collectionName}
             onSelect={(slug, id) => {
-              handleSelectCollection(id);
-              navigate(`/${slug}`);
+              navigate(buildCollectionPath(slug));
             }}
             onCreateNew={() => {
               const { slug } = handleCreateCollection();
-              navigate(`/${slug}`);
+              navigate(buildCollectionPath(slug));
             }}
             onViewAll={() => navigate('/')}
           />
@@ -362,8 +375,6 @@ function MobileLayout({
             isDirty={isDirty}
             currentName={config.name}
             onSelectPalette={onSelectPalette}
-            onSaveAndSwitch={onSaveAndSwitch}
-            onSaveNewAndSwitch={onSaveNewAndSwitch}
             onNewPalette={onNewPalette}
             onNavigateToCollection={onNavigateToCollection}
           />
@@ -501,6 +512,7 @@ export function EditPalettePage() {
     handleAddToCollection,
     handleUpdateInCollection,
     handleRevertChanges,
+    handleDiscardDraftChanges,
     handleDuplicatePalette,
     handleRemove,
     handleApplyHex,
@@ -525,13 +537,19 @@ export function EditPalettePage() {
     ? collections.find((candidate) => candidate.slug === collectionSlug) ?? null
     : null;
   const matchedPaletteLocation = paletteId ? findPaletteLocation(collections, paletteId) : null;
-  const draftRouteIntent = !!(location.state && typeof location.state === 'object' && 'createDraft' in location.state && location.state.createDraft === true);
+  const draftRouteIntent = hasEditorRouteFlag(location.state, 'createDraft');
+  const navigateBypassingDirtyGuard = useCallback((to: string, options?: { replace?: boolean }) => {
+    navigate(to, {
+      replace: options?.replace,
+      state: buildBypassDirtyGuardState(),
+    });
+  }, [navigate]);
 
   useEffect(() => {
     if (!collectionSlug) {
       if (paletteId) {
         if (matchedPaletteLocation) {
-          navigate(
+          navigateBypassingDirtyGuard(
             buildCollectionSavedEditorPath(matchedPaletteLocation.collectionSlug, matchedPaletteLocation.palette.id),
             { replace: true },
           );
@@ -540,17 +558,17 @@ export function EditPalettePage() {
 
         if (expectedDeletedPaletteIdRef.current === paletteId) {
           expectedDeletedPaletteIdRef.current = null;
-          navigate(activeCollection ? buildCollectionPath(activeCollection.slug) : '/', { replace: true });
+          navigateBypassingDirtyGuard(activeCollection ? buildCollectionPath(activeCollection.slug) : '/', { replace: true });
           return;
         }
 
         toast.info('Palette not found');
-        navigate(activeCollection ? buildCollectionPath(activeCollection.slug) : '/', { replace: true });
+        navigateBypassingDirtyGuard(activeCollection ? buildCollectionPath(activeCollection.slug) : '/', { replace: true });
         return;
       }
 
       if (activeCollection) {
-        navigate(buildCollectionDraftEditorPath(activeCollection.slug), { replace: true });
+        navigateBypassingDirtyGuard(buildCollectionDraftEditorPath(activeCollection.slug), { replace: true });
       }
       return;
     }
@@ -560,7 +578,7 @@ export function EditPalettePage() {
         const canonicalPath = paletteId && activePaletteId
           ? buildCollectionSavedEditorPath(activeCollection.slug, activePaletteId)
           : buildCollectionPath(activeCollection.slug);
-        navigate(canonicalPath, { replace: true });
+        navigateBypassingDirtyGuard(canonicalPath, { replace: true });
         return;
       }
       return;
@@ -575,7 +593,7 @@ export function EditPalettePage() {
       }
 
       if (hasPersistedBaseline && activeCollectionId === matchedCollection.id && activePaletteId) {
-        navigate(
+        navigateBypassingDirtyGuard(
           buildCollectionSavedEditorPath(matchedCollection.slug, activePaletteId),
           { replace: true },
         );
@@ -591,17 +609,17 @@ export function EditPalettePage() {
     if (!matchedPaletteLocation) {
       if (expectedDeletedPaletteIdRef.current === paletteId) {
         expectedDeletedPaletteIdRef.current = null;
-        navigate(buildCollectionPath(matchedCollection.slug), { replace: true });
+        navigateBypassingDirtyGuard(buildCollectionPath(matchedCollection.slug), { replace: true });
         return;
       }
 
       toast.info('Palette not found');
-      navigate(buildCollectionPath(matchedCollection.slug), { replace: true });
+      navigateBypassingDirtyGuard(buildCollectionPath(matchedCollection.slug), { replace: true });
       return;
     }
 
     if (matchedPaletteLocation.collectionId !== matchedCollection.id) {
-      navigate(
+      navigateBypassingDirtyGuard(
         buildCollectionSavedEditorPath(matchedPaletteLocation.collectionSlug, matchedPaletteLocation.palette.id),
         { replace: true },
       );
@@ -621,14 +639,19 @@ export function EditPalettePage() {
     matchedCollection,
     matchedPaletteLocation,
     navigate,
+    navigateBypassingDirtyGuard,
     draftRouteIntent,
     paletteId,
     selectPaletteInCollection,
     startDraftPalette,
   ]);
 
-  // ─── Fix #3: Block in-app navigation when palette has unsaved changes ───
-  const blocker = useBlocker(isDirty && hasPersistedBaseline);
+  // Block editor exits whenever there are dirty changes unless the app is
+  // correcting the URL/state internally.
+  const blocker = useBlocker(useCallback(
+    ({ nextLocation }) => isDirty && !hasEditorRouteFlag(nextLocation.state, 'bypassDirtyGuard'),
+    [isDirty],
+  ));
 
   const basePath = activeCollection ? buildCollectionPath(activeCollection.slug) : '/';
 
@@ -658,34 +681,6 @@ export function EditPalettePage() {
     [activeCollection, navigate]
   );
 
-  const handleSaveAndSwitch = useCallback(
-    (targetId: string): boolean => {
-      if (!activeCollection) return false;
-      const result = handleUpdateInCollection();
-      if (!result.ok) {
-        openMobileControls();
-        return false;
-      }
-      navigate(buildCollectionSavedEditorPath(activeCollection.slug, targetId));
-      return true;
-    },
-    [activeCollection, handleUpdateInCollection, navigate, openMobileControls]
-  );
-
-  const handleSaveNewAndSwitch = useCallback(
-    (targetId: string): boolean => {
-      if (!activeCollection) return false;
-      const result = handleAddToCollection();
-      if (!result.ok) {
-        openMobileControls();
-        return false;
-      }
-      navigate(buildCollectionSavedEditorPath(activeCollection.slug, targetId));
-      return true;
-    },
-    [activeCollection, handleAddToCollection, navigate, openMobileControls]
-  );
-
   const handleSaveDraftPalette = useCallback(() => {
     if (!activeCollection) return;
     const result = handleAddToCollection();
@@ -698,11 +693,10 @@ export function EditPalettePage() {
 
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
-    startDraftPalette(activeCollection.id);
     navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
       state: { createDraft: true },
     });
-  }, [activeCollection, navigate, startDraftPalette]);
+  }, [activeCollection, navigate]);
 
   const handleNavigateToCollection = useCallback(() => {
     navigate(basePath);
@@ -754,10 +748,12 @@ export function EditPalettePage() {
   };
 
   // No early returns — use conditional rendering to keep hook count stable
+  const isEditingSavedPalette = hasPersistedBaseline;
 
   const unsavedChangesDialog = (
     <AlertDialog open={blocker.state === 'blocked'} onOpenChange={(open) => { if (!open) blocker.reset?.(); }}>
       <AlertDialogContent>
+        <AlertDialogClose onClick={() => blocker.reset?.()} />
         <AlertDialogHeader>
           <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
           <AlertDialogDescription>
@@ -765,13 +761,14 @@ export function EditPalettePage() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-          <AlertDialogCancel onClick={() => blocker.reset?.()}>
-            Keep editing
-          </AlertDialogCancel>
           <Button
             variant="outline"
             onClick={() => {
-              handleRevertChanges({ silent: true });
+              if (isEditingSavedPalette) {
+                handleRevertChanges({ silent: true });
+              } else {
+                handleDiscardDraftChanges({ silent: true });
+              }
               blocker.proceed?.();
             }}
           >
@@ -779,7 +776,9 @@ export function EditPalettePage() {
           </Button>
           <Button
             onClick={() => {
-              const result = handleUpdateInCollection();
+              const result = isEditingSavedPalette
+                ? handleUpdateInCollection()
+                : handleAddToCollection();
               if (!result.ok) {
                 openMobileControls();
                 return;
@@ -787,7 +786,7 @@ export function EditPalettePage() {
               blocker.proceed?.();
             }}
           >
-            Save and leave
+            {isEditingSavedPalette ? 'Save and leave' : 'Add to collection and leave'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -826,8 +825,6 @@ export function EditPalettePage() {
         {...layoutProps}
         config={config}
         onSelectPalette={handleSelectPalette}
-        onSaveAndSwitch={handleSaveAndSwitch}
-        onSaveNewAndSwitch={handleSaveNewAndSwitch}
         onNewPalette={handleCreateNewPalette}
         onNavigateToCollection={handleNavigateToCollection}
         controlsOpenSignal={mobileControlsOpenSignal}

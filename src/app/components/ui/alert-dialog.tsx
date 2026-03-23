@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+import { XIcon } from "lucide-react";
 
 import { cn } from "./utils";
 import { buttonVariants } from "./button";
@@ -142,6 +143,31 @@ function AlertDialogCancel({
   );
 }
 
+function AlertDialogClose({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
+  return (
+    <AlertDialogPrimitive.Cancel
+      data-slot="alert-dialog-close"
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "icon" }),
+        "absolute top-4 right-4 opacity-70 hover:opacity-100",
+        className,
+      )}
+      {...props}
+    >
+      {children ?? (
+        <>
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </>
+      )}
+    </AlertDialogPrimitive.Cancel>
+  );
+}
+
 export {
   AlertDialog,
   AlertDialogPortal,
@@ -154,4 +180,5 @@ export {
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  AlertDialogClose,
 };

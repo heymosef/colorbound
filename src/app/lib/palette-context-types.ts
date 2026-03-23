@@ -88,6 +88,7 @@ export interface PaletteContextValue {
   handleSelectFromCollection: (id: string) => void;
   selectPaletteInCollection: (collectionId: string, paletteId: string) => boolean;
   handleRevertChanges: (options?: { silent?: boolean }) => void;
+  handleDiscardDraftChanges: (options?: { silent?: boolean }) => void;
   handleRemove: (id: string) => void;
   handleRename: (id: string, name: string) => PaletteRenameResult;
   handleReorder: (fromIndex: number, toIndex: number) => void;

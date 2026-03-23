@@ -431,6 +431,16 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     }
   }, [activeCollectionId, savedBaselinePalette, setEditorFromPalette]);
 
+  const handleDiscardDraftChanges = useCallback((options?: { silent?: boolean }) => {
+    startDraftPalette(activeCollectionId ?? undefined);
+    if (!options?.silent) {
+      toast.success('Discarded draft changes', {
+        duration: 2000,
+      });
+      announcePolite('Discarded draft changes');
+    }
+  }, [activeCollectionId, startDraftPalette]);
+
   const handleRemove = useCallback(
     (id: string) => {
       const removedName = collection.find((p) => p.id === id)?.name ?? 'palette';
@@ -1026,6 +1036,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleSelectFromCollection,
       selectPaletteInCollection,
       handleRevertChanges,
+      handleDiscardDraftChanges,
       handleRemove,
       handleRename,
       handleReorder,
@@ -1070,6 +1081,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleSelectFromCollection,
       selectPaletteInCollection,
       handleRevertChanges,
+      handleDiscardDraftChanges,
       handleRemove,
       handleRename,
       handleReorder,

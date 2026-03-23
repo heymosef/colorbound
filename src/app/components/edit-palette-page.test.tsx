@@ -14,6 +14,8 @@ const handleAddToCollection = vi.fn();
 const handleUpdateInCollection = vi.fn();
 const selectPaletteInCollection = vi.fn();
 const handleDuplicatePalette = vi.fn();
+const handleRevertChanges = vi.fn();
+const handleDiscardDraftChanges = vi.fn();
 const handleRemove = vi.fn();
 let breakpoint: 'mobile' | 'tablet' | 'desktop' = 'desktop';
 
@@ -83,7 +85,8 @@ function buildContext(overrides: Record<string, unknown> = {}) {
     handleUpdateInCollection,
     handleSelectFromCollection: vi.fn(),
     selectPaletteInCollection,
-    handleRevertChanges: vi.fn(),
+    handleRevertChanges,
+    handleDiscardDraftChanges,
     handleRemove,
     handleRename: vi.fn(),
     handleReorder: vi.fn(),
@@ -123,7 +126,13 @@ vi.mock('../lib/use-document-title', () => ({
 
 vi.mock('./root-layout', () => ({
   ThemeSwitcher: () => null,
-  CollectionSwitcher: () => null,
+  CollectionSwitcher: ({ onSelect, onCreateNew, onViewAll }: any) => (
+    <div>
+      <button onClick={() => onSelect?.('other-collection', 'collection-2')}>Switch collection</button>
+      {onCreateNew ? <button onClick={onCreateNew}>Create collection</button> : null}
+      {onViewAll ? <button onClick={onViewAll}>View all collections</button> : null}
+    </div>
+  ),
   useThemeContext: () => ({ theme: 'light', setTheme: vi.fn() }),
 }));
 
@@ -150,8 +159,12 @@ vi.mock('./palette-workspace', () => ({
 }));
 
 vi.mock('./palette-switcher', () => ({
-  PaletteSwitcher: ({ onNewPalette }: any) => (
-    <button onClick={onNewPalette}>New palette</button>
+  PaletteSwitcher: ({ onNewPalette, onSelectPalette, onNavigateToCollection }: any) => (
+    <div>
+      <button onClick={onNewPalette}>New palette</button>
+      <button onClick={() => onSelectPalette?.('saved-2')}>Switch palette</button>
+      <button onClick={onNavigateToCollection}>View all palettes</button>
+    </div>
   ),
 }));
 
@@ -196,6 +209,8 @@ describe('EditPalettePage draft save flow', () => {
     handleUpdateInCollection.mockReset();
     selectPaletteInCollection.mockReset();
     handleDuplicatePalette.mockReset();
+    handleRevertChanges.mockReset();
+    handleDiscardDraftChanges.mockReset();
     handleRemove.mockReset();
     toastInfo.mockReset();
     paletteContextValue = buildContext();
@@ -504,6 +519,326 @@ describe('EditPalettePage draft save flow', () => {
     });
 
     expect(toastInfo).toHaveBeenCalledWith('Palette not found');
+  });
+
+  it('opens exactly one dialog and discards immediately when switching away from a dirty saved palette', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette, otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette, otherPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: true,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.getAllByText('Unsaved changes')).toHaveLength(1);
+
+    fireEvent.click(screen.getByText('Discard changes'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(handleRevertChanges).toHaveBeenCalledWith({ silent: true });
+    await waitFor(() => {
+      expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    });
+  });
+
+  it('saves and navigates from a dirty saved palette through the dialog', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette, otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette, otherPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: true,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+    handleUpdateInCollection.mockReturnValue({
+      ok: true,
+      paletteId: 'saved-1',
+      collectionId: 'collection-1',
+      name: 'Cyan',
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+    fireEvent.click(await screen.findByText('Save and leave'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(handleUpdateInCollection).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the dialog open when saving a dirty saved palette fails', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette, otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette, otherPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: true,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+    handleUpdateInCollection.mockReturnValue({
+      ok: false,
+      error: 'duplicate',
+      message: 'A palette with this name already exists in this collection.',
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+    fireEvent.click(await screen.findByText('Save and leave'));
+
+    expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+  });
+
+  it('uses the same dialog save path for dirty drafts', async () => {
+    breakpoint = 'mobile';
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [otherPalette],
+        },
+      ],
+      activePaletteId: null,
+      savedBaselinePalette: null,
+      hasPersistedBaseline: false,
+      isDirty: true,
+      currentPalette: makePalette('draft-1', 'Draft Cyan'),
+      config: {
+        name: 'Draft Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+    handleAddToCollection.mockReturnValue({
+      ok: true,
+      paletteId: 'saved-3',
+      collectionId: 'collection-1',
+    });
+
+    const router = renderAt('/my-collection/edit');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.getByText('Add to collection and leave')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Add to collection and leave'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(handleAddToCollection).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards dirty drafts before navigating away', async () => {
+    breakpoint = 'mobile';
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [otherPalette],
+        },
+      ],
+      activePaletteId: null,
+      savedBaselinePalette: null,
+      hasPersistedBaseline: false,
+      isDirty: true,
+      currentPalette: makePalette('draft-1', 'Draft Cyan'),
+      config: {
+        name: 'Draft Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    const router = renderAt('/my-collection/edit');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+    fireEvent.click(await screen.findByText('Discard changes'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+    });
+
+    expect(handleDiscardDraftChanges).toHaveBeenCalledWith({ silent: true });
+  });
+
+  it('cancels blocked navigation cleanly and uses the next target on retry', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+    const otherPalette = makePalette('saved-2', 'Magenta');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette, otherPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette, otherPalette],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: true,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Switch palette'));
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(screen.queryByText('Keep editing')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+    await waitFor(() => {
+      expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('View all palettes'));
+    fireEvent.click(await screen.findByText('Discard changes'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection');
+    });
+  });
+
+  it('blocks collection switching from the editor until the dialog resolves', async () => {
+    breakpoint = 'mobile';
+    const savedPalette = makePalette('saved-1', 'Cyan');
+
+    paletteContextValue = buildContext({
+      collection: [savedPalette],
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'My Collection',
+          slug: 'my-collection',
+          palettes: [savedPalette],
+        },
+        {
+          id: 'collection-2',
+          name: 'Other Collection',
+          slug: 'other-collection',
+          palettes: [],
+        },
+      ],
+      activePaletteId: 'saved-1',
+      savedBaselinePalette: savedPalette,
+      hasPersistedBaseline: true,
+      isDirty: true,
+      currentPalette: savedPalette,
+      config: {
+        name: 'Cyan',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+    });
+
+    const router = renderAt('/my-collection/edit/saved-1');
+
+    fireEvent.click(screen.getByText('Switch collection'));
+    fireEvent.click(await screen.findByText('Discard changes'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/other-collection');
+    });
   });
 });
 

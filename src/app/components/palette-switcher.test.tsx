@@ -44,13 +44,15 @@ function defaultProps(overrides: Record<string, unknown> = {}) {
     isDirty: false,
     currentName: 'Blue',
     onSelectPalette: vi.fn(),
-    onSaveAndSwitch: vi.fn(),
-    onSaveNewAndSwitch: vi.fn(),
     onNewPalette: vi.fn(),
     onNavigateToCollection: vi.fn(),
-    onAfterSwitch: vi.fn(),
     ...overrides,
   };
+}
+
+function openSwitcher(overrides: Record<string, unknown> = {}) {
+  render(<PaletteSwitcher {...defaultProps(overrides)} />);
+  fireEvent.click(screen.getByLabelText(/Switch palette/));
 }
 
 describe('PaletteSwitcher', () => {
@@ -84,8 +86,7 @@ describe('PaletteSwitcher', () => {
   });
 
   it('shows "No saved palettes yet" when collection is empty', () => {
-    render(<PaletteSwitcher {...defaultProps({ collection: [] })} />);
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
+    openSwitcher({ collection: [] });
     expect(screen.getByText('No saved palettes yet')).toBeInTheDocument();
   });
 
@@ -94,8 +95,7 @@ describe('PaletteSwitcher', () => {
       makePalette({ id: 'a', name: 'Red' }),
       makePalette({ id: 'b', name: 'Green' }),
     ];
-    render(<PaletteSwitcher {...defaultProps({ collection })} />);
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
+    openSwitcher({ collection });
     expect(screen.getByText('Red')).toBeInTheDocument();
     expect(screen.getByText('Green')).toBeInTheDocument();
   });
@@ -117,7 +117,7 @@ describe('PaletteSwitcher', () => {
     expect(inactiveRow).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('calls onSelectPalette for a clean switch', () => {
+  it('closes the popover without navigating when the active palette is clicked', () => {
     const onSelectPalette = vi.fn();
     const collection = [
       makePalette({ id: 'a', name: 'Red' }),
@@ -128,46 +128,18 @@ describe('PaletteSwitcher', () => {
         {...defaultProps({
           collection,
           activePaletteId: 'a',
-          isDirty: false,
           onSelectPalette,
         })}
       />
     );
     fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    expect(onSelectPalette).toHaveBeenCalledWith('b');
-  });
-
-  it('shows dirty confirmation instead of switching immediately when isDirty', () => {
-    const onSelectPalette = vi.fn();
-    const collection = [
-      makePalette({ id: 'a', name: 'Red' }),
-      makePalette({ id: 'b', name: 'Green' }),
-    ];
-    render(
-      <PaletteSwitcher
-        {...defaultProps({
-          collection,
-          activePaletteId: 'a',
-          isDirty: true,
-          currentName: 'Red',
-          onSelectPalette,
-        })}
-      />
-    );
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    // Should NOT have switched yet
+    fireEvent.click(screen.getByRole('option', { name: /Red/ }));
     expect(onSelectPalette).not.toHaveBeenCalled();
-    // Should show confirmation
-    expect(screen.getByText(/Unsaved changes to "Red"/)).toBeInTheDocument();
-    expect(screen.getByText('Update & Switch')).toBeInTheDocument();
-    expect(screen.getByText('Discard')).toBeInTheDocument();
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
+    expect(screen.queryByRole('listbox', { name: 'Saved palettes' })).not.toBeInTheDocument();
   });
 
-  it('dirty confirmation: Save & Switch calls onSaveAndSwitch', () => {
-    const onSaveAndSwitch = vi.fn(() => true);
+  it('calls onSelectPalette for a clean switch and closes the popover', () => {
+    const onSelectPalette = vi.fn();
     const collection = [
       makePalette({ id: 'a', name: 'Red' }),
       makePalette({ id: 'b', name: 'Green' }),
@@ -177,45 +149,18 @@ describe('PaletteSwitcher', () => {
         {...defaultProps({
           collection,
           activePaletteId: 'a',
-          isDirty: true,
-          currentName: 'Red',
-          onSaveAndSwitch,
+          isDirty: false,
+          onSelectPalette,
         })}
       />
     );
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    fireEvent.click(screen.getByText('Update & Switch'));
-    expect(onSaveAndSwitch).toHaveBeenCalledWith('b');
+    expect(onSelectPalette).toHaveBeenCalledWith('b');
+    expect(screen.queryByRole('listbox', { name: 'Saved palettes' })).not.toBeInTheDocument();
   });
 
-  it('keeps the confirmation open when Save & Switch fails', () => {
-    const onSaveAndSwitch = vi.fn(() => false);
-    const collection = [
-      makePalette({ id: 'a', name: 'Red' }),
-      makePalette({ id: 'b', name: 'Green' }),
-    ];
-    render(
-      <PaletteSwitcher
-        {...defaultProps({
-          collection,
-          activePaletteId: 'a',
-          isDirty: true,
-          currentName: 'Red',
-          onSaveAndSwitch,
-        })}
-      />,
-    );
-
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    fireEvent.click(screen.getByText('Update & Switch'));
-
-    expect(onSaveAndSwitch).toHaveBeenCalledWith('b');
-    expect(screen.getByText(/Unsaved changes to "Red"/)).toBeInTheDocument();
-  });
-
-  it('dirty confirmation: Discard calls onSelectPalette directly', () => {
+  it('calls onSelectPalette for a dirty switch and does not render inline confirmation UI', () => {
     const onSelectPalette = vi.fn();
     const collection = [
       makePalette({ id: 'a', name: 'Red' }),
@@ -234,55 +179,9 @@ describe('PaletteSwitcher', () => {
     );
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    fireEvent.click(screen.getByText('Discard'));
     expect(onSelectPalette).toHaveBeenCalledWith('b');
-  });
-
-  it('dirty confirmation: Cancel hides the confirmation', () => {
-    const collection = [
-      makePalette({ id: 'a', name: 'Red' }),
-      makePalette({ id: 'b', name: 'Green' }),
-    ];
-    render(
-      <PaletteSwitcher
-        {...defaultProps({
-          collection,
-          activePaletteId: 'a',
-          isDirty: true,
-          currentName: 'Red',
-        })}
-      />
-    );
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    expect(screen.getByText(/Unsaved changes/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Cancel'));
-    expect(screen.queryByText(/Unsaved changes/)).not.toBeInTheDocument();
-  });
-
-  it('unsaved palette uses "Save & Switch" label and calls onSaveNewAndSwitch', () => {
-    const onSaveNewAndSwitch = vi.fn();
-    const collection = [
-      makePalette({ id: 'b', name: 'Green' }),
-    ];
-    render(
-      <PaletteSwitcher
-        {...defaultProps({
-          collection,
-          activePaletteId: null, // unsaved
-          isDirty: false,
-          currentName: 'Untitled',
-          onSaveNewAndSwitch,
-        })}
-      />
-    );
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    // Unsaved triggers confirmation
-    expect(screen.getByText(/\"Untitled\" is unsaved/)).toBeInTheDocument();
-    expect(screen.getByText('Save & Switch')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Save & Switch'));
-    expect(onSaveNewAndSwitch).toHaveBeenCalledWith('b');
+    expect(screen.queryByText(/Unsaved changes|Save & Switch|Update & Switch|Discard|Cancel/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('listbox', { name: 'Saved palettes' })).not.toBeInTheDocument();
   });
 
   it('calls onNewPalette when "New Palette" is clicked', () => {
@@ -291,6 +190,7 @@ describe('PaletteSwitcher', () => {
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     fireEvent.click(screen.getByText('New palette'));
     expect(onNewPalette).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('listbox', { name: 'Saved palettes' })).not.toBeInTheDocument();
   });
 
   it('calls onNavigateToCollection when "View Collection" is clicked', () => {
@@ -301,27 +201,7 @@ describe('PaletteSwitcher', () => {
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     fireEvent.click(screen.getByText('View all palettes'));
     expect(onNavigateToCollection).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onAfterSwitch after a clean switch', () => {
-    const onAfterSwitch = vi.fn();
-    const collection = [
-      makePalette({ id: 'a', name: 'Red' }),
-      makePalette({ id: 'b', name: 'Green' }),
-    ];
-    render(
-      <PaletteSwitcher
-        {...defaultProps({
-          collection,
-          activePaletteId: 'a',
-          isDirty: false,
-          onAfterSwitch,
-        })}
-      />
-    );
-    fireEvent.click(screen.getByLabelText(/Switch palette/));
-    fireEvent.click(screen.getByRole('option', { name: /Green/ }));
-    expect(onAfterSwitch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('listbox', { name: 'Saved palettes' })).not.toBeInTheDocument();
   });
 
   it('does not show filter input when collection has 5 or fewer palettes', () => {

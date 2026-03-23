@@ -495,6 +495,55 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.lightness950).toBe(0.025);
   });
 
+  it('discards dirty draft changes by resetting the editor to a clean seeded draft', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const rememberedPalette = makeSavedPalette('saved-p3', {
+      name: 'P3 Sky',
+      hue: 220,
+      chroma: 0.28,
+      lightness50: 0.97,
+      lightness950: 0.04,
+      targetColorSpace: 'p3',
+    });
+    const collection = seedHydratedState({
+      palettes: [rememberedPalette],
+      activePaletteId: rememberedPalette.id,
+      lastViewedSavedPaletteId: rememberedPalette.id,
+      config: makeConfig(rememberedPalette),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.selectPaletteInCollection(collection.id, rememberedPalette.id);
+      result.current.startDraftPalette(collection.id);
+    });
+
+    act(() => {
+      result.current.handleConfigChange({
+        targetColorSpace: 'srgb',
+        chroma: 0.1,
+        lightness50: 0.9,
+        lightness950: 0.1,
+      });
+    });
+
+    expect(result.current.isDirty).toBe(true);
+
+    act(() => {
+      result.current.handleDiscardDraftChanges({ silent: true });
+    });
+
+    expect(result.current.activePaletteId).toBeNull();
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.config.hue).toBe(180);
+    expect(result.current.config.targetColorSpace).toBe('p3');
+    expect(result.current.config.chroma).toBe(0.28);
+    expect(result.current.config.lightness50).toBe(0.97);
+    expect(result.current.config.lightness950).toBe(0.04);
+    expect(result.current.config.name).toBe(suggestPaletteName(180, 0.28, 0.97, 0.04));
+  });
+
   it('imports a shared palette into the selected collection and activates it', () => {
     const destinationCollection = createDefaultCollection([makeSavedPalette('existing-1', { name: 'Ocean' })]);
     destinationCollection.name = 'Marketing';

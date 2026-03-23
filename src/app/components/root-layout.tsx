@@ -274,10 +274,6 @@ function HeaderBreadcrumb() {
     activePaletteId,
     activeCollection,
     isDirty,
-    handleSelectFromCollection,
-    handleUpdateInCollection,
-    handleAddToCollection,
-    startDraftPalette,
     handleCreateCollection,
     handleSelectCollection,
   } = usePaletteContext();
@@ -286,7 +282,6 @@ function HeaderBreadcrumb() {
   const isEdit = isEditorRoute(pathname);
   const isShared = pathname.startsWith('/p/') || pathname.startsWith('/c/');
   const isCollectionsList = pathname === '/';
-  const collectionCount = collection.length;
   const collectionSlug = activeCollection?.slug ?? '';
   const collectionName = activeCollection?.name ?? 'Collection';
   const basePath = collectionSlug ? buildCollectionPath(collectionSlug) : '';
@@ -302,35 +297,12 @@ function HeaderBreadcrumb() {
     [collectionSlug, navigate]
   );
 
-  const handleSaveAndSwitch = useCallback(
-    (targetId: string): boolean => {
-      const result = handleUpdateInCollection();
-      if (!result.ok) return false;
-      if (!collectionSlug) return false;
-      navigate(buildCollectionSavedEditorPath(collectionSlug, targetId));
-      return true;
-    },
-    [collectionSlug, handleUpdateInCollection, navigate]
-  );
-
-  const handleSaveNewAndSwitch = useCallback(
-    (targetId: string): boolean => {
-      const result = handleAddToCollection();
-      if (!result.ok) return false;
-      if (!collectionSlug) return false;
-      navigate(buildCollectionSavedEditorPath(collectionSlug, targetId));
-      return true;
-    },
-    [collectionSlug, handleAddToCollection, navigate]
-  );
-
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
-    startDraftPalette(activeCollection.id);
     navigate(buildCollectionDraftEditorPath(activeCollection.slug), {
       state: { createDraft: true },
     });
-  }, [activeCollection, navigate, startDraftPalette]);
+  }, [activeCollection, navigate]);
 
   const handleNavigateToCollection = useCallback(() => {
     navigate(basePath || '/');
@@ -341,8 +313,6 @@ function HeaderBreadcrumb() {
 
   // Collections list (home) page: no breadcrumb needed
   if (isCollectionsList) return null;
-
-  const hasMultipleCollections = collections.length > 1;
 
   // Collection detail page
   if (isCollectionDetail) {
@@ -388,8 +358,7 @@ function HeaderBreadcrumb() {
               collections={collections}
               activeCollectionId={activeCollection?.id ?? null}
               collectionName={collectionName}
-              onSelect={(slug, id) => {
-                handleSelectCollection(id);
+              onSelect={(slug) => {
                 navigate(buildCollectionPath(slug));
               }}
               onCreateNew={() => {
@@ -412,8 +381,6 @@ function HeaderBreadcrumb() {
               isDirty={isDirty}
               currentName={config.name}
               onSelectPalette={handleSelectPalette}
-              onSaveAndSwitch={handleSaveAndSwitch}
-              onSaveNewAndSwitch={handleSaveNewAndSwitch}
               onNewPalette={handleCreateNewPalette}
               onNavigateToCollection={handleNavigateToCollection}
             />

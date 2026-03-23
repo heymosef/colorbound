@@ -10,17 +10,9 @@
  */
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { Input } from './ui/input';
-import {
-  ChevronDown,
-  Check,
-  Plus,
-  Layers,
-  Search,
-  AlertTriangle,
-} from 'lucide-react';
+import { ChevronDown, Check, Plus, Layers, Search } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getRampDisplayColors } from '../lib/palette-preview';
 import { getPaletteSwitcherViewportClass } from './switcher-viewport';
@@ -95,59 +87,6 @@ function PaletteRow({
   );
 }
 
-/** Inline dirty-state confirmation strip */
-function DirtyConfirmation({
-  currentName,
-  isUnsaved,
-  onSaveAndSwitch,
-  onDiscard,
-  onCancel,
-}: {
-  currentName: string;
-  isUnsaved: boolean;
-  onSaveAndSwitch: () => void;
-  onDiscard: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="px-2 py-2 space-y-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md mx-1 mb-1">
-      <div className="flex items-start gap-1.5">
-        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-amber-800 dark:text-amber-300">
-          {isUnsaved
-            ? `"${currentName}" is unsaved`
-            : `Unsaved changes to "${currentName}"`}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        <Button
-          size="sm"
-          className="h-6 text-[10px] px-2 whitespace-nowrap"
-          onClick={onSaveAndSwitch}
-        >
-          {isUnsaved ? 'Save & Switch' : 'Update & Switch'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-[10px] px-2 whitespace-nowrap"
-          onClick={onDiscard}
-        >
-          Discard
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 text-[10px] px-2 whitespace-nowrap"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───
 
 export interface PaletteSwitcherProps {
@@ -157,12 +96,8 @@ export interface PaletteSwitcherProps {
   isDirty: boolean;
   currentName: string;
   onSelectPalette: (id: string) => void;
-  onSaveAndSwitch: (targetId: string) => boolean;
-  onSaveNewAndSwitch: (targetId: string) => boolean;
   onNewPalette: () => void;
   onNavigateToCollection: () => void;
-  /** Called after a switch completes — e.g. close mobile Sheet */
-  onAfterSwitch?: () => void;
   /** 'default' = sidebar trigger (mini ramp + details), 'compact' = breadcrumb trigger (dot + name) */
   variant?: 'default' | 'compact';
   /** Compact trigger sizing: 'sm' = header breadcrumb, 'lg' = mobile top bar */
@@ -176,24 +111,19 @@ export function PaletteSwitcher({
   isDirty,
   currentName,
   onSelectPalette,
-  onSaveAndSwitch,
-  onSaveNewAndSwitch,
   onNewPalette,
   onNavigateToCollection,
-  onAfterSwitch,
   variant = 'default',
   compactSize = 'sm',
 }: PaletteSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
-  const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
   const filterInputId = 'palette-switcher-filter';
 
   // Reset state when popover closes
   useEffect(() => {
     if (!open) {
       setFilter('');
-      setPendingSwitchId(null);
     }
   }, [open]);
 
@@ -212,17 +142,8 @@ export function PaletteSwitcher({
   const filteredCollection = useMemo(() => {
     if (!filter.trim()) return collection;
     const q = filter.toLowerCase().trim();
-    return collection.filter(
-      (p) => p.name.toLowerCase().includes(q)
-    );
+    return collection.filter((p) => p.name.toLowerCase().includes(q));
   }, [collection, filter]);
-
-  const rampColors = useMemo(
-    () => getRampDisplayColors(currentPalette?.tokens ?? []),
-    [currentPalette?.tokens]
-  );
-
-  const isUnsaved = !activePaletteId;
 
   const handleRowClick = useCallback(
     (id: string) => {
@@ -231,56 +152,22 @@ export function PaletteSwitcher({
         setOpen(false);
         return;
       }
-      // If dirty, show confirmation
-      if (isDirty || isUnsaved) {
-        setPendingSwitchId(id);
-        return;
-      }
-      // Clean switch
-      onSelectPalette(id);
+
       setOpen(false);
-      onAfterSwitch?.();
+      onSelectPalette(id);
     },
-    [activePaletteId, isDirty, isUnsaved, onSelectPalette, onAfterSwitch]
+    [activePaletteId, onSelectPalette],
   );
 
-  const handleSaveAndSwitch = useCallback(() => {
-    if (!pendingSwitchId) return;
-    const didSwitch = isUnsaved
-      ? onSaveNewAndSwitch(pendingSwitchId)
-      : onSaveAndSwitch(pendingSwitchId);
-
-    if (!didSwitch) {
-      return;
-    }
-    setPendingSwitchId(null);
-    setOpen(false);
-    onAfterSwitch?.();
-  }, [pendingSwitchId, isUnsaved, onSaveAndSwitch, onSaveNewAndSwitch, onAfterSwitch]);
-
-  const handleDiscard = useCallback(() => {
-    if (!pendingSwitchId) return;
-    onSelectPalette(pendingSwitchId);
-    setPendingSwitchId(null);
-    setOpen(false);
-    onAfterSwitch?.();
-  }, [pendingSwitchId, onSelectPalette, onAfterSwitch]);
-
-  const handleCancel = useCallback(() => {
-    setPendingSwitchId(null);
-  }, []);
-
   const handleNewPalette = useCallback(() => {
-    onNewPalette();
     setOpen(false);
-    onAfterSwitch?.();
-  }, [onNewPalette, onAfterSwitch]);
+    onNewPalette();
+  }, [onNewPalette]);
 
   const handleViewAll = useCallback(() => {
-    onNavigateToCollection();
     setOpen(false);
-    onAfterSwitch?.();
-  }, [onNavigateToCollection, onAfterSwitch]);
+    onNavigateToCollection();
+  }, [onNavigateToCollection]);
 
   const hasCollection = collection.length > 0;
   const showFilter = collection.length > 5;
@@ -291,13 +178,18 @@ export function PaletteSwitcher({
     return t?.hex ?? '#888888';
   }, [currentPalette?.tokens]);
 
+  const triggerClassName =
+    compactSize === 'lg'
+      ? 'inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]'
+      : 'inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]';
+
   /**
    * Compact trigger — used in header breadcrumb and mobile top bar.
    * Shows: colored dot + palette name + chevron
    */
   const compactTrigger = (
     <PopoverTrigger
-      className="inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+      className={triggerClassName}
       aria-label={`Switch palette. Currently editing: ${currentName}`}
     >
       <div
@@ -389,19 +281,6 @@ export function PaletteSwitcher({
             </div>
           )}
         </div>
-
-        {/* Dirty confirmation */}
-        {pendingSwitchId && (
-          <div className="shrink-0">
-            <DirtyConfirmation
-              currentName={currentName}
-              isUnsaved={isUnsaved}
-              onSaveAndSwitch={handleSaveAndSwitch}
-              onDiscard={handleDiscard}
-              onCancel={handleCancel}
-            />
-          </div>
-        )}
 
         <Separator className="shrink-0" />
 
