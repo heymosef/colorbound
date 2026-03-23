@@ -45,7 +45,7 @@
     "@vitejs/plugin-react": "4.7.0",
     "jsdom": "^28.1.0",
     "tailwindcss": "4.1.12",
-    "vite": "6.3.5",
+    "vite": "^8.0.1",
     "vitest": "^4.0.18"
   }
 }

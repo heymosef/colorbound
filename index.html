@@ -3,6 +3,7 @@
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
+      <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co; img-src 'self' data: blob:;" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Colorbound — Generate OKLCH color palettes</title>
     <meta name="description" content="Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma." />
@@ -11,27 +12,7 @@
     <meta property="og:description" content="Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma." />
     <meta property="og:type" content="website" />
     <!-- SPA redirect restore for GitHub Pages (matches public/404.html) -->
-    <script>
-      (function () {
-        var redirect = sessionStorage.redirect;
-        delete sessionStorage.redirect;
-        if (redirect && redirect !== location.href) {
-          history.replaceState(null, null, redirect);
-        }
-      })();
-      (function () {
-        var l = window.location;
-        if (l.search[1] === '/') {
-          var decoded = l.search.slice(1).split('&').map(function (s) {
-            return s.replace(/~and~/g, '&');
-          }).join('?');
-          sessionStorage.redirect = l.protocol + '//' + l.host + decoded + l.hash;
-          window.history.replaceState(null, null,
-            l.pathname.slice(0, -1) + decoded + l.hash
-          );
-        }
-      })();
-    </script>
+    <script src="/spa-redirect.js"></script>
     </head>
 
     <body>
