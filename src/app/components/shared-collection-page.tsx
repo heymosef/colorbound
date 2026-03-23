@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLoaderData, Link } from 'react-router';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -36,6 +36,7 @@ import { useDocumentTitle } from '../lib/use-document-title';
 import { PaletteColorRamp } from './palette-color-ramp';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
+import { track } from '../lib/analytics';
 
 // ─── Config spec (inline) ───
 
@@ -216,6 +217,10 @@ export function SharedCollectionPage() {
   const [linkCopied, triggerLinkCopied] = useCopyFeedback();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
+  useEffect(() => {
+    track('shared_collection_viewed', { share_id: shareId, palette_count: entries.length });
+  }, [shareId, entries.length]);
+
   const toggleSelection = useCallback((index: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -254,6 +259,7 @@ export function SharedCollectionPage() {
       toast.error('No palettes selected', { duration: 2000 });
       return;
     }
+    track('shared_collection_imported', { share_id: shareId, palette_count: selected.size });
     if (selected.size === 1) {
       const idx = Array.from(selected)[0];
       const entry = entries[idx];

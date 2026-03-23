@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from 'react';
 import type { Collection } from '../lib/collection-types';
 import { Outlet, useLocation, useNavigate, Link } from 'react-router';
+import { initPostHog, track, trackPageview } from '../lib/analytics';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import {
   Breadcrumb,
@@ -400,6 +401,23 @@ export function RootLayout() {
   const location = useLocation();
   const breakpoint = useBreakpoint();
 
+  // PostHog init + pageview tracking
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    initPostHog();
+  }, []);
+  useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      trackPageview();
+    }
+  }, [location.pathname]);
+
+  const handleSetTheme = useCallback((t: AppTheme) => {
+    setTheme(t);
+    track('theme_changed', { theme: t });
+  }, [setTheme]);
+
   // On mobile, hide the global header when on the edit page —
   // MobileLayout in EditPalettePage provides its own top bar
   // (PaletteSwitcher + More + Edit).
@@ -408,7 +426,7 @@ export function RootLayout() {
   const hideHeader = breakpoint === 'mobile' && isEditPage;
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme }}>
       <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
         {/* App Header — hidden on mobile edit page (MobileLayout has its own top bar) */}
         {!hideHeader && (

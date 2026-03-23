@@ -30,6 +30,7 @@ import {
 } from '../lib/color-utils';
 import { copyToClipboard } from '../lib/clipboard';
 import { useCopyFeedback } from '../lib/use-copy-feedback';
+import { track } from '../lib/analytics';
 import { getPaletteWithVisibleTokens } from '../lib/palette-density';
 import { usePaletteContext } from '../lib/palette-context';
 
@@ -139,18 +140,23 @@ function CodeBlock({
   code,
   language,
   filename,
+  onTrackCopy,
+  onTrackDownload,
 }: {
   code: string;
   language: string;
   filename: string;
+  onTrackCopy?: () => void;
+  onTrackDownload?: () => void;
 }) {
   const [copied, triggerCopied] = useCopyFeedback();
 
   const handleCopy = useCallback(async () => {
     await copyToClipboard(code);
     triggerCopied();
+    onTrackCopy?.();
     toast.success('Copied to clipboard', { duration: 2000 });
-  }, [code, triggerCopied]);
+  }, [code, triggerCopied, onTrackCopy]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([code], { type: 'text/plain' });
@@ -162,8 +168,9 @@ function CodeBlock({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    onTrackDownload?.();
     toast.success(`Downloaded ${filename}`, { duration: 2000 });
-  }, [code, filename]);
+  }, [code, filename, onTrackDownload]);
 
   const lineCount = code.split('\n').length;
 
@@ -483,6 +490,10 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
     );
   }
 
+  const exportProps = { output: activeFormat, format: colorFormat, scope, has_prefix: prefix.length > 0, include_dark_mode: includeDark };
+  const handleTrackCopy = useCallback(() => track('export_copied', exportProps), [activeFormat, colorFormat, scope, prefix, includeDark]);
+  const handleTrackDownload = useCallback(() => track('export_downloaded', exportProps), [activeFormat, colorFormat, scope, prefix, includeDark]);
+
   const content = (
     <div className="space-y-4 min-w-0">
         {/* Settings */}
@@ -512,6 +523,8 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
               code={exportArtifacts[0].code}
               language={exportArtifacts[0].language}
               filename={exportArtifacts[0].filename}
+              onTrackCopy={handleTrackCopy}
+              onTrackDownload={handleTrackDownload}
             />
           ) : (
             <Tabs value={activePreviewId} onValueChange={setActivePreviewId} className="gap-3">
@@ -529,6 +542,8 @@ export function ExportPanel({ inlineMode }: ExportPanelProps) {
                     code={artifact.code}
                     language={artifact.language}
                     filename={artifact.filename}
+                    onTrackCopy={handleTrackCopy}
+                    onTrackDownload={handleTrackDownload}
                   />
                 </TabsContent>
               ))}

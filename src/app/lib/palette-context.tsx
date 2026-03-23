@@ -36,6 +36,7 @@ import {
   type CopyPaletteOperationResult,
   type MovePaletteOperationResult,
 } from './collection-operations';
+import { track, setUserProperties } from './analytics';
 import { validateCollectionName } from './collection-name-validation';
 import {
   buildPaletteNameIndex,
@@ -277,6 +278,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setActivePaletteId(null);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
+    track('palette_created');
   }, [activeCollectionId, collections, lastViewedSavedPalette]);
 
   const handleConfigChange = useCallback(
@@ -360,6 +362,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setHasCompletedFirstRun(true);
     toast.success(`Added "${validation.normalizedName}" to collection`, { duration: 2000 });
     announcePolite(`Added ${validation.normalizedName} to collection`);
+    track('palette_saved', { palette_name: validation.normalizedName });
     return { ok: true, paletteId: snapshot.id, collectionId: activeCollectionId };
   }, [activeCollection, activeCollectionId, config.name, currentPalette, updateActiveCollectionPalettes, validateNameInCollection]);
 
@@ -451,6 +454,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       }
       toast('Palette removed from collection', { duration: 2000 });
       announce(`Removed ${removedName} from collection`);
+      track('palette_deleted');
     },
     [activePaletteId, updateActiveCollectionPalettes, collection]
   );
@@ -483,6 +487,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
     }
 
+    track('palette_renamed');
     return {
       ok: true,
       paletteId: id,
@@ -661,6 +666,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       duration: 2000,
     });
     announcePolite(`Duplicated as ${validation.normalizedName}`);
+    track('palette_duplicated');
     return {
       ok: true,
       paletteId: newId,
@@ -792,6 +798,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setHasCompletedFirstRun(true);
     toast.success(`Created "${finalName}"`, { duration: 2000 });
     announcePolite(`Created collection ${finalName}`);
+    track('collection_created');
     return { id: newCollection.id, slug: finalSlug };
   }, [collections]);
 
@@ -818,6 +825,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       )
     );
     announcePolite(`Renamed collection to ${normalizedName}`);
+    track('collection_renamed');
     return {
       ok: true,
       collectionId,
@@ -857,6 +865,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
     toast.success('Collection deleted', { duration: 2000 });
     announce('Collection deleted');
+    track('collection_deleted');
     return true;
   }, [activeCollectionId, activePaletteId, collections, lastViewedSavedPaletteId]);
 
@@ -884,6 +893,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'collection';
     toast.success(`Moved to "${targetName}"`, { duration: 2000 });
     announce(`Moved palette to ${targetName}`);
+    track('palette_moved');
     return operation;
   }, [activePaletteId, collections, setEditorFromPalette]);
 
@@ -904,6 +914,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'collection';
     toast.success(`Copied to "${targetName}"`, { duration: 2000 });
     announcePolite(`Duplicated palette to ${targetName}`);
+    track('palette_copied_to_collection');
     return operation;
   }, [activePaletteId, collections, setEditorFromPalette]);
 
@@ -925,6 +936,10 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
+
+    // Update PostHog person properties with current counts
+    const totalPalettes = collections.reduce((sum, c) => sum + c.palettes.length, 0);
+    setUserProperties({ palette_count: totalPalettes, collection_count: collections.length });
 
     // Debounce: wait 300ms after the last state change before persisting
     saveTimeoutRef.current = setTimeout(() => {

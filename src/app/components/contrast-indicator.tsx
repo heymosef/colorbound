@@ -10,6 +10,7 @@ import { relativeLuminance, wcag2Contrast, getWcag2Rating, apcaContrast, getApca
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
 import { usePaletteContext, type ContrastAlgorithm } from '../lib/palette-context';
+import { track } from '../lib/analytics';
 
 // ─── Types ───
 
@@ -115,12 +116,16 @@ function StatusIcon({ level, size = 18 }: { level: ContrastLevel; size?: number 
 // ─── Algorithm Toggle ───
 
 export function AlgorithmToggle({ value, onChange }: { value: ContrastAlgorithm; onChange: (v: ContrastAlgorithm) => void }) {
+  const handleChange = (v: ContrastAlgorithm) => {
+    onChange(v);
+    track('contrast_algorithm_changed', { algorithm: v });
+  };
   return (
     <div className="inline-flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5" role="radiogroup" aria-label="Contrast algorithm">
       <button
         role="radio"
         aria-checked={value === 'wcag'}
-        onClick={() => onChange('wcag')}
+        onClick={() => handleChange('wcag')}
         className={`inline-flex items-center px-2 py-1 rounded-sm text-[11px] transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
           value === 'wcag' ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground' : 'text-muted-foreground hover:text-foreground'
         }`}
@@ -130,7 +135,7 @@ export function AlgorithmToggle({ value, onChange }: { value: ContrastAlgorithm;
       <button
         role="radio"
         aria-checked={value === 'apca'}
-        onClick={() => onChange('apca')}
+        onClick={() => handleChange('apca')}
         className={`inline-flex items-center px-2 py-1 rounded-sm text-[11px] transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${
           value === 'apca' ? 'bg-background dark:bg-muted-foreground/15 shadow-sm dark:shadow-none text-foreground' : 'text-muted-foreground hover:text-foreground'
         }`}

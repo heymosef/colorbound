@@ -6,6 +6,7 @@ import { copyToClipboard } from '../lib/clipboard';
 import { useCopyFeedback } from '../lib/use-copy-feedback';
 import { getTokenDisplayColor, useSupportsP3 } from '../lib/use-supports-p3';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { track } from '../lib/analytics';
 
 type SwatchVariant =
   | 'workspace'
@@ -54,6 +55,7 @@ export function CopyableTokenSwatch({
 
     await copyToClipboard(targetCss);
     triggerCopied();
+    track('swatch_color_copied', { step: token.step, palette_name: paletteName });
     toast.success(`Copied ${paletteName}-${token.step}`, {
       description: targetCss,
       duration: 2000,

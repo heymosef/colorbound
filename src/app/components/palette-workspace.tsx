@@ -11,7 +11,7 @@
  * by EditPalettePage's top bar and More menu.
  */
 
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
@@ -29,6 +29,7 @@ import {
 } from './ui/table';
 import { usePaletteContext } from '../lib/palette-context';
 import { PopoverMenuItem } from './popover-menu-item';
+import { track } from '../lib/analytics';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
 
@@ -377,7 +378,10 @@ export function PaletteWorkspace({
         )}
 
         {/* Token Table */}
-        <Tabs defaultValue="preview" className="w-full">
+        <Tabs defaultValue="preview" className="w-full" onValueChange={(v) => {
+          if (v === 'values') track('token_values_tab_viewed');
+          if (v === 'preview') track('ui_preview_viewed');
+        }}>
           <TabsList className="h-8">
             <TabsTrigger value="preview" className="text-[12px] h-6">
               UI Preview
