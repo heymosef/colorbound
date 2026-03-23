@@ -250,6 +250,40 @@ describe('EditPalettePage draft save flow', () => {
     expect(startDraftPalette).not.toHaveBeenCalled();
   });
 
+  it('does not show the unsaved changes dialog after saving a dirty draft palette', async () => {
+    handleAddToCollection.mockImplementation(() => {
+      const savedPalette = makePalette('saved-new', 'Draft Cyan');
+      paletteContextValue = buildContext({
+        collection: [savedPalette],
+        collections: [
+          {
+            id: 'collection-1',
+            name: 'My Collection',
+            slug: 'my-collection',
+            palettes: [savedPalette],
+          },
+        ],
+        activePaletteId: 'saved-new',
+        savedBaselinePalette: savedPalette,
+        hasPersistedBaseline: true,
+        isDirty: false,
+        currentPalette: savedPalette,
+      });
+      return { ok: true, paletteId: 'saved-new', collectionId: 'collection-1' };
+    });
+
+    const router = renderAt('/my-collection/edit');
+
+    fireEvent.click(screen.getByText('Save palette'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-new');
+    });
+
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    expect(startDraftPalette).not.toHaveBeenCalled();
+  });
+
   it('canonicalizes a saved baseline on the draft route back to the saved palette route', async () => {
     const savedPalette = makePalette('saved-1');
     paletteContextValue = buildContext({
