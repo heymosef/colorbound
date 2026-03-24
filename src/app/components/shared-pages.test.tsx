@@ -28,8 +28,9 @@ vi.mock('../lib/palette-context', () => ({
   usePaletteContext: () => paletteContextValue,
 }));
 
+const mockUseDocumentTitle = vi.fn();
 vi.mock('../lib/use-document-title', () => ({
-  useDocumentTitle: vi.fn(),
+  useDocumentTitle: (...args: unknown[]) => mockUseDocumentTitle(...args),
 }));
 
 vi.mock('../lib/clipboard', () => ({
@@ -123,6 +124,7 @@ describe('Shared pages', () => {
     handleImportPaletteToCollection.mockReset();
     handleImportCollection.mockReset();
     handleCreateCollection.mockReset();
+    mockUseDocumentTitle.mockReset();
     paletteContextValue = {
       collections: [],
       handleImportPalette,
@@ -303,5 +305,49 @@ describe('Shared pages', () => {
       'collection-2',
     );
     expect(navigate).toHaveBeenCalledWith('/imported-into/edit/imported-2');
+  });
+
+  it('shared palette page calls useDocumentTitle with palette name and description', () => {
+    loaderData = {
+      palette: {
+        name: 'Ocean',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      },
+      createdAt: '2026-03-18T00:00:00.000Z',
+    };
+
+    render(<SharedPaletteHarness />);
+
+    expect(mockUseDocumentTitle).toHaveBeenCalledWith(
+      'Ocean — OKLCH color palette via Colorbound',
+      expect.stringContaining('Ocean'),
+    );
+  });
+
+  it('shared collection page calls useDocumentTitle with collection name and description', () => {
+    loaderData = {
+      type: 'collection',
+      name: 'Brand Palette',
+      palettes: [
+        {
+          name: 'Slate',
+          hue: 210,
+          chroma: 0.01,
+          lightness50: 0.985,
+          lightness950: 0.025,
+        },
+      ],
+      createdAt: '2026-03-18T00:00:00.000Z',
+    };
+
+    render(<SharedCollectionPage />);
+
+    expect(mockUseDocumentTitle).toHaveBeenCalledWith(
+      'Brand Palette — OKLCH color collection via Colorbound',
+      expect.stringContaining('Brand Palette'),
+    );
   });
 });

@@ -25,12 +25,18 @@ export function useDocumentTitle(
     setMetaContent('meta[name="description"]', resolvedDescription);
     setMetaContent('meta[property="og:title"]', resolvedTitle);
     setMetaContent('meta[property="og:description"]', resolvedDescription);
+    setMetaContent('meta[property="og:url"]', window.location.href);
+    setMetaContent('meta[name="twitter:title"]', resolvedTitle);
+    setMetaContent('meta[name="twitter:description"]', resolvedDescription);
 
     return () => {
       document.title = DEFAULT_TITLE;
       setMetaContent('meta[name="description"]', DEFAULT_DESCRIPTION);
       setMetaContent('meta[property="og:title"]', DEFAULT_TITLE);
       setMetaContent('meta[property="og:description"]', DEFAULT_DESCRIPTION);
+      setMetaContent('meta[property="og:url"]', 'https://colorbound.dev/');
+      setMetaContent('meta[name="twitter:title"]', DEFAULT_TITLE);
+      setMetaContent('meta[name="twitter:description"]', DEFAULT_DESCRIPTION);
     };
   }, [title, description]);
 }
