@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pre-commit hook: block commits containing .env files with real credentials
+
+# Block .env.production, .env.staging, .env.live from being committed
+if git diff --cached --name-only | grep -qE '\.env\.(production|staging|live)$'; then
+  echo ""
+  echo "ERROR: Attempting to commit a production .env file."
+  echo "Use GitHub Actions secrets instead. See CLAUDE.md for the pattern."
+  echo ""
+  exit 1
+fi
+
+# Block Supabase service role keys (these are truly secret)
+if git diff --cached | grep -qE '(SUPABASE_SERVICE_ROLE_KEY|service_role.*eyJ|eyJ.*service_role)'; then
+  echo ""
+  echo "ERROR: Potential Supabase service role key detected in staged changes."
+  echo "Service role keys must never be committed. Use GitHub Actions secrets."
+  echo ""
+  exit 1
+fi
+
+exit 0
