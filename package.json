@@ -10,7 +10,8 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "vite"
+    "dev": "vite",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "1.1.6",
