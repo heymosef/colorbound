@@ -13,6 +13,15 @@ const headers = {
   Authorization: `Bearer ${publicAnonKey}`,
 };
 
+function assertShareConfigured(): void {
+  if (!projectId || !publicAnonKey) {
+    throw new ShareError(
+      'Sharing is not available — the app is not configured correctly.',
+      0,
+    );
+  }
+}
+
 // ─── Types ───
 
 export interface SharedPaletteEntry {
@@ -58,6 +67,7 @@ export class ShareError extends Error {
 // ─── API calls ───
 
 export async function createSharedPalette(palette: SharedPaletteEntry): Promise<ShareResult> {
+  assertShareConfigured();
   const res = await fetch(`${BASE_URL}/share/palette`, {
     method: 'POST',
     headers,
@@ -76,6 +86,7 @@ export async function createSharedCollection(
   palettes: SharedPaletteEntry[],
   name?: string,
 ): Promise<ShareResult> {
+  assertShareConfigured();
   const res = await fetch(`${BASE_URL}/share/collection`, {
     method: 'POST',
     headers,
@@ -91,6 +102,7 @@ export async function createSharedCollection(
 }
 
 export async function getSharedPalette(id: string): Promise<SharedPaletteResponse> {
+  assertShareConfigured();
   const res = await fetch(`${BASE_URL}/share/palette/${encodeURIComponent(id)}`, {
     headers,
   });
@@ -104,6 +116,7 @@ export async function getSharedPalette(id: string): Promise<SharedPaletteRespons
 }
 
 export async function getSharedCollection(id: string): Promise<SharedCollectionResponse> {
+  assertShareConfigured();
   const res = await fetch(`${BASE_URL}/share/collection/${encodeURIComponent(id)}`, {
     headers,
   });

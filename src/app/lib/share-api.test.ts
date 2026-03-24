@@ -94,6 +94,37 @@ describe('ShareError', () => {
   });
 });
 
+// ─── Misconfiguration guard ───
+
+describe('misconfiguration guard', () => {
+  it('throws ShareError when Supabase credentials are missing', async () => {
+    vi.resetModules();
+    vi.doMock('/utils/supabase/info', () => ({
+      projectId: '',
+      publicAnonKey: '',
+    }));
+
+    const { createSharedPalette: unconfiguredCreate } = await import('./share-api');
+
+    await expect(
+      unconfiguredCreate({
+        name: 'Test',
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+      }),
+    ).rejects.toMatchObject({
+      name: 'ShareError',
+      status: 0,
+      message: expect.stringContaining('not configured'),
+    });
+
+    vi.doUnmock('/utils/supabase/info');
+    vi.resetModules();
+  });
+});
+
 // ─── createSharedPalette / createSharedCollection ───
 
 describe('createSharedPalette', () => {
