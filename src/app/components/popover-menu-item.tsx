@@ -13,13 +13,14 @@ export function PopoverMenuItem({
   className,
   disabled,
   variant = 'default',
+  ...rest
 }: {
   children: React.ReactNode;
   onClick: () => void;
   className?: string;
   disabled?: boolean;
   variant?: 'default' | 'destructive';
-}) {
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'onClick' | 'disabled' | 'className'>) {
   return (
     <button
       type="button"
@@ -32,6 +33,7 @@ export function PopoverMenuItem({
         className,
       )}
       onClick={onClick}
+      {...rest}
     >
       {children}
     </button>

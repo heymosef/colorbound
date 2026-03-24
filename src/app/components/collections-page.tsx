@@ -25,6 +25,7 @@ import { CollectionIcon } from './collection-icon';
 import { ShareCollectionButton, SharePaletteButton } from './share/share-actions';
 import { PopoverMenuItem } from './popover-menu-item';
 import { useDocumentTitle } from '../lib/use-document-title';
+import { announcePolite } from './aria-live-announcer';
 import { PaletteColorRamp } from './palette-color-ramp';
 import { DUPLICATE_PALETTE_NAME_MESSAGE } from '../lib/palette-name-validation';
 import { validateCollectionName } from '../lib/collection-name-validation';
@@ -120,6 +121,7 @@ function PaletteCard({
     }
     setNameError(null);
     setEditing(false);
+    announcePolite(`Renamed palette to "${editName.trim()}"`);
   };
 
   return (
@@ -383,6 +385,7 @@ export function CollectionsPage() {
       }
 
       setCollectionNameError(null);
+      announcePolite(`Renamed collection to "${validation.normalizedName}"`);
       navigate(buildCollectionPath(result.slug), { replace: true });
     }
     setEditingCollectionName(false);
@@ -489,7 +492,7 @@ export function CollectionsPage() {
                       setDeleteDialogOpen(true);
                     }}
                     variant="destructive"
-                    className={canDeleteCollection ? '' : 'opacity-40 pointer-events-none'}
+                    disabled={!canDeleteCollection}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Delete collection

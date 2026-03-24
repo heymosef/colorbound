@@ -116,7 +116,7 @@ export function CopyableTokenSwatch({
             <span>{secondaryValue}</span>
           </div>
         </div>
-        <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
+        <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" aria-hidden="true">
           {copied ? (
             <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
           ) : (
@@ -153,7 +153,7 @@ export function CopyableTokenSwatch({
         <div className="p-2 space-y-1">
           {compactBody}
         </div>
-        <span className="absolute right-2 top-2 opacity-0 group-hover/swatch:opacity-100 transition-opacity" aria-hidden="true">
+        <span className="absolute right-2 top-2 opacity-0 group-hover/swatch:opacity-100 group-focus-within/swatch:opacity-100 transition-opacity" aria-hidden="true">
           {copied ? (
             <Check className="w-3 h-3 lucide-check" style={{ color: textColor }} />
           ) : (
@@ -185,7 +185,7 @@ export function CopyableTokenSwatch({
           {secondaryValue}
         </p>
       </div>
-      <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
+      <span className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" aria-hidden="true">
         {copied ? (
           <Check className="w-3.5 h-3.5 lucide-check" style={{ color: textColor }} />
         ) : (

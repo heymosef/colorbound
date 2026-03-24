@@ -295,7 +295,7 @@ describe('PaletteSwitcher', () => {
         })}
       />
     );
-    const dot = document.querySelector('[title="Unsaved changes"]');
+    const dot = document.querySelector('[aria-label="Unsaved changes"]');
     expect(dot).toBeInTheDocument();
   });
 
@@ -308,7 +308,7 @@ describe('PaletteSwitcher', () => {
         })}
       />
     );
-    const dot = document.querySelector('[title="Unsaved changes"]');
+    const dot = document.querySelector('[aria-label="Unsaved changes"]');
     expect(dot).not.toBeInTheDocument();
   });
 

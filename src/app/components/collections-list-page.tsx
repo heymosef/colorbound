@@ -45,6 +45,7 @@ import { PopoverMenuItem } from './popover-menu-item';
 import { validateCollectionName } from '../lib/collection-name-validation';
 import { buildCollectionPath } from '../lib/editor-routes';
 import { CollectionIcon } from './collection-icon';
+import { announcePolite } from './aria-live-announcer';
 
 // ─── Color swatches from a collection's palettes ───
 
@@ -63,12 +64,13 @@ function CollectionSwatches({ collection }: { collection: Collection }) {
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" role="img" aria-label={`Collection colors: ${swatches.length} palette preview${swatches.length !== 1 ? 's' : ''}`}>
       {swatches.map((color, i) => (
         <div
           key={i}
           className="w-5 h-5 rounded-[3px] shrink-0"
           style={{ backgroundColor: color }}
+          aria-hidden="true"
         />
       ))}
     </div>
@@ -164,7 +166,10 @@ function SortSelector({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="inline-flex items-center gap-1.5 rounded-md h-9 px-3 text-[13px] border border-border hover:bg-accent transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]">
+      <PopoverTrigger
+        className="inline-flex items-center gap-1.5 rounded-md h-9 px-3 text-[13px] border border-border hover:bg-accent transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+        aria-label={`Sort collections: ${labels[value]}`}
+      >
         <ArrowUpDown className="w-3.5 h-3.5" />
         {labels[value]}
       </PopoverTrigger>
@@ -173,6 +178,7 @@ function SortSelector({
           <PopoverMenuItem
             key={key}
             onClick={() => { onChange(key); setOpen(false); }}
+            aria-current={value === key ? 'true' : undefined}
           >
             {value === key && <Check className="w-3.5 h-3.5" />}
             <span className={value !== key ? 'ml-5.5' : ''}>{labels[key]}</span>
@@ -215,6 +221,7 @@ function CollectionCard({
     onRename(validation.normalizedName);
     setNameError(null);
     setEditing(false);
+    announcePolite(`Renamed collection to "${validation.normalizedName}"`);
   };
 
   const relativeDate = useMemo(() => {

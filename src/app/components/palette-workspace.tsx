@@ -157,7 +157,10 @@ function PaletteMoreMenu({
             disabled={isDirty}
           >
             <Share2 className="w-3.5 h-3.5" />
-            Share palette
+            <span className="flex flex-col items-start">
+              <span>Share palette</span>
+              {isDirty && <span className="text-[10px] text-muted-foreground font-normal">Save changes first</span>}
+            </span>
           </PopoverMenuItem>
 
           {/* Move / Copy to collection */}
@@ -420,6 +423,7 @@ export function PaletteWorkspace({
                             <div
                               className="w-6 h-4 rounded-sm mx-auto border border-border"
                               style={{ backgroundColor: getTokenDisplayColor(token, supportsP3) }}
+                              aria-hidden="true"
                             />
                           </TableCell>
                         </TableRow>

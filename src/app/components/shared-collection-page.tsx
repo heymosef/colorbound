@@ -159,25 +159,28 @@ function SharedPaletteCard({
         {/* Expanded details */}
         {expanded && (
           <div className="border-t border-border p-3 sm:p-4 space-y-3">
-            {/* Full swatch strip with click-to-copy */}
-            <div
-              className="flex gap-1 max-md:overflow-x-auto max-md:pb-2 max-md:-mx-1 max-md:px-1 max-md:snap-x max-md:snap-mandatory"
-              role="list"
-              aria-label={`${entry.config.name} token swatches`}
-            >
-              {visibleTokens.map((token) => (
-                <div key={token.step} className="flex-1 min-w-0 max-md:flex-none max-md:w-[60px] max-md:snap-start" role="listitem">
-                  <CopyableTokenSwatch
-                    token={token}
-                    paletteName={entry.config.name}
-                    variant="sharedCompact"
-                    stopPropagation
-                  />
+            {/* Full swatch strip with click-to-copy + contrast indicators */}
+            <div className="overflow-x-auto max-md:pb-2 max-md:-mx-1 max-md:px-1 max-md:snap-x max-md:snap-mandatory">
+              <div className="space-y-1.5 min-w-max">
+                <div
+                  className="flex gap-1"
+                  role="list"
+                  aria-label={`${entry.config.name} token swatches`}
+                >
+                  {visibleTokens.map((token) => (
+                    <div key={token.step} className="flex-1 min-w-0 max-md:flex-none max-md:w-[60px] max-md:snap-start" role="listitem">
+                      <CopyableTokenSwatch
+                        token={token}
+                        paletteName={entry.config.name}
+                        variant="sharedCompact"
+                        stopPropagation
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <ContrastRow tokens={visibleTokens} isDarkMode={false} />
+              </div>
             </div>
-            {/* Contrast indicators */}
-            <ContrastRow tokens={visibleTokens} isDarkMode={false} />
             {/* Config spec */}
             <InlineConfigSpec config={entry.config} />
           </div>

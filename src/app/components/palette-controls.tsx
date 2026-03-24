@@ -135,7 +135,7 @@ function GamutBadge({ gamut }: { gamut: GamutFlag }) {
           ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
           : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
       }`}
-      title={gamut === 'p3' ? 'This color uses the wider Display P3 gamut' : 'This color exceeds Display P3 gamut — chroma will be reduced'}
+      aria-label={gamut === 'p3' ? 'This color uses the wider Display P3 gamut' : 'This color exceeds Display P3 gamut — chroma will be reduced'}
     >
       {gamut === 'p3' ? 'P3' : 'Out of gamut'}
     </span>

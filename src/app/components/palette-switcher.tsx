@@ -201,7 +201,7 @@ export function PaletteSwitcher({
         {currentName || 'Untitled'}
       </span>
       {isDirty && activePaletteId && (
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" role="status" aria-label="Unsaved changes" />
       )}
       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
     </PopoverTrigger>
@@ -221,7 +221,7 @@ export function PaletteSwitcher({
         {currentName || 'Untitled'}
       </span>
       {isDirty && activePaletteId && (
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" role="status" aria-label="Unsaved changes" />
       )}
       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
     </PopoverTrigger>
