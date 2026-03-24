@@ -5,7 +5,6 @@
  * palette count, and last-edited date.
  * Supports sorting by last modified (default), name, or date created.
  */
-import React from 'react';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent } from './ui/card';

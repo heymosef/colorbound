@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { usePaletteContext } from '../lib/palette-context';
