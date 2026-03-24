@@ -1,4 +1,4 @@
-import { buildOgHtml, isCrawler, SHARE_BASE_URL, SUPABASE_HEADERS } from '../_og';
+import { buildOgHtml, isCrawler, SHARE_BASE_URL, SUPABASE_HEADERS } from '../_og.js';
 
 export const config = { runtime: 'edge' };
 
