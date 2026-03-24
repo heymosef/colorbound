@@ -287,14 +287,12 @@
 
   /* Tighten vertical hit-area for checkboxes and radio buttons */
   [data-slot="checkbox"],
-  [data-slot="dropdown-menu-radio-item"],
   input[type="radio"],
   input[type="checkbox"] {
     position: relative;
   }
 
   [data-slot="checkbox"]::after,
-  [data-slot="dropdown-menu-radio-item"]::after,
   input[type="radio"]::after,
   input[type="checkbox"]::after {
     content: '';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useRouteError, Link } from 'react-router';
 import { Button } from './ui/button';
 import { AlertCircle, Palette as PaletteIcon } from 'lucide-react';

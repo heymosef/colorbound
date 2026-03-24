@@ -1,4 +1,3 @@
-import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import { RootLayout } from './components/root-layout';
 import { HomeEntryPage } from './components/home-entry-page';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Palette as PaletteIcon } from 'lucide-react';
 
 export function CollectionIcon({
