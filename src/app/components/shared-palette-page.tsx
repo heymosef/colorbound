@@ -61,26 +61,30 @@ function PaletteStrip({ palette, label }: { palette: Palette; label?: string }) 
           <p className="text-[12px] text-muted-foreground">{label} palette</p>
         </div>
       )}
-      <div
-        className="flex gap-1.5 max-md:overflow-x-auto max-md:pb-2 max-md:-mx-1 max-md:px-1 max-md:snap-x max-md:snap-mandatory"
-        role="list"
-        aria-label={`${label ?? 'Palette'} token swatches`}
-      >
-        {visibleTokens.map((token) => (
+      <div className="overflow-x-auto max-md:pb-2 max-md:-mx-1 max-md:px-1 max-md:snap-x max-md:snap-mandatory">
+        <div className="space-y-1.5 min-w-max">
           <div
-            key={token.step}
-            className="flex-1 min-w-0 max-md:flex-none max-md:w-[72px] max-md:snap-start"
-            role="listitem"
+            className="flex gap-1.5"
+            role="list"
+            aria-label={`${label ?? 'Palette'} token swatches`}
           >
-            <CopyableTokenSwatch
-              token={token}
-              paletteName={palette.name}
-              variant="shared"
-            />
+            {visibleTokens.map((token) => (
+              <div
+                key={token.step}
+                className="flex-1 min-w-0 max-md:flex-none max-md:w-[72px] max-md:snap-start"
+                role="listitem"
+              >
+                <CopyableTokenSwatch
+                  token={token}
+                  paletteName={palette.name}
+                  variant="shared"
+                />
+              </div>
+            ))}
           </div>
-        ))}
+          <ContrastRow tokens={visibleTokens} isDarkMode={isDark} />
+        </div>
       </div>
-      <ContrastRow tokens={visibleTokens} isDarkMode={isDark} />
     </div>
   );
 }
