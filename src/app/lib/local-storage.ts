@@ -8,8 +8,20 @@
 // v6: remembered last-viewed saved palette id for draft seeding
 // v7: density persisted per palette/config
 // v8: chroma50/chroma950 persisted per palette/config
+// v9: lightBias/darkBias persisted per palette/config
+// v10: lightCurve/darkCurve become canonical; legacy bias fields remain read-compatible
+// v11: curve sign semantics invert so +1 holds side chroma longer; persisted curves are remapped on read
+// v12: +1 now favors the more saturated anchor on each side; persisted curves are remapped on read
 
-import { GENERATION_VERSION, generatePalette, generateId, type Palette } from './color-utils';
+import {
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
+  GENERATION_VERSION,
+  generatePalette,
+  generateId,
+  resolvePersistedCurveValues,
+  type Palette,
+} from './color-utils';
 import { findPaletteLocation } from './collection-operations';
 import {
   legacyRangeToLightness,
@@ -27,7 +39,7 @@ import {
 } from './palette-name-validation';
 
 const STORAGE_KEY = 'color-token-generator';
-const CURRENT_VERSION = 8;
+const CURRENT_VERSION = 12;
 
 // ─── Stored types (lightweight, no derived tokens) ───
 
@@ -38,6 +50,10 @@ interface StoredPaletteEntry {
   chroma50: number;
   chroma: number;
   chroma950: number;
+  lightCurve?: number;
+  darkCurve?: number;
+  lightBias?: number;
+  darkBias?: number;
   lightness50: number;
   lightness950: number;
   density: 5 | 7 | 9 | 11;
@@ -130,6 +146,58 @@ interface StoredStateV8 {
   hasCompletedFirstRun?: boolean;
 }
 
+interface StoredStateV9 {
+  version: 9;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
+interface StoredStateV10 {
+  version: 10;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
+interface StoredStateV11 {
+  version: 11;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
+interface StoredStateV12 {
+  version: 12;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
 // ─── Migration helpers ───
 
 function withStoredChromaEndpoints<T extends {
@@ -149,6 +217,17 @@ function withStoredChromaEndpoints<T extends {
       ? Math.min(0.4, Math.max(0, value.chroma950))
       : fallback,
   };
+}
+
+function withStoredChromaCurves<T extends {
+  lightCurve?: unknown;
+  darkCurve?: unknown;
+  lightBias?: unknown;
+  darkBias?: unknown;
+  generationVersion?: unknown;
+}>(value: T) {
+  const { lightCurve, darkCurve } = resolvePersistedCurveValues(value);
+  return { lightCurve, darkCurve };
 }
 
 function hasValidStoredEntryCoreFields(entry: unknown): entry is {
@@ -182,6 +261,7 @@ function migrateEntryV2ToV3(entry: StoredPaletteEntryV2): StoredPaletteEntry {
     chroma50: entry.chroma,
     chroma: entry.chroma,
     chroma950: entry.chroma,
+    ...withStoredChromaCurves(entry),
     lightness50,
     lightness950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -200,6 +280,7 @@ function migrateConfigV2ToV3(config: Record<string, unknown>): PaletteConfig {
     chroma50: (config.chroma as number) ?? 0.18,
     chroma: (config.chroma as number) ?? 0.18,
     chroma950: (config.chroma as number) ?? 0.18,
+    ...withStoredChromaCurves(config),
     lightness50,
     lightness950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -215,6 +296,7 @@ function migrateEntryV3ToV4(entry: Record<string, unknown>): StoredPaletteEntry 
     name: entry.name,
     hue: entry.hue,
     ...withStoredChromaEndpoints(entry),
+    ...withStoredChromaCurves(entry),
     chroma: entry.chroma,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
@@ -245,11 +327,12 @@ function paletteToStored(p: Palette): StoredPaletteEntry {
     chroma50: p.chroma50,
     chroma: p.chroma,
     chroma950: p.chroma950,
+    ...withStoredChromaCurves(p),
     lightness50: p.lightness50,
     lightness950: p.lightness950,
     density: p.density,
     targetColorSpace: p.targetColorSpace === 'p3' ? 'p3' : 'srgb',
-    generationVersion: p.generationVersion ?? GENERATION_VERSION,
+    generationVersion: GENERATION_VERSION,
   };
 }
 
@@ -259,9 +342,13 @@ function storedToPalette(entry: StoredPaletteEntry): Palette {
     entry.chroma50,
     entry.chroma,
     entry.chroma950,
-    entry.lightness50,
-    entry.lightness950,
-    entry.targetColorSpace,
+    {
+      lightness50: entry.lightness50,
+      lightness950: entry.lightness950,
+      lightCurve: entry.lightCurve,
+      darkCurve: entry.darkCurve,
+      targetColorSpace: entry.targetColorSpace,
+    },
   );
   return {
     id: entry.id,
@@ -271,11 +358,13 @@ function storedToPalette(entry: StoredPaletteEntry): Palette {
     chroma50: entry.chroma50,
     chroma: entry.chroma,
     chroma950: entry.chroma950,
+    lightCurve: entry.lightCurve ?? DEFAULT_LIGHT_CURVE,
+    darkCurve: entry.darkCurve ?? DEFAULT_DARK_CURVE,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
     density: entry.density,
     targetColorSpace: entry.targetColorSpace,
-    generationVersion: entry.generationVersion,
+    generationVersion: GENERATION_VERSION,
   };
 }
 
@@ -295,9 +384,10 @@ function normalizeConfig(config: PaletteConfig): PaletteConfig {
   return {
     ...config,
     ...withStoredChromaEndpoints(config),
+    ...withStoredChromaCurves(config),
     density: isPaletteDensity(config.density) ? config.density : DEFAULT_PALETTE_DENSITY,
     targetColorSpace: config.targetColorSpace === 'p3' ? 'p3' : 'srgb',
-    generationVersion: config.generationVersion ?? GENERATION_VERSION,
+    generationVersion: GENERATION_VERSION,
   };
 }
 
@@ -364,11 +454,15 @@ function isValidConfig(c: unknown): c is PaletteConfig {
     isValidNumber(obj.chroma50, 0, 0.5) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
     isValidNumber(obj.chroma950, 0, 0.5) &&
+    (obj.lightCurve === undefined || isValidNumber(obj.lightCurve, -1, 1)) &&
+    (obj.darkCurve === undefined || isValidNumber(obj.darkCurve, -1, 1)) &&
     isValidNumber(obj.lightness50, 0, 1) &&
     isValidNumber(obj.lightness950, 0, 1) &&
     isPaletteDensity(obj.density) &&
     isValidTargetColorSpace(obj.targetColorSpace) &&
-    obj.generationVersion === GENERATION_VERSION
+    typeof obj.generationVersion === 'number' &&
+    Number.isFinite(obj.generationVersion) &&
+    obj.generationVersion > 0
   );
 }
 
@@ -383,6 +477,10 @@ function isValidStoredEntryBase(e: unknown): e is Omit<StoredPaletteEntry, 'dens
     isValidNumber(obj.chroma50, 0, 0.5) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
     isValidNumber(obj.chroma950, 0, 0.5) &&
+    (obj.lightCurve === undefined || isValidNumber(obj.lightCurve, -1, 1)) &&
+    (obj.darkCurve === undefined || isValidNumber(obj.darkCurve, -1, 1)) &&
+    (obj.lightBias === undefined || isValidNumber(obj.lightBias, -1, 1)) &&
+    (obj.darkBias === undefined || isValidNumber(obj.darkBias, -1, 1)) &&
     isValidNumber(obj.lightness50, 0, 1) &&
     isValidNumber(obj.lightness950, 0, 1)
   );
@@ -391,7 +489,12 @@ function isValidStoredEntryBase(e: unknown): e is Omit<StoredPaletteEntry, 'dens
 function isValidStoredEntry(e: unknown): e is StoredPaletteEntry {
   if (!isValidStoredEntryBase(e)) return false;
   const obj = e as Record<string, unknown>;
-  return isValidTargetColorSpace(obj.targetColorSpace) && obj.generationVersion === GENERATION_VERSION;
+  return (
+    isValidTargetColorSpace(obj.targetColorSpace) &&
+    typeof obj.generationVersion === 'number' &&
+    Number.isFinite(obj.generationVersion) &&
+    obj.generationVersion > 0
+  );
 }
 
 function isValidStoredCollection(c: unknown): c is StoredCollection {
@@ -534,6 +637,7 @@ function migrateEntryV6ToV7(entry: StoredPaletteEntry | Record<string, unknown>)
     name: entry.name,
     hue: entry.hue,
     ...withStoredChromaEndpoints(entry),
+    ...withStoredChromaCurves(entry),
     chroma: entry.chroma,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
@@ -565,6 +669,130 @@ function migrateV7toV8(v7: StoredStateV7): StoredStateV8 {
     contrastAlgorithm: v7.contrastAlgorithm,
     isDirty: v7.isDirty,
     hasCompletedFirstRun: v7.hasCompletedFirstRun,
+  };
+}
+
+function migrateV8toV9(v8: StoredStateV8): StoredStateV9 {
+  return {
+    version: 9,
+    collections: v8.collections.map((collection) => ({
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: (collection.conflictedPalettes ?? [])
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+    })),
+    activeCollectionId: v8.activeCollectionId,
+    activePaletteId: v8.activePaletteId,
+    lastViewedSavedPaletteId: v8.lastViewedSavedPaletteId,
+    config: normalizeConfig(v8.config),
+    nameManuallyEdited: v8.nameManuallyEdited,
+    contrastAlgorithm: v8.contrastAlgorithm,
+    isDirty: v8.isDirty,
+    hasCompletedFirstRun: v8.hasCompletedFirstRun,
+  };
+}
+
+function migrateV9toV10(v9: StoredStateV9): StoredStateV10 {
+  return {
+    version: 10,
+    collections: v9.collections.map((collection) => ({
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: (collection.conflictedPalettes ?? [])
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+    })),
+    activeCollectionId: v9.activeCollectionId,
+    activePaletteId: v9.activePaletteId,
+    lastViewedSavedPaletteId: v9.lastViewedSavedPaletteId,
+    config: normalizeConfig(v9.config),
+    nameManuallyEdited: v9.nameManuallyEdited,
+    contrastAlgorithm: v9.contrastAlgorithm,
+    isDirty: v9.isDirty,
+    hasCompletedFirstRun: v9.hasCompletedFirstRun,
+  };
+}
+
+function migrateV10toV11(v10: StoredStateV10): StoredStateV11 {
+  return {
+    version: 11,
+    collections: v10.collections.map((collection) => ({
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: (collection.conflictedPalettes ?? [])
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+    })),
+    activeCollectionId: v10.activeCollectionId,
+    activePaletteId: v10.activePaletteId,
+    lastViewedSavedPaletteId: v10.lastViewedSavedPaletteId,
+    config: normalizeConfig(v10.config),
+    nameManuallyEdited: v10.nameManuallyEdited,
+    contrastAlgorithm: v10.contrastAlgorithm,
+    isDirty: v10.isDirty,
+    hasCompletedFirstRun: v10.hasCompletedFirstRun,
+  };
+}
+
+function migrateV11toV12(v11: StoredStateV11): StoredStateV12 {
+  return {
+    version: 12,
+    collections: v11.collections.map((collection) => ({
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: (collection.conflictedPalettes ?? [])
+        .map((palette) => ({
+          ...palette,
+          ...withStoredChromaCurves(palette),
+          generationVersion: GENERATION_VERSION,
+        }))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+    })),
+    activeCollectionId: v11.activeCollectionId,
+    activePaletteId: v11.activePaletteId,
+    lastViewedSavedPaletteId: v11.lastViewedSavedPaletteId,
+    config: normalizeConfig(v11.config),
+    nameManuallyEdited: v11.nameManuallyEdited,
+    contrastAlgorithm: v11.contrastAlgorithm,
+    isDirty: v11.isDirty,
+    hasCompletedFirstRun: v11.hasCompletedFirstRun,
   };
 }
 
@@ -655,16 +883,36 @@ export function loadState(): HydratedState | null {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }
 
+    if (parsed.version === 8) {
+      parsed = migrateV8toV9(parsed as StoredStateV8);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
+    if (parsed.version === 9) {
+      parsed = migrateV9toV10(parsed as StoredStateV9);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
+    if (parsed.version === 10) {
+      parsed = migrateV10toV11(parsed as StoredStateV10);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
+    if (parsed.version === 11) {
+      parsed = migrateV11toV12(parsed as StoredStateV11);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     if (parsed.version !== CURRENT_VERSION) return null;
 
-    const v8 = parsed as StoredStateV8;
+    const v12 = parsed as StoredStateV12;
 
     // Validate config
-    if (!isValidConfig(v8.config)) return null;
+    if (!isValidConfig(v12.config)) return null;
 
     // Validate & rebuild collections
-    const validStoredCollections = Array.isArray(v8.collections)
-      ? v8.collections.filter(isValidStoredCollection)
+    const validStoredCollections = Array.isArray(v12.collections)
+      ? v12.collections.filter(isValidStoredCollection)
       : [];
 
     let didSanitizeCollections = false;
@@ -678,30 +926,30 @@ export function loadState(): HydratedState | null {
 
     // Validate activeCollectionId still exists
     const activeCollectionId =
-      typeof v8.activeCollectionId === 'string' &&
-      collections.some((c) => c.id === v8.activeCollectionId)
-        ? v8.activeCollectionId
+      typeof v12.activeCollectionId === 'string' &&
+      collections.some((c) => c.id === v12.activeCollectionId)
+        ? v12.activeCollectionId
         : collections.length > 0 ? collections[0].id : null;
 
     // Validate activePaletteId still exists within the active collection
     const activeCollection = collections.find((c) => c.id === activeCollectionId);
     const activePaletteId =
-      typeof v8.activePaletteId === 'string' &&
-      activeCollection?.palettes.some((p) => p.id === v8.activePaletteId)
-        ? v8.activePaletteId
+      typeof v12.activePaletteId === 'string' &&
+      activeCollection?.palettes.some((p) => p.id === v12.activePaletteId)
+        ? v12.activePaletteId
         : null;
 
     const lastViewedSavedPaletteId =
-      typeof v8.lastViewedSavedPaletteId === 'string' &&
-      findPaletteLocation(collections, v8.lastViewedSavedPaletteId)
-        ? v8.lastViewedSavedPaletteId
+      typeof v12.lastViewedSavedPaletteId === 'string' &&
+      findPaletteLocation(collections, v12.lastViewedSavedPaletteId)
+        ? v12.lastViewedSavedPaletteId
         : null;
 
     const shouldPersistNormalizedState =
       didSanitizeCollections ||
-      activeCollectionId !== v8.activeCollectionId ||
-      activePaletteId !== v8.activePaletteId ||
-      lastViewedSavedPaletteId !== v8.lastViewedSavedPaletteId;
+      activeCollectionId !== v12.activeCollectionId ||
+      activePaletteId !== v12.activePaletteId ||
+      lastViewedSavedPaletteId !== v12.lastViewedSavedPaletteId;
 
     if (shouldPersistNormalizedState) {
       localStorage.setItem(
@@ -712,11 +960,11 @@ export function loadState(): HydratedState | null {
           activeCollectionId,
           activePaletteId,
           lastViewedSavedPaletteId,
-          config: normalizeConfig(v8.config),
-          nameManuallyEdited: typeof v8.nameManuallyEdited === 'boolean' ? v8.nameManuallyEdited : false,
-          contrastAlgorithm: v8.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-          isDirty: typeof v8.isDirty === 'boolean' ? v8.isDirty : false,
-          hasCompletedFirstRun: typeof v8.hasCompletedFirstRun === 'boolean' ? v8.hasCompletedFirstRun : true,
+          config: normalizeConfig(v12.config),
+          nameManuallyEdited: typeof v12.nameManuallyEdited === 'boolean' ? v12.nameManuallyEdited : false,
+          contrastAlgorithm: v12.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+          isDirty: typeof v12.isDirty === 'boolean' ? v12.isDirty : false,
+          hasCompletedFirstRun: typeof v12.hasCompletedFirstRun === 'boolean' ? v12.hasCompletedFirstRun : true,
         }),
       );
     }
@@ -726,11 +974,11 @@ export function loadState(): HydratedState | null {
       activeCollectionId,
       activePaletteId,
       lastViewedSavedPaletteId,
-      config: normalizeConfig(v8.config),
-      nameManuallyEdited: typeof v8.nameManuallyEdited === 'boolean' ? v8.nameManuallyEdited : false,
-      contrastAlgorithm: v8.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-      isDirty: typeof v8.isDirty === 'boolean' ? v8.isDirty : false,
-      hasCompletedFirstRun: typeof v8.hasCompletedFirstRun === 'boolean' ? v8.hasCompletedFirstRun : true,
+      config: normalizeConfig(v12.config),
+      nameManuallyEdited: typeof v12.nameManuallyEdited === 'boolean' ? v12.nameManuallyEdited : false,
+      contrastAlgorithm: v12.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+      isDirty: typeof v12.isDirty === 'boolean' ? v12.isDirty : false,
+      hasCompletedFirstRun: typeof v12.hasCompletedFirstRun === 'boolean' ? v12.hasCompletedFirstRun : true,
     };
   } catch {
     return null;
@@ -753,7 +1001,7 @@ export function saveState(state: {
       throw new Error('Duplicate active palette names cannot be persisted');
     }
 
-    const stored: StoredStateV8 = {
+    const stored: StoredStateV12 = {
       version: CURRENT_VERSION,
       collections: state.collections.map(collectionToStored),
       activeCollectionId: state.activeCollectionId,

@@ -6,6 +6,7 @@ import {
   ShareCollectionButton,
   SharePaletteButton,
 } from './share-dialog';
+import { DEFAULT_DARK_CURVE, DEFAULT_LIGHT_CURVE } from '../lib/color-utils';
 
 const createSharedPalette = vi.fn();
 const createSharedCollection = vi.fn();
@@ -97,6 +98,8 @@ describe('Share dialog flows', () => {
           chroma50: 0.12,
           chroma: 0.12,
           chroma950: 0.12,
+          lightCurve: DEFAULT_LIGHT_CURVE,
+          darkCurve: DEFAULT_DARK_CURVE,
           lightness50: 0.985,
           lightness950: 0.025,
           density: 11,
@@ -111,11 +114,13 @@ describe('Share dialog flows', () => {
       chroma50: 0.12,
       chroma: 0.12,
       chroma950: 0.12,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       lightness50: 0.985,
       lightness950: 0.025,
       density: 11,
       targetColorSpace: 'srgb',
-      generationVersion: 2,
+      generationVersion: 6,
     });
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
@@ -138,6 +143,8 @@ describe('Share dialog flows', () => {
           chroma50: 0.12,
           chroma: 0.12,
           chroma950: 0.12,
+          lightCurve: DEFAULT_LIGHT_CURVE,
+          darkCurve: DEFAULT_DARK_CURVE,
           lightness50: 0.985,
           lightness950: 0.025,
           density: 11,
@@ -154,11 +161,13 @@ describe('Share dialog flows', () => {
         chroma50: 0.12,
         chroma: 0.12,
         chroma950: 0.12,
+        lightCurve: DEFAULT_LIGHT_CURVE,
+        darkCurve: DEFAULT_DARK_CURVE,
         lightness50: 0.985,
         lightness950: 0.025,
         density: 11,
         targetColorSpace: 'srgb',
-        generationVersion: 2,
+        generationVersion: 6,
       }], 'Brand Colors');
     });
     expect(await screen.findByDisplayValue('https://colorbound.test/collection/collection-1')).toBeInTheDocument();

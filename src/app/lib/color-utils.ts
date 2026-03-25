@@ -10,11 +10,42 @@ export interface OklchColor {
 }
 
 export type TargetColorSpace = 'srgb' | 'p3';
+export interface ChromaCurveOptions {
+  chroma50: number;
+  chroma: number;
+  chroma950: number;
+  lightCurve: number;
+  darkCurve: number;
+}
+interface PaletteGenerationOptions {
+  lightness50: number;
+  lightness950: number;
+  targetColorSpace?: TargetColorSpace;
+  lightCurve?: number;
+  darkCurve?: number;
+  lightBias?: number;
+  darkBias?: number;
+}
+export interface StepChromaDiagnostic {
+  step: number;
+  authoredChroma: number;
+  srgbChroma: number;
+  targetChroma: number;
+  chromaLoss: number;
+}
 
 /** Which gamut the *original* (pre-mapping) OKLCH color falls in. */
 export type GamutFlag = 'srgb' | 'p3' | 'out';
 
-export const GENERATION_VERSION = 2;
+export const GENERATION_VERSION = 6;
+export const MIN_CHROMA_CURVE = -1;
+export const MAX_CHROMA_CURVE = 1;
+export const DEFAULT_LIGHT_CURVE = 0;
+export const DEFAULT_DARK_CURVE = 0;
+export const LEGACY_AUTO_LIGHT_BIAS = 0.2;
+export const LEGACY_AUTO_DARK_BIAS = 0.35;
+export const DEFAULT_LIGHT_BIAS = DEFAULT_LIGHT_CURVE;
+export const DEFAULT_DARK_BIAS = DEFAULT_DARK_CURVE;
 
 export interface ColorToken {
   step: number;
@@ -55,6 +86,8 @@ export interface Palette {
   chroma50: number;
   chroma: number;
   chroma950: number;
+  lightCurve: number;
+  darkCurve: number;
   /** Target OKLCH lightness for step 50 (lightest). 0–1, default 0.985. */
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
@@ -65,6 +98,276 @@ export interface Palette {
 }
 
 export const SCALE_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+const MIN_SCALE_STEP = SCALE_STEPS[0];
+const MID_SCALE_STEP = 500;
+const MAX_SCALE_STEP = SCALE_STEPS[SCALE_STEPS.length - 1];
+const BEZIER_LINEAR_P1 = { x: 0.3333, y: 0.3333 };
+const BEZIER_LINEAR_P2 = { x: 0.6667, y: 0.6667 };
+const BEZIER_EARLY_P1 = { x: 0.16, y: 0.84 };
+const BEZIER_EARLY_P2 = { x: 0.32, y: 1 };
+const BEZIER_DELAYED_P1 = { x: 0.68, y: 0 };
+const BEZIER_DELAYED_P2 = { x: 0.84, y: 0.16 };
+const NEWTON_ITERATIONS = 8;
+const BEZIER_EPSILON = 0.000001;
+
+interface BezierPoint {
+  x: number;
+  y: number;
+}
+
+export interface ChromaBezierCurve {
+  p1: BezierPoint;
+  p2: BezierPoint;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampChroma(value: number): number {
+  return clampNumber(value, 0, 0.4);
+}
+
+export function clampChromaCurve(value: number): number {
+  return clampNumber(value, MIN_CHROMA_CURVE, MAX_CHROMA_CURVE);
+}
+
+function normalizeSignedZero(value: number): number {
+  return Object.is(value, -0) ? 0 : value;
+}
+
+function lerp(start: number, end: number, t: number): number {
+  return start + (end - start) * t;
+}
+
+function isPaletteGenerationOptions(value: unknown): value is PaletteGenerationOptions {
+  return !!value &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).lightness50 === 'number' &&
+    typeof (value as Record<string, unknown>).lightness950 === 'number';
+}
+
+export function getChromaBiasExponent(bias: number): number {
+  return 2 ** clampChromaCurve(bias);
+}
+
+export function resolveLegacyCurveValues(value: {
+  lightCurve?: unknown;
+  darkCurve?: unknown;
+  lightBias?: unknown;
+  darkBias?: unknown;
+}): { lightCurve: number; darkCurve: number } {
+  const hasLightCurve = typeof value.lightCurve === 'number' && Number.isFinite(value.lightCurve);
+  const hasDarkCurve = typeof value.darkCurve === 'number' && Number.isFinite(value.darkCurve);
+
+  if (hasLightCurve || hasDarkCurve) {
+    return {
+      lightCurve: hasLightCurve ? clampChromaCurve(value.lightCurve as number) : DEFAULT_LIGHT_CURVE,
+      darkCurve: hasDarkCurve ? clampChromaCurve(value.darkCurve as number) : DEFAULT_DARK_CURVE,
+    };
+  }
+
+  const hasLightBias = typeof value.lightBias === 'number' && Number.isFinite(value.lightBias);
+  const hasDarkBias = typeof value.darkBias === 'number' && Number.isFinite(value.darkBias);
+
+  if (!hasLightBias && !hasDarkBias) {
+    return {
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
+    };
+  }
+
+  const legacyLight = hasLightBias ? clampChromaCurve(value.lightBias as number) : DEFAULT_LIGHT_CURVE;
+  const legacyDark = hasDarkBias ? clampChromaCurve(value.darkBias as number) : DEFAULT_DARK_CURVE;
+  const usesLegacyAutoDefaults =
+    hasLightBias &&
+    hasDarkBias &&
+    Math.abs(legacyLight - LEGACY_AUTO_LIGHT_BIAS) < 0.000001 &&
+    Math.abs(legacyDark - LEGACY_AUTO_DARK_BIAS) < 0.000001;
+
+  if (usesLegacyAutoDefaults) {
+    return {
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
+    };
+  }
+
+  return {
+    lightCurve: legacyLight,
+    darkCurve: legacyDark,
+  };
+}
+
+function hasExplicitCurveValue(value: {
+  lightCurve?: unknown;
+  darkCurve?: unknown;
+  lightBias?: unknown;
+  darkBias?: unknown;
+}): boolean {
+  return (
+    (typeof value.lightCurve === 'number' && Number.isFinite(value.lightCurve)) ||
+    (typeof value.darkCurve === 'number' && Number.isFinite(value.darkCurve)) ||
+    (typeof value.lightBias === 'number' && Number.isFinite(value.lightBias)) ||
+    (typeof value.darkBias === 'number' && Number.isFinite(value.darkBias))
+  );
+}
+
+export function resolvePersistedCurveValues(value: {
+  lightCurve?: unknown;
+  darkCurve?: unknown;
+  lightBias?: unknown;
+  darkBias?: unknown;
+  chroma50?: unknown;
+  chroma?: unknown;
+  chroma950?: unknown;
+  generationVersion?: unknown;
+}): { lightCurve: number; darkCurve: number } {
+  const resolved = resolveLegacyCurveValues(value);
+  const generationVersion =
+    typeof value.generationVersion === 'number' && Number.isFinite(value.generationVersion)
+      ? value.generationVersion
+      : null;
+  if (!hasExplicitCurveValue(value) || generationVersion === GENERATION_VERSION) {
+    return resolved;
+  }
+
+  const midpointChroma = typeof value.chroma === 'number' && Number.isFinite(value.chroma)
+    ? clampChroma(value.chroma)
+    : 0;
+  const lightEndpointChroma = typeof value.chroma50 === 'number' && Number.isFinite(value.chroma50)
+    ? clampChroma(value.chroma50)
+    : midpointChroma;
+  const darkEndpointChroma = typeof value.chroma950 === 'number' && Number.isFinite(value.chroma950)
+    ? clampChroma(value.chroma950)
+    : midpointChroma;
+
+  if (generationVersion !== null && generationVersion >= 5) {
+    return {
+      lightCurve: normalizeSignedZero(
+        lightEndpointChroma < midpointChroma
+          ? clampChromaCurve(-resolved.lightCurve)
+          : resolved.lightCurve,
+      ),
+      darkCurve: normalizeSignedZero(
+        darkEndpointChroma < midpointChroma
+          ? clampChromaCurve(-resolved.darkCurve)
+          : resolved.darkCurve,
+      ),
+    };
+  }
+
+  return {
+    lightCurve: normalizeSignedZero(
+      lightEndpointChroma > midpointChroma
+        ? clampChromaCurve(-resolved.lightCurve)
+        : resolved.lightCurve,
+    ),
+    darkCurve: normalizeSignedZero(
+      darkEndpointChroma > midpointChroma
+        ? clampChromaCurve(-resolved.darkCurve)
+        : resolved.darkCurve,
+    ),
+  };
+}
+
+function mixPoint(start: BezierPoint, end: BezierPoint, amount: number): BezierPoint {
+  return {
+    x: lerp(start.x, end.x, amount),
+    y: lerp(start.y, end.y, amount),
+  };
+}
+
+export function getChromaBezierCurve(curveValue: number): ChromaBezierCurve {
+  const clamped = clampChromaCurve(curveValue);
+  if (clamped === 0) {
+    return {
+      p1: { ...BEZIER_LINEAR_P1 },
+      p2: { ...BEZIER_LINEAR_P2 },
+    };
+  }
+
+  const amount = Math.abs(clamped);
+  const targetP1 = clamped > 0 ? BEZIER_EARLY_P1 : BEZIER_DELAYED_P1;
+  const targetP2 = clamped > 0 ? BEZIER_EARLY_P2 : BEZIER_DELAYED_P2;
+
+  return {
+    p1: mixPoint(BEZIER_LINEAR_P1, targetP1, amount),
+    p2: mixPoint(BEZIER_LINEAR_P2, targetP2, amount),
+  };
+}
+
+function sampleCubicComponent(a1: number, a2: number, t: number): number {
+  const oneMinusT = 1 - t;
+  return 3 * oneMinusT * oneMinusT * t * a1 +
+    3 * oneMinusT * t * t * a2 +
+    t * t * t;
+}
+
+function sampleCubicDerivative(a1: number, a2: number, t: number): number {
+  const oneMinusT = 1 - t;
+  return 3 * oneMinusT * oneMinusT * a1 +
+    6 * oneMinusT * t * (a2 - a1) +
+    3 * t * t * (1 - a2);
+}
+
+export function evaluateCubicBezierEase(progress: number, curveValue: number): number {
+  const clampedProgress = clampNumber(progress, 0, 1);
+  if (clampedProgress === 0 || clampedProgress === 1) {
+    return clampedProgress;
+  }
+
+  const curve = getChromaBezierCurve(curveValue);
+  let t = clampedProgress;
+
+  for (let iteration = 0; iteration < NEWTON_ITERATIONS; iteration += 1) {
+    const sampleX = sampleCubicComponent(curve.p1.x, curve.p2.x, t) - clampedProgress;
+    if (Math.abs(sampleX) < BEZIER_EPSILON) {
+      return clampNumber(sampleCubicComponent(curve.p1.y, curve.p2.y, t), 0, 1);
+    }
+
+    const derivative = sampleCubicDerivative(curve.p1.x, curve.p2.x, t);
+    if (Math.abs(derivative) < BEZIER_EPSILON) {
+      break;
+    }
+
+    t -= sampleX / derivative;
+  }
+
+  let lower = 0;
+  let upper = 1;
+  t = clampedProgress;
+
+  while (lower < upper) {
+    const sampleX = sampleCubicComponent(curve.p1.x, curve.p2.x, t);
+    if (Math.abs(sampleX - clampedProgress) < BEZIER_EPSILON) {
+      break;
+    }
+
+    if (clampedProgress > sampleX) {
+      lower = t;
+    } else {
+      upper = t;
+    }
+
+    const next = (lower + upper) / 2;
+    if (Math.abs(next - t) < BEZIER_EPSILON) {
+      t = next;
+      break;
+    }
+    t = next;
+  }
+
+  return clampNumber(sampleCubicComponent(curve.p1.y, curve.p2.y, t), 0, 1);
+}
+
+export function resolveStepLightness(
+  step: number,
+  lightness50: number,
+  lightness950: number,
+): number {
+  const t = clampNumber((step - MIN_SCALE_STEP) / (MAX_SCALE_STEP - MIN_SCALE_STEP), 0, 1);
+  return lightness50 - t * (lightness50 - lightness950);
+}
 
 // ─── Low-level Oklab / OKLCH conversions ───
 
@@ -302,6 +605,52 @@ export function maxP3ChromaAtLightness(hue: number, lightness: number): number {
   return maxGamutChromaAtLightness(hue, lightness, isInP3Gamut);
 }
 
+export function resolveStepChroma(
+  step: number,
+  curve: ChromaCurveOptions,
+  _lightness50: number,
+  _lightness950: number,
+  _hue: number,
+  _targetColorSpace: TargetColorSpace,
+): number {
+  const effective = {
+    chroma50: clampChroma(curve.chroma50),
+    chroma: clampChroma(curve.chroma),
+    chroma950: clampChroma(curve.chroma950),
+    lightCurve: clampChromaCurve(curve.lightCurve),
+    darkCurve: clampChromaCurve(curve.darkCurve),
+  };
+  const resolveAdaptiveCurve = (curveValue: number, startChroma: number, endChroma: number) => (
+    endChroma >= startChroma ? curveValue : -curveValue
+  );
+
+  if (step <= MID_SCALE_STEP) {
+    const u = clampNumber((step - MIN_SCALE_STEP) / (MID_SCALE_STEP - MIN_SCALE_STEP), 0, 1);
+    const eased = evaluateCubicBezierEase(
+      u,
+      resolveAdaptiveCurve(effective.lightCurve, effective.chroma50, effective.chroma),
+    );
+    return clampChroma(lerp(effective.chroma50, effective.chroma, eased));
+  }
+
+  const u = clampNumber((MAX_SCALE_STEP - step) / (MAX_SCALE_STEP - MID_SCALE_STEP), 0, 1);
+  const eased = evaluateCubicBezierEase(
+    u,
+    resolveAdaptiveCurve(effective.darkCurve, effective.chroma950, effective.chroma),
+  );
+  return clampChroma(lerp(effective.chroma950, effective.chroma, eased));
+}
+
+export function getPaletteChromaDiagnostics(tokens: readonly ColorToken[]): StepChromaDiagnostic[] {
+  return tokens.map((token) => ({
+    step: token.step,
+    authoredChroma: token.authoredOklch.c,
+    srgbChroma: token.srgbOklch.c,
+    targetChroma: token.targetOklch.c,
+    chromaLoss: Math.max(0, token.authoredOklch.c - token.targetOklch.c),
+  }));
+}
+
 // ─── Public conversion functions ───
 
 /** Convert a hex color string to OKLCH { l, c, h }. */
@@ -405,20 +754,36 @@ function resolvePaletteGenerationArgs(
   chroma50OrChroma: number,
   chromaOrLightness50: number,
   chroma950OrLightness950: number,
-  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness50OrOptionsOrTargetColorSpace?: number | TargetColorSpace | PaletteGenerationOptions,
   lightness950Maybe?: number,
   targetColorSpaceMaybe: TargetColorSpace = 'srgb',
 ) {
+  if (isPaletteGenerationOptions(lightness50OrOptionsOrTargetColorSpace)) {
+    const { lightCurve, darkCurve } = resolveLegacyCurveValues(lightness50OrOptionsOrTargetColorSpace);
+    return {
+      chroma50: chroma50OrChroma,
+      chroma: chromaOrLightness50,
+      chroma950: chroma950OrLightness950,
+      lightness50: lightness50OrOptionsOrTargetColorSpace.lightness50,
+      lightness950: lightness50OrOptionsOrTargetColorSpace.lightness950,
+      lightCurve,
+      darkCurve,
+      targetColorSpace: lightness50OrOptionsOrTargetColorSpace.targetColorSpace === 'p3' ? 'p3' : 'srgb',
+    };
+  }
+
   if (
-    typeof lightness50OrTargetColorSpace === 'number' &&
+    typeof lightness50OrOptionsOrTargetColorSpace === 'number' &&
     typeof lightness950Maybe === 'number'
   ) {
     return {
       chroma50: chroma50OrChroma,
       chroma: chromaOrLightness50,
       chroma950: chroma950OrLightness950,
-      lightness50: lightness50OrTargetColorSpace,
+      lightness50: lightness50OrOptionsOrTargetColorSpace,
       lightness950: lightness950Maybe,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       targetColorSpace: targetColorSpaceMaybe,
     };
   }
@@ -429,7 +794,9 @@ function resolvePaletteGenerationArgs(
     chroma950: chroma50OrChroma,
     lightness50: chromaOrLightness50,
     lightness950: chroma950OrLightness950,
-    targetColorSpace: lightness50OrTargetColorSpace === 'p3' ? 'p3' : 'srgb',
+    lightCurve: DEFAULT_LIGHT_CURVE,
+    darkCurve: DEFAULT_DARK_CURVE,
+    targetColorSpace: lightness50OrOptionsOrTargetColorSpace === 'p3' ? 'p3' : 'srgb',
   };
 }
 
@@ -438,7 +805,7 @@ export function generatePalette(
   chroma50OrChroma: number,
   chromaOrLightness50: number,
   chroma950OrLightness950: number,
-  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness50OrOptionsOrTargetColorSpace?: number | TargetColorSpace | PaletteGenerationOptions,
   lightness950Maybe?: number,
   targetColorSpaceMaybe: TargetColorSpace = 'srgb',
 ): ColorToken[] {
@@ -447,6 +814,8 @@ export function generatePalette(
     chroma50,
     chroma: maxChroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50,
     lightness950,
     targetColorSpace,
@@ -454,29 +823,27 @@ export function generatePalette(
     chroma50OrChroma,
     chromaOrLightness50,
     chroma950OrLightness950,
-    lightness50OrTargetColorSpace,
+    lightness50OrOptionsOrTargetColorSpace,
     lightness950Maybe,
     targetColorSpaceMaybe,
   );
 
-  const maxL = lightness50;
-  const minL = lightness950;
-  const minStep = SCALE_STEPS[0];
-  const anchorStep = 500;
-  const maxStep = SCALE_STEPS[SCALE_STEPS.length - 1];
-
   for (const step of SCALE_STEPS) {
-    // Map step to 0-1 range (50=bright, 950=dark)
-    const t = (step - 50) / 900;
-
-    // Lightness: linear interpolation from maxL (light) to minL (dark).
-    // OKLCH lightness is perceptually uniform, so linear = even visual spacing.
-    const l = maxL - t * (maxL - minL);
-
-    const c = step <= anchorStep
-      ? chroma50 + ((maxChroma - chroma50) * (step - minStep)) / (anchorStep - minStep)
-      : maxChroma + ((chroma950 - maxChroma) * (step - anchorStep)) / (maxStep - anchorStep);
-    const authoredChroma = Math.max(0, Math.min(0.4, c));
+    const l = resolveStepLightness(step, lightness50, lightness950);
+    const authoredChroma = resolveStepChroma(
+      step,
+      {
+        chroma50,
+        chroma: maxChroma,
+        chroma950,
+        lightCurve,
+        darkCurve,
+      },
+      lightness50,
+      lightness950,
+      hue,
+      targetColorSpace,
+    );
     const effectiveHue = hue;
 
     // Original OKLCH (may be outside target gamuts)
@@ -529,7 +896,7 @@ export function generateDarkPalette(
   chroma50OrChroma: number,
   chromaOrLightness50: number,
   chroma950OrLightness950: number,
-  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness50OrOptionsOrTargetColorSpace?: number | TargetColorSpace | PaletteGenerationOptions,
   lightness950Maybe?: number,
   targetColorSpaceMaybe: TargetColorSpace = 'srgb',
 ): ColorToken[] {
@@ -537,6 +904,8 @@ export function generateDarkPalette(
     chroma50,
     chroma: maxChroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50,
     lightness950,
     targetColorSpace,
@@ -544,7 +913,7 @@ export function generateDarkPalette(
     chroma50OrChroma,
     chromaOrLightness50,
     chroma950OrLightness950,
-    lightness50OrTargetColorSpace,
+    lightness50OrOptionsOrTargetColorSpace,
     lightness950Maybe,
     targetColorSpaceMaybe,
   );
@@ -554,9 +923,13 @@ export function generateDarkPalette(
     chroma50 * 0.85,
     maxChroma * 0.85,
     chroma950 * 0.85,
-    lightness50 * 0.995,
-    lightness950 * 1.2,
-    targetColorSpace,
+    {
+      lightness50: lightness50 * 0.995,
+      lightness950: lightness950 * 1.2,
+      lightCurve,
+      darkCurve,
+      targetColorSpace,
+    },
   );
 }
 
@@ -568,9 +941,13 @@ export function deriveDarkPalette(palette: Palette): Palette {
       palette.chroma50,
       palette.chroma,
       palette.chroma950,
-      palette.lightness50,
-      palette.lightness950,
-      palette.targetColorSpace,
+      {
+        lightness50: palette.lightness50,
+        lightness950: palette.lightness950,
+        lightCurve: palette.lightCurve,
+        darkCurve: palette.darkCurve,
+        targetColorSpace: palette.targetColorSpace,
+      },
     ),
   };
 }

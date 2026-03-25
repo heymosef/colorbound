@@ -1,9 +1,13 @@
 import React, { useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import {
+  clampChromaCurve,
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
   generatePalette,
   generateDarkPalette,
   generateId,
   GENERATION_VERSION,
+  resolveLegacyCurveValues,
   suggestPaletteName,
   type Palette,
 } from './color-utils';
@@ -66,6 +70,8 @@ function createDefaultConfig(hue?: number): PaletteConfig {
     chroma50: DEFAULT_CHROMA,
     chroma: DEFAULT_CHROMA,
     chroma950: DEFAULT_CHROMA,
+    lightCurve: DEFAULT_LIGHT_CURVE,
+    darkCurve: DEFAULT_DARK_CURVE,
     lightness50: DEFAULT_LIGHTNESS_50,
     lightness950: DEFAULT_LIGHTNESS_950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -80,6 +86,7 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
   const chroma = seedPalette?.chroma ?? DEFAULT_CHROMA;
   const chroma50 = seedPalette?.chroma50 ?? chroma;
   const chroma950 = seedPalette?.chroma950 ?? chroma;
+  const { lightCurve, darkCurve } = resolveLegacyCurveValues(seedPalette ?? {});
   const lightness50 = seedPalette?.lightness50 ?? DEFAULT_LIGHTNESS_50;
   const lightness950 = seedPalette?.lightness950 ?? DEFAULT_LIGHTNESS_950;
   const density = seedPalette?.density ?? DEFAULT_PALETTE_DENSITY;
@@ -90,6 +97,8 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
     chroma50,
     chroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50,
     lightness950,
     density,
@@ -102,14 +111,20 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
   const density = config.density ?? DEFAULT_PALETTE_DENSITY;
   const chroma50 = config.chroma50 ?? config.chroma;
   const chroma950 = config.chroma950 ?? config.chroma;
+  const lightCurve = config.lightCurve ?? DEFAULT_LIGHT_CURVE;
+  const darkCurve = config.darkCurve ?? DEFAULT_DARK_CURVE;
   const tokens = generatePalette(
     config.hue,
     chroma50,
     config.chroma,
     chroma950,
-    config.lightness50,
-    config.lightness950,
-    config.targetColorSpace,
+    {
+      lightness50: config.lightness50,
+      lightness950: config.lightness950,
+      targetColorSpace: config.targetColorSpace,
+      lightCurve,
+      darkCurve,
+    },
   );
   return {
     id: id ?? generateId(),
@@ -119,6 +134,8 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     chroma50,
     chroma: config.chroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
@@ -131,14 +148,20 @@ function buildDarkPalette(config: PaletteConfig): Palette {
   const density = config.density ?? DEFAULT_PALETTE_DENSITY;
   const chroma50 = config.chroma50 ?? config.chroma;
   const chroma950 = config.chroma950 ?? config.chroma;
+  const lightCurve = config.lightCurve ?? DEFAULT_LIGHT_CURVE;
+  const darkCurve = config.darkCurve ?? DEFAULT_DARK_CURVE;
   const tokens = generateDarkPalette(
     config.hue,
     chroma50,
     config.chroma,
     chroma950,
-    config.lightness50,
-    config.lightness950,
-    config.targetColorSpace,
+    {
+      lightness50: config.lightness50,
+      lightness950: config.lightness950,
+      targetColorSpace: config.targetColorSpace,
+      lightCurve,
+      darkCurve,
+    },
   );
   return {
     id: generateId(),
@@ -148,6 +171,8 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     chroma50,
     chroma: config.chroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
@@ -264,6 +289,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   );
 
   const setEditorFromPalette = useCallback((palette: Palette, collectionId: string) => {
+    const { lightCurve, darkCurve } = resolveLegacyCurveValues(palette);
     setActiveCollectionId(collectionId);
     setConfig({
       name: palette.name,
@@ -271,6 +297,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       chroma50: palette.chroma50 ?? palette.chroma,
       chroma: palette.chroma,
       chroma950: palette.chroma950 ?? palette.chroma,
+      lightCurve,
+      darkCurve,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
       density: palette.density ?? DEFAULT_PALETTE_DENSITY,
@@ -304,7 +332,21 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
   const handleConfigChange = useCallback(
     (partial: Partial<PaletteConfig>) => {
       setConfig((prev) => {
-        const next = { ...prev, ...partial };
+        const explicitLightCurve =
+          'lightCurve' in partial && typeof partial.lightCurve === 'number'
+            ? clampChromaCurve(partial.lightCurve)
+            : undefined;
+        const explicitDarkCurve =
+          'darkCurve' in partial && typeof partial.darkCurve === 'number'
+            ? clampChromaCurve(partial.darkCurve)
+            : undefined;
+        const legacyCurves = resolveLegacyCurveValues(partial);
+        const next = {
+          ...prev,
+          ...partial,
+          lightCurve: explicitLightCurve ?? ('lightBias' in partial ? legacyCurves.lightCurve : prev.lightCurve),
+          darkCurve: explicitDarkCurve ?? ('darkBias' in partial ? legacyCurves.darkCurve : prev.darkCurve),
+        };
         if (('hue' in partial || 'chroma' in partial || 'lightness50' in partial || 'lightness950' in partial) && !nameManuallyEdited) {
           next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
         }
@@ -776,7 +818,15 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
   const handleApplyHex = useCallback((hue: number, chroma: number) => {
     setConfig((prev) => {
-      const next = { ...prev, hue, chroma50: chroma, chroma, chroma950: chroma };
+      const next = {
+        ...prev,
+        hue,
+        chroma50: chroma,
+        chroma,
+        chroma950: chroma,
+        lightCurve: hasPersistedBaseline ? prev.lightCurve : DEFAULT_LIGHT_CURVE,
+        darkCurve: hasPersistedBaseline ? prev.darkCurve : DEFAULT_DARK_CURVE,
+      };
       if (!hasPersistedBaseline) {
         next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
       }

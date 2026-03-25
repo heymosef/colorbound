@@ -10,7 +10,7 @@ import {
 } from './share-serialization';
 import type { PaletteConfig } from './palette-context-types';
 import type { SharedPaletteEntry } from './share-api';
-import { GENERATION_VERSION } from './color-utils';
+import { DEFAULT_DARK_CURVE, DEFAULT_LIGHT_CURVE, GENERATION_VERSION } from './color-utils';
 import { DEFAULT_PALETTE_DENSITY } from './palette-density';
 
 const VALID_CONFIG: PaletteConfig = {
@@ -19,6 +19,8 @@ const VALID_CONFIG: PaletteConfig = {
   chroma50: 0.18,
   chroma: 0.18,
   chroma950: 0.18,
+  lightCurve: DEFAULT_LIGHT_CURVE,
+  darkCurve: DEFAULT_DARK_CURVE,
   lightness50: 0.985,
   lightness950: 0.025,
   density: DEFAULT_PALETTE_DENSITY,
@@ -79,6 +81,8 @@ describe('deserializePaletteConfig', () => {
       chroma50: 0.18,
       chroma: 0.18,
       chroma950: 0.18,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       lightness50: 0.985,
       lightness950: 0.025,
       density: DEFAULT_PALETTE_DENSITY,
@@ -98,6 +102,56 @@ describe('deserializePaletteConfig', () => {
     expect(result).not.toBeNull();
     expect(result!.lightness50).toBeCloseTo(0.985, 3);
     expect(result!.lightness950).toBeCloseTo(0.0225, 3);
+    expect(result!.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
+    expect(result!.darkCurve).toBe(DEFAULT_DARK_CURVE);
+  });
+
+  it('normalizes the legacy auto-seeded bias pair to neutral curves', () => {
+    const result = deserializePaletteConfig({
+      hue: 200,
+      chroma: 0.15,
+      lightBias: 0.2,
+      darkBias: 0.35,
+      lightness50: 0.985,
+      lightness950: 0.025,
+      name: 'Legacy',
+    });
+
+    expect(result).toEqual({
+      name: 'Legacy',
+      hue: 200,
+      chroma50: 0.15,
+      chroma: 0.15,
+      chroma950: 0.15,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
+      lightness50: 0.985,
+      lightness950: 0.025,
+      density: DEFAULT_PALETTE_DENSITY,
+      targetColorSpace: 'srgb',
+      generationVersion: GENERATION_VERSION,
+    });
+  });
+
+  it('inverts v5 curve values when the midpoint is the more saturated anchor', () => {
+    const result = deserializePaletteConfig({
+      name: 'Legacy Curves',
+      hue: 200,
+      chroma: 0.15,
+      chroma50: 0.04,
+      chroma950: 0.04,
+      lightCurve: 0.75,
+      darkCurve: -0.5,
+      lightness50: 0.985,
+      lightness950: 0.025,
+      generationVersion: 5,
+    });
+
+    expect(result).toMatchObject({
+      lightCurve: -0.75,
+      darkCurve: 0.5,
+      generationVersion: GENERATION_VERSION,
+    });
   });
 
   it('clamps out-of-range lightness values', () => {
@@ -113,6 +167,8 @@ describe('deserializePaletteConfig', () => {
       chroma50: 0.18,
       chroma: 0.18,
       chroma950: 0.18,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       lightness50: 1,
       lightness950: 0,
       density: DEFAULT_PALETTE_DENSITY,
@@ -133,6 +189,8 @@ describe('deserializePaletteConfig', () => {
       chroma50: 0.18,
       chroma: 0.18,
       chroma950: 0.18,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       lightness50: 0.985,
       lightness950: 0.025,
       density: DEFAULT_PALETTE_DENSITY,
@@ -223,6 +281,8 @@ describe('deserializeCollection', () => {
           chroma50: 0.18,
           chroma: 0.18,
           chroma950: 0.18,
+          lightCurve: DEFAULT_LIGHT_CURVE,
+          darkCurve: DEFAULT_DARK_CURVE,
           lightness50: 0.985,
           lightness950: 0.025,
           density: DEFAULT_PALETTE_DENSITY,
@@ -252,6 +312,9 @@ describe('configToPalette', () => {
     expect(palette.name).toBe('Ocean Blue');
     expect(palette.tokens).toHaveLength(11);
     expect(palette.hue).toBe(220);
+    expect(palette.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
+    expect(palette.darkCurve).toBe(DEFAULT_DARK_CURVE);
+    expect(palette.generationVersion).toBe(GENERATION_VERSION);
     expect(palette).not.toHaveProperty('group');
     expect(palette).not.toHaveProperty('isNeutral');
   });
@@ -262,5 +325,8 @@ describe('configToDarkPalette', () => {
     const palette = configToDarkPalette(VALID_CONFIG, 'dark-id');
     expect(palette.id).toBe('dark-id');
     expect(palette.tokens).toHaveLength(11);
+    expect(palette.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
+    expect(palette.darkCurve).toBe(DEFAULT_DARK_CURVE);
+    expect(palette.generationVersion).toBe(GENERATION_VERSION);
   });
 });
