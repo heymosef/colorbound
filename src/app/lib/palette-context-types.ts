@@ -14,6 +14,8 @@ export interface PaletteConfig {
   chroma50: number;
   chroma: number;
   chroma950: number;
+  lightCurve: number;
+  darkCurve: number;
   /** Target OKLCH lightness for step 50 (lightest). 0–1, default 0.985. */
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */

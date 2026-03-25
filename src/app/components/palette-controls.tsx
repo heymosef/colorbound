@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { track } from "../lib/analytics";
 import type { OklchColor, GamutFlag } from "../lib/color-utils";
 import {
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
   oklchToRgb,
   rgbToHex,
   hexToOklch,
@@ -57,6 +59,13 @@ interface PaletteControlsProps {
   onRevert?: (options?: { silent?: boolean }) => void;
   onClose?: () => void;
 }
+
+type CurveAwarePaletteConfig = PaletteConfig & {
+  lightCurve?: number;
+  darkCurve?: number;
+  lightBias?: number;
+  darkBias?: number;
+};
 
 function isFailedMutationResult(value: unknown): value is { ok: false } {
   return typeof value === 'object' && value !== null && 'ok' in value && (value as { ok?: boolean }).ok === false;
@@ -215,10 +224,13 @@ export function PaletteControls({
 }: PaletteControlsProps) {
   const [hexInput, setHexInput] = useState('');
   const [hexError, setHexError] = useState(false);
-  const targetColorSpace = config.targetColorSpace ?? 'srgb';
+  const curveConfig = config as CurveAwarePaletteConfig;
+  const targetColorSpace = curveConfig.targetColorSpace ?? 'srgb';
   const currentDensity = config.density ?? DEFAULT_PALETTE_DENSITY;
   const chroma50 = config.chroma50 ?? config.chroma;
   const chroma950 = config.chroma950 ?? config.chroma;
+  const lightCurve = curveConfig.lightCurve ?? curveConfig.lightBias ?? DEFAULT_LIGHT_CURVE;
+  const darkCurve = curveConfig.darkCurve ?? curveConfig.darkBias ?? DEFAULT_DARK_CURVE;
   const hasPaletteNameError = !!paletteNameError;
 
   // Compute gamut status for the identity swatch (500 step equivalent)
@@ -249,7 +261,9 @@ export function PaletteControls({
     [config.hue, config.lightness950, targetColorSpace],
   );
 
-  // Auto-clamp chroma anchors when the cap shrinks below current value
+  // Auto-clamp chroma anchors when the cap shrinks below current value.
+  // The endpoint anchors stay internal, but they still need to remain valid
+  // so palette generation and saved data stay consistent.
   useEffect(() => {
     const nextPartial: Partial<PaletteConfig> = {};
 
@@ -466,26 +480,50 @@ export function PaletteControls({
 
         <SliderField
           id="chroma-50"
-          label="Step 50"
+          label="Light End"
           value={chroma50}
           min={0}
           max={chroma50Cap}
           step={0.005}
           onChange={(v) => onConfigChange({ chroma50: v })}
-          tooltip={`Controls the lightest token's intensity. Max ${targetColorSpace.toUpperCase()}-safe at step 50: ${chroma50Cap.toFixed(3)}`}
+          tooltip={`Chroma at the lightest token (step 50). Max ${targetColorSpace.toUpperCase()}-safe at step 50: ${chroma50Cap.toFixed(3)}`}
           displayValue={chroma50.toFixed(3)}
         />
 
         <SliderField
           id="chroma-950"
-          label="Step 950"
+          label="Dark End"
           value={chroma950}
           min={0}
           max={chroma950Cap}
           step={0.005}
           onChange={(v) => onConfigChange({ chroma950: v })}
-          tooltip={`Controls the darkest token's intensity. Max ${targetColorSpace.toUpperCase()}-safe at step 950: ${chroma950Cap.toFixed(3)}`}
+          tooltip={`Chroma at the darkest token (step 950). Max ${targetColorSpace.toUpperCase()}-safe at step 950: ${chroma950Cap.toFixed(3)}`}
           displayValue={chroma950.toFixed(3)}
+        />
+
+        <SliderField
+          id="light-curve"
+          label="Light Curve"
+          value={lightCurve}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v) => onConfigChange({ lightCurve: v } as Partial<PaletteConfig>)}
+          tooltip="Shapes the light side toward the stronger or softer chroma anchor. Positive values favor the more saturated anchor; negative values favor the less saturated anchor."
+          displayValue={lightCurve.toFixed(2)}
+        />
+
+        <SliderField
+          id="dark-curve"
+          label="Dark Curve"
+          value={darkCurve}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v) => onConfigChange({ darkCurve: v } as Partial<PaletteConfig>)}
+          tooltip="Shapes the dark side toward the stronger or softer chroma anchor. Positive values favor the more saturated anchor; negative values favor the less saturated anchor."
+          displayValue={darkCurve.toFixed(2)}
         />
 
         <Separator />

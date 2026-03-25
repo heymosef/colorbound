@@ -30,6 +30,10 @@ export interface SharedPaletteEntry {
   chroma50: number;
   chroma: number;
   chroma950: number;
+  lightCurve: number;
+  darkCurve: number;
+  lightBias?: number;
+  darkBias?: number;
   lightness50: number;
   lightness950: number;
   density: 5 | 7 | 9 | 11;

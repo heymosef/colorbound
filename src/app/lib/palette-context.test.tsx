@@ -3,7 +3,12 @@ import '@testing-library/jest-dom/vitest';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaletteProvider, usePaletteContext } from './palette-context';
-import { GENERATION_VERSION, suggestPaletteName } from './color-utils';
+import {
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
+  GENERATION_VERSION,
+  suggestPaletteName,
+} from './color-utils';
 import { createDefaultCollection, saveState } from './local-storage';
 
 vi.mock('sonner', () => ({
@@ -32,8 +37,11 @@ function makeSavedPalette(id: string, overrides: Record<string, unknown> = {}) {
     chroma50: 0.12,
     chroma: 0.12,
     chroma950: 0.12,
+    lightCurve: DEFAULT_LIGHT_CURVE,
+    darkCurve: DEFAULT_DARK_CURVE,
     lightness50: 0.985,
     lightness950: 0.025,
+    density: 11,
     targetColorSpace: 'srgb' as const,
     generationVersion: GENERATION_VERSION,
     ...overrides,
@@ -47,8 +55,11 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     chroma50: 0.15,
     chroma: 0.15,
     chroma950: 0.15,
+    lightCurve: DEFAULT_LIGHT_CURVE,
+    darkCurve: DEFAULT_DARK_CURVE,
     lightness50: 0.985,
     lightness950: 0.025,
+    density: 11,
     targetColorSpace: 'srgb' as const,
     generationVersion: GENERATION_VERSION,
     ...overrides,
@@ -179,6 +190,8 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.name).toBe(
       suggestPaletteName(120, 0.222, 0.985, 0.025),
     );
+    expect(result.current.config.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
+    expect(result.current.config.darkCurve).toBe(DEFAULT_DARK_CURVE);
   });
 
   it('creates a collection without changing editor selection when activate is false', () => {
@@ -343,9 +356,34 @@ describe('PaletteProvider naming behavior', () => {
     expect(result.current.config.hue).toBe(180);
     expect(result.current.config.targetColorSpace).toBe('p3');
     expect(result.current.config.chroma).toBe(0.28);
+    expect(result.current.config.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
+    expect(result.current.config.darkCurve).toBe(DEFAULT_DARK_CURVE);
     expect(result.current.config.lightness50).toBe(0.97);
     expect(result.current.config.lightness950).toBe(0.04);
     expect(result.current.config.name).toBe(suggestPaletteName(180, 0.28, 0.97, 0.04));
+  });
+
+  it('restores saved light and dark curve settings when selecting a palette', () => {
+    const savedPalette = makeSavedPalette('biased-1', {
+      name: 'Biased',
+      lightCurve: -0.4,
+      darkCurve: 0.75,
+    });
+    const collection = seedHydratedState({
+      palettes: [savedPalette],
+      activePaletteId: savedPalette.id,
+      lastViewedSavedPaletteId: savedPalette.id,
+      config: makeConfig(savedPalette),
+    });
+
+    const { result } = renderHook(() => usePaletteContext(), { wrapper });
+
+    act(() => {
+      result.current.selectPaletteInCollection(collection.id, savedPalette.id);
+    });
+
+    expect(result.current.config.lightCurve).toBe(-0.4);
+    expect(result.current.config.darkCurve).toBe(0.75);
   });
 
   it('seeds a new draft from the last viewed saved srgb palette', () => {

@@ -4,7 +4,16 @@
 // MUST pass through the deserialize* functions before use.
 
 import type { PaletteConfig } from './palette-context-types';
-import { GENERATION_VERSION, generatePalette, generateDarkPalette, type Palette } from './color-utils';
+import {
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
+  GENERATION_VERSION,
+  generatePalette,
+  generateDarkPalette,
+  resolveLegacyCurveValues,
+  resolvePersistedCurveValues,
+  type Palette,
+} from './color-utils';
 import { DEFAULT_PALETTE_DENSITY, isPaletteDensity } from './palette-density';
 import {
   hasLegacyLightnessFields,
@@ -20,6 +29,8 @@ const DEFAULTS: Readonly<PaletteConfig> = {
   chroma50: 0.18,
   chroma: 0.18,
   chroma950: 0.18,
+  lightCurve: DEFAULT_LIGHT_CURVE,
+  darkCurve: DEFAULT_DARK_CURVE,
   lightness50: 0.985,
   lightness950: 0.025,
   density: DEFAULT_PALETTE_DENSITY,
@@ -51,12 +62,15 @@ function safeString(v: unknown, maxLen: number, fallback: string): string {
 
 /** Serialize a PaletteConfig for sharing. Strips runtime fields, clamps values. */
 export function serializePaletteConfig(config: PaletteConfig): SharedPaletteEntry {
+  const { lightCurve, darkCurve } = resolveLegacyCurveValues(config);
   return {
     name: safeString(config.name, 100, DEFAULTS.name),
     hue: clamp(config.hue, 0, 360, DEFAULTS.hue),
     chroma50: clamp(config.chroma50, 0, 0.4, config.chroma),
     chroma: clamp(config.chroma, 0, 0.4, DEFAULTS.chroma),
     chroma950: clamp(config.chroma950, 0, 0.4, config.chroma),
+    lightCurve,
+    darkCurve,
     lightness50: clamp(config.lightness50, 0, 1, DEFAULTS.lightness50),
     lightness950: clamp(config.lightness950, 0, 1, DEFAULTS.lightness950),
     density: isPaletteDensity(config.density) ? config.density : DEFAULTS.density,
@@ -89,7 +103,7 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
   const obj = payload as Record<string, unknown>;
 
   // Require at least one recognizable field to proceed
-  const hasAnyField = ['hue', 'chroma50', 'chroma', 'chroma950', 'name', 'lightness50', 'lightness950', 'blackRange', 'whiteRange'].some(
+  const hasAnyField = ['hue', 'chroma50', 'chroma', 'chroma950', 'name', 'lightness50', 'lightness950', 'lightCurve', 'darkCurve', 'lightBias', 'darkBias', 'blackRange', 'whiteRange'].some(
     (k) => k in obj,
   );
   if (!hasAnyField) return null;
@@ -107,12 +121,16 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
     l950 = converted.lightness950;
   }
 
+  const { lightCurve, darkCurve } = resolvePersistedCurveValues(obj);
+
   return {
     name: safeString(obj.name, 100, DEFAULTS.name),
     hue: clamp(obj.hue, 0, 360, DEFAULTS.hue),
     chroma: clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma),
     chroma50: clamp(obj.chroma50, 0, 0.4, clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma)),
     chroma950: clamp(obj.chroma950, 0, 0.4, clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma)),
+    lightCurve,
+    darkCurve,
     lightness50: l50,
     lightness950: l950,
     density: isPaletteDensity(obj.density) ? obj.density : DEFAULTS.density,
@@ -160,14 +178,19 @@ export function configToPalette(
   const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
   const chroma50 = config.chroma50 ?? config.chroma;
   const chroma950 = config.chroma950 ?? config.chroma;
+  const { lightCurve, darkCurve } = resolveLegacyCurveValues(config);
   const tokens = generatePalette(
     config.hue,
     chroma50,
     config.chroma,
     chroma950,
-    config.lightness50,
-    config.lightness950,
-    config.targetColorSpace,
+    {
+      lightness50: config.lightness50,
+      lightness950: config.lightness950,
+      lightCurve,
+      darkCurve,
+      targetColorSpace: config.targetColorSpace,
+    },
   );
   return {
     id,
@@ -177,11 +200,13 @@ export function configToPalette(
     chroma50,
     chroma: config.chroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
     targetColorSpace: config.targetColorSpace,
-    generationVersion: config.generationVersion,
+    generationVersion: GENERATION_VERSION,
   };
 }
 
@@ -193,14 +218,19 @@ export function configToDarkPalette(
   const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
   const chroma50 = config.chroma50 ?? config.chroma;
   const chroma950 = config.chroma950 ?? config.chroma;
+  const { lightCurve, darkCurve } = resolveLegacyCurveValues(config);
   const tokens = generateDarkPalette(
     config.hue,
     chroma50,
     config.chroma,
     chroma950,
-    config.lightness50,
-    config.lightness950,
-    config.targetColorSpace,
+    {
+      lightness50: config.lightness50,
+      lightness950: config.lightness950,
+      lightCurve,
+      darkCurve,
+      targetColorSpace: config.targetColorSpace,
+    },
   );
   return {
     id,
@@ -210,10 +240,12 @@ export function configToDarkPalette(
     chroma50,
     chroma: config.chroma,
     chroma950,
+    lightCurve,
+    darkCurve,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
     targetColorSpace: config.targetColorSpace,
-    generationVersion: config.generationVersion,
+    generationVersion: GENERATION_VERSION,
   };
 }

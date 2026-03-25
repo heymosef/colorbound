@@ -3,6 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaletteControls } from './palette-controls';
+import type { PaletteConfig } from '../lib/palette-context';
+import { DEFAULT_DARK_CURVE, DEFAULT_LIGHT_CURVE } from '../lib/color-utils';
 
 const { toastSuccess } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
@@ -65,10 +67,40 @@ vi.mock('./ui/popover', () => ({
 }));
 
 vi.mock('./ui/slider', () => ({
-  Slider: ({ id, 'aria-label': ariaLabel }: any) => (
-    <input id={id} aria-label={ariaLabel} type="range" />
+  Slider: ({ id, 'aria-label': ariaLabel, value, onValueChange, min, max }: any) => (
+    <input
+      id={id}
+      aria-label={ariaLabel}
+      type="range"
+      min={min}
+      max={max}
+      value={Array.isArray(value) ? value[0] : value ?? ''}
+      onChange={(e) => onValueChange?.([Number(e.target.value)])}
+    />
   ),
 }));
+
+type CurveAwarePaletteConfig = PaletteConfig & {
+  lightCurve?: number;
+  darkCurve?: number;
+  lightBias?: number;
+  darkBias?: number;
+};
+
+const baseConfig: CurveAwarePaletteConfig = {
+  name: 'Ocean',
+  hue: 210,
+  chroma50: 0.12,
+  chroma: 0.12,
+  chroma950: 0.12,
+  lightCurve: DEFAULT_LIGHT_CURVE,
+  darkCurve: DEFAULT_DARK_CURVE,
+  lightness50: 0.985,
+  lightness950: 0.025,
+  density: 11,
+  targetColorSpace: 'srgb',
+  generationVersion: 6,
+};
 
 describe('PaletteControls', () => {
   beforeEach(() => {
@@ -76,18 +108,10 @@ describe('PaletteControls', () => {
     toastSuccess.mockReset();
   });
 
-  it('does not render the removed neutral palette toggle', () => {
+  it('renders explicit endpoint and curve controls in the chroma section', () => {
     render(
       <PaletteControls
-        config={{
-          name: 'Ocean',
-          hue: 210,
-          chroma50: 0.12,
-          chroma: 0.12,
-          chroma950: 0.12,
-          lightness50: 0.985,
-          lightness950: 0.025,
-        }}
+        config={baseConfig}
         onConfigChange={vi.fn()}
         onNameChange={vi.fn()}
       />,
@@ -98,6 +122,74 @@ describe('PaletteControls', () => {
     expect(screen.queryByText('Chroma Curve')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Chroma curve preview from step 50 to step 950')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Chroma')).toBeInTheDocument();
+    expect(screen.getByLabelText('Light End')).toBeInTheDocument();
+    expect(screen.getByLabelText('Dark End')).toBeInTheDocument();
+    expect(screen.getByLabelText('Light Curve')).toBeInTheDocument();
+    expect(screen.getByLabelText('Dark Curve')).toBeInTheDocument();
+  });
+
+  it('keeps the chroma controls available across desktop, tablet, and mobile layouts', () => {
+    for (const nextBreakpoint of ['desktop', 'tablet', 'mobile'] as const) {
+      breakpoint = nextBreakpoint;
+      const { unmount } = render(
+        <PaletteControls
+          config={baseConfig}
+          onConfigChange={vi.fn()}
+          onNameChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByLabelText('Chroma')).toBeInTheDocument();
+      expect(screen.getByLabelText('Light End')).toBeInTheDocument();
+      expect(screen.getByLabelText('Dark End')).toBeInTheDocument();
+      expect(screen.getByLabelText('Light Curve')).toBeInTheDocument();
+      expect(screen.getByLabelText('Dark Curve')).toBeInTheDocument();
+
+      unmount();
+    }
+  });
+
+  it('updates endpoint and curve controls independently', () => {
+    const onConfigChange = vi.fn();
+
+    render(
+      <PaletteControls
+        config={baseConfig}
+        onConfigChange={onConfigChange}
+        onNameChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Light End'), { target: { value: '0.01' } });
+    fireEvent.change(screen.getByLabelText('Dark End'), { target: { value: '0.04' } });
+    fireEvent.change(screen.getByLabelText('Light Curve'), { target: { value: '-0.4' } });
+    fireEvent.change(screen.getByLabelText('Dark Curve'), { target: { value: '0.75' } });
+
+    expect(onConfigChange).toHaveBeenCalledWith({ chroma50: 0.01 });
+    expect(onConfigChange).toHaveBeenCalledWith({ chroma950: 0.04 });
+    expect(onConfigChange).toHaveBeenCalledWith({ lightCurve: -0.4 });
+    expect(onConfigChange).toHaveBeenCalledWith({ darkCurve: 0.75 });
+  });
+
+  it('falls back to legacy curve fields when canonical curve fields are absent', () => {
+    const legacyCurveConfig: CurveAwarePaletteConfig = {
+      ...baseConfig,
+      lightCurve: undefined,
+      darkCurve: undefined,
+      lightBias: -0.25,
+      darkBias: 0.5,
+    };
+
+    render(
+      <PaletteControls
+        config={legacyCurveConfig}
+        onConfigChange={vi.fn()}
+        onNameChange={vi.fn()}
+      />,
+    );
+
+    expect((screen.getByLabelText('Light Curve') as HTMLInputElement).value).toBe('-0.25');
+    expect((screen.getByLabelText('Dark Curve') as HTMLInputElement).value).toBe('0.5');
   });
 
   it('keeps the saved palette name in the paste flow toast', () => {
@@ -106,15 +198,7 @@ describe('PaletteControls', () => {
 
     render(
       <PaletteControls
-        config={{
-          name: 'Ocean',
-          hue: 210,
-          chroma50: 0.12,
-          chroma: 0.12,
-          chroma950: 0.12,
-          lightness50: 0.985,
-          lightness950: 0.025,
-        }}
+        config={baseConfig}
         onConfigChange={vi.fn()}
         onNameChange={vi.fn()}
         onApplyHex={onApplyHex}
@@ -145,15 +229,7 @@ describe('PaletteControls', () => {
 
     render(
       <PaletteControls
-        config={{
-          name: 'Ocean',
-          hue: 210,
-          chroma50: 0.12,
-          chroma: 0.12,
-          chroma950: 0.12,
-          lightness50: 0.985,
-          lightness950: 0.025,
-        }}
+        config={baseConfig}
         onConfigChange={vi.fn()}
         onNameChange={vi.fn()}
         onApplyHex={onApplyHex}
@@ -179,15 +255,7 @@ describe('PaletteControls', () => {
 
     render(
       <PaletteControls
-        config={{
-          name: 'Ocean',
-          hue: 210,
-          chroma50: 0.12,
-          chroma: 0.12,
-          chroma950: 0.12,
-          lightness50: 0.985,
-          lightness950: 0.025,
-        }}
+        config={baseConfig}
         onConfigChange={vi.fn()}
         onNameChange={vi.fn()}
       />,

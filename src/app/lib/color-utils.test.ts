@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  DEFAULT_DARK_CURVE,
+  DEFAULT_LIGHT_CURVE,
   oklchToRgb,
   rgbToHex,
   formatOklch,
@@ -30,6 +32,9 @@ import {
   oklchToP3,
   oklchMappedToRgb,
   GENERATION_VERSION,
+  evaluateCubicBezierEase,
+  getChromaBezierCurve,
+  getPaletteChromaDiagnostics,
 } from './color-utils';
 
 function generateFlatChromaPalette(
@@ -437,6 +442,246 @@ describe('generatePalette', () => {
     expect(token50.hex).toBe(rgbToHex(r, g, b));
     expect(token50.rgb).toBe(formatRgb(r, g, b));
   });
+
+  it('keeps the 500 step chroma stable when only the light curve changes', () => {
+    const linear = generatePalette(210, 0.05, 0.18, 0.08, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0,
+      darkCurve: 0,
+    });
+    const biased = generatePalette(210, 0.05, 0.18, 0.08, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0.8,
+      darkCurve: 0,
+    });
+
+    expect(biased.find((token) => token.step === 500)?.authoredOklch.c).toBeCloseTo(
+      linear.find((token) => token.step === 500)?.authoredOklch.c ?? 0,
+      6,
+    );
+    expect(biased.find((token) => token.step === 300)?.authoredOklch.c).not.toBeCloseTo(
+      linear.find((token) => token.step === 300)?.authoredOklch.c ?? 0,
+      6,
+    );
+    expect(biased.find((token) => token.step === 700)?.authoredOklch.c).toBeCloseTo(
+      linear.find((token) => token.step === 700)?.authoredOklch.c ?? 0,
+      6,
+    );
+  });
+
+  it('keeps the 500 step chroma stable when only the dark curve changes', () => {
+    const linear = generatePalette(210, 0.05, 0.18, 0.08, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0,
+      darkCurve: 0,
+    });
+    const biased = generatePalette(210, 0.05, 0.18, 0.08, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0,
+      darkCurve: 0.9,
+    });
+
+    expect(biased.find((token) => token.step === 500)?.authoredOklch.c).toBeCloseTo(
+      linear.find((token) => token.step === 500)?.authoredOklch.c ?? 0,
+      6,
+    );
+    expect(biased.find((token) => token.step === 300)?.authoredOklch.c).toBeCloseTo(
+      linear.find((token) => token.step === 300)?.authoredOklch.c ?? 0,
+      6,
+    );
+    expect(biased.find((token) => token.step === 700)?.authoredOklch.c).not.toBeCloseTo(
+      linear.find((token) => token.step === 700)?.authoredOklch.c ?? 0,
+      6,
+    );
+  });
+
+  it('treats zero curves as the linear interpolation baseline', () => {
+    const zeroCurve = generatePalette(210, 0.06, 0.18, 0.1, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0,
+      darkCurve: 0,
+    });
+    const expectedChromaByStep = new Map([
+      [50, 0.06],
+      [100, 0.073333],
+      [200, 0.1],
+      [300, 0.126667],
+      [400, 0.153333],
+      [500, 0.18],
+      [600, 0.162222],
+      [700, 0.144444],
+      [800, 0.126667],
+      [900, 0.108889],
+      [950, 0.1],
+    ]);
+
+    expect(
+      zeroCurve.map((token) => ({
+        step: token.step,
+        c: Number(token.authoredOklch.c.toFixed(6)),
+      })),
+    ).toEqual(
+      SCALE_STEPS.map((step) => ({
+        step,
+        c: expectedChromaByStep.get(step),
+      })),
+    );
+  });
+
+  it('matches the Bézier control points at the curve extremes', () => {
+    const neutral = getChromaBezierCurve(0);
+    expect(neutral.p1.x).toBeCloseTo(0.3333, 4);
+    expect(neutral.p1.y).toBeCloseTo(0.3333, 4);
+    expect(neutral.p2.x).toBeCloseTo(0.6667, 4);
+    expect(neutral.p2.y).toBeCloseTo(0.6667, 4);
+
+    const favorEndAnchor = getChromaBezierCurve(1);
+    expect(favorEndAnchor.p1.x).toBeCloseTo(0.16, 4);
+    expect(favorEndAnchor.p1.y).toBeCloseTo(0.84, 4);
+    expect(favorEndAnchor.p2.x).toBeCloseTo(0.32, 4);
+    expect(favorEndAnchor.p2.y).toBeCloseTo(1, 4);
+
+    const favorStartAnchor = getChromaBezierCurve(-1);
+    expect(favorStartAnchor.p1.x).toBeCloseTo(0.68, 4);
+    expect(favorStartAnchor.p1.y).toBeCloseTo(0, 4);
+    expect(favorStartAnchor.p2.x).toBeCloseTo(0.84, 4);
+    expect(favorStartAnchor.p2.y).toBeCloseTo(0.16, 4);
+  });
+
+  it('samples the Bézier easing contract at representative progress values', () => {
+    expect(evaluateCubicBezierEase(0.25, 0)).toBeCloseTo(0.25, 3);
+    expect(evaluateCubicBezierEase(0.5, 0)).toBeCloseTo(0.5, 3);
+    expect(evaluateCubicBezierEase(0.75, 0)).toBeCloseTo(0.75, 3);
+
+    expect(evaluateCubicBezierEase(0.25, 1)).toBeGreaterThan(0.65);
+    expect(evaluateCubicBezierEase(0.5, 1)).toBeGreaterThan(0.9);
+    expect(evaluateCubicBezierEase(0.75, 1)).toBeGreaterThan(0.98);
+
+    expect(evaluateCubicBezierEase(0.25, -1)).toBeLessThan(0.02);
+    expect(evaluateCubicBezierEase(0.5, -1)).toBeLessThan(0.1);
+    expect(evaluateCubicBezierEase(0.75, -1)).toBeLessThan(0.35);
+  });
+
+  it('keeps authored chroma monotone on each side of the midpoint', () => {
+    const diagnostics = getPaletteChromaDiagnostics(
+      generatePalette(210, 0.04, 0.18, 0.06, {
+        lightness50: 0.985,
+        lightness950: 0.025,
+        lightCurve: 0.35,
+        darkCurve: 0.45,
+      }),
+    );
+    const lightSide = diagnostics.filter((entry) => entry.step <= 500).map((entry) => entry.authoredChroma);
+    const darkSide = diagnostics.filter((entry) => entry.step >= 500).map((entry) => entry.authoredChroma);
+
+    for (let index = 1; index < lightSide.length; index += 1) {
+      expect(lightSide[index]).toBeGreaterThanOrEqual(lightSide[index - 1] - 0.000001);
+    }
+
+    for (let index = 1; index < darkSide.length; index += 1) {
+      expect(darkSide[index]).toBeLessThanOrEqual(darkSide[index - 1] + 0.000001);
+    }
+  });
+
+  it('keeps flat-endpoint palettes flat even when curve controls change', () => {
+    const linear = getPaletteChromaDiagnostics(
+      generatePalette(78, 0.14, 0.14, 0.14, {
+        lightness50: 0.985,
+        lightness950: 0.025,
+        lightCurve: 0,
+        darkCurve: 0,
+      }),
+    );
+    const curved = getPaletteChromaDiagnostics(
+      generatePalette(78, 0.14, 0.14, 0.14, {
+        lightness50: 0.985,
+        lightness950: 0.025,
+        lightCurve: 0.75,
+        darkCurve: -0.75,
+      }),
+    );
+
+    expect(curved).toEqual(linear);
+  });
+
+  it('preserves explicit light and dark endpoint chroma values regardless of curve settings', () => {
+    const curved = generatePalette(210, 0.03, 0.18, 0.02, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 1,
+      darkCurve: -1,
+    });
+
+    expect(curved.find((token) => token.step === 50)?.authoredOklch.c).toBeCloseTo(0.03, 6);
+    expect(curved.find((token) => token.step === 500)?.authoredOklch.c).toBeCloseTo(0.18, 6);
+    expect(curved.find((token) => token.step === 950)?.authoredOklch.c).toBeCloseTo(0.02, 6);
+  });
+
+  it('holds a punchy light endpoint longer when the light curve is positive', () => {
+    const linear = generatePalette(134, 0.275, 0.125, 0.04, {
+      lightness50: 0.9,
+      lightness950: 0.135,
+      lightCurve: 0,
+      darkCurve: 0,
+      targetColorSpace: 'p3',
+    });
+    const punchier = generatePalette(134, 0.275, 0.125, 0.04, {
+      lightness50: 0.9,
+      lightness950: 0.135,
+      lightCurve: 1,
+      darkCurve: 0,
+      targetColorSpace: 'p3',
+    });
+
+    expect(punchier.find((token) => token.step === 100)?.authoredOklch.c).toBeGreaterThan(
+      linear.find((token) => token.step === 100)?.authoredOklch.c ?? 0,
+    );
+    expect(punchier.find((token) => token.step === 200)?.authoredOklch.c).toBeGreaterThan(
+      linear.find((token) => token.step === 200)?.authoredOklch.c ?? 0,
+    );
+    expect(punchier.find((token) => token.step === 300)?.authoredOklch.c).toBeGreaterThan(
+      linear.find((token) => token.step === 300)?.authoredOklch.c ?? 0,
+    );
+  });
+
+  it('pushes mid-light steps toward the punchier midpoint when the light endpoint is weaker', () => {
+    const linear = generatePalette(6, 0.005, 0.205, 0.115, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 0,
+      darkCurve: 0,
+      targetColorSpace: 'p3',
+    });
+    const punchier = generatePalette(6, 0.005, 0.205, 0.115, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: 1,
+      darkCurve: 0,
+      targetColorSpace: 'p3',
+    });
+    const softer = generatePalette(6, 0.005, 0.205, 0.115, {
+      lightness50: 0.985,
+      lightness950: 0.025,
+      lightCurve: -1,
+      darkCurve: 0,
+      targetColorSpace: 'p3',
+    });
+
+    expect(punchier.find((token) => token.step === 200)?.authoredOklch.c).toBeGreaterThan(
+      linear.find((token) => token.step === 200)?.authoredOklch.c ?? 0,
+    );
+    expect(punchier.find((token) => token.step === 300)?.authoredOklch.c).toBeGreaterThan(
+      linear.find((token) => token.step === 300)?.authoredOklch.c ?? 0,
+    );
+    expect(softer.find((token) => token.step === 200)?.authoredOklch.c).toBeLessThan(
+      linear.find((token) => token.step === 200)?.authoredOklch.c ?? 0,
+    );
+  });
 });
 
 describe('generateDarkPalette', () => {
@@ -462,8 +707,11 @@ describe('deriveDarkPalette', () => {
       chroma50: 0.18,
       chroma: 0.18,
       chroma950: 0.18,
+      lightCurve: DEFAULT_LIGHT_CURVE,
+      darkCurve: DEFAULT_DARK_CURVE,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: 11 as const,
       targetColorSpace: 'srgb' as const,
       generationVersion: GENERATION_VERSION,
     };
