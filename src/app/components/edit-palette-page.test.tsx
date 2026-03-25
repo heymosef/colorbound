@@ -283,6 +283,17 @@ describe('EditPalettePage draft save flow', () => {
     expect(startDraftPalette).not.toHaveBeenCalled();
   });
 
+  it('renders desktop sidebar borders on the layout columns', () => {
+    renderAt('/my-collection/edit');
+
+    const complements = screen.getAllByRole('complementary');
+    const controlsSidebar = complements.find((node) => node.getAttribute('aria-label') === 'Palette controls');
+    const rightSidebar = complements.find((node) => node.getAttribute('aria-label') === 'Accessibility and export');
+
+    expect(controlsSidebar?.className).toContain('border-r');
+    expect(rightSidebar?.className).toContain('border-l');
+  });
+
   it('canonicalizes a saved baseline on the draft route back to the saved palette route', async () => {
     const savedPalette = makePalette('saved-1');
     paletteContextValue = buildContext({

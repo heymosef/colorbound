@@ -3,11 +3,13 @@ import {
   normalizeLegacyLightnessFields,
 } from "../../../src/app/lib/legacy-palette-compat.ts";
 
-export const SHARE_SCHEMA_VERSION = 4;
+export const SHARE_SCHEMA_VERSION = 5;
 export const CANONICAL_SHARE_FIELDS = [
   "name",
   "hue",
+  "chroma50",
   "chroma",
+  "chroma950",
   "lightness50",
   "lightness950",
   "density",
@@ -24,7 +26,9 @@ export const DUPLICATE_PALETTE_NAME_MESSAGE =
 export interface PaletteEntry {
   name: string;
   hue: number;
+  chroma50: number;
   chroma: number;
+  chroma950: number;
   lightness50: number;
   lightness950: number;
   density: 5 | 7 | 9 | 11;
@@ -86,15 +90,18 @@ export function normalizePaletteEntry(e: unknown): PaletteEntry | null {
     isValidNumber(obj.hue, 0, 360) &&
     isValidNumber(obj.chroma, 0, 0.4)
   ) {
+    const chroma = obj.chroma;
     return {
       name: obj.name,
       hue: obj.hue,
-      chroma: obj.chroma,
+      chroma50: clampNumber(obj.chroma50, 0, 0.4, chroma),
+      chroma,
+      chroma950: clampNumber(obj.chroma950, 0, 0.4, chroma),
       lightness50,
       lightness950,
       density: isValidDensity(obj.density) ? obj.density : 11,
       targetColorSpace: obj.targetColorSpace === "p3" ? "p3" : "srgb",
-      generationVersion: 1,
+      generationVersion: 2,
     };
   }
 
@@ -105,12 +112,14 @@ export function sanitizePaletteEntry(e: PaletteEntry): PaletteEntry {
   return {
     name: e.name.slice(0, 100),
     hue: e.hue,
+    chroma50: clampNumber(e.chroma50, 0, 0.4, e.chroma),
     chroma: e.chroma,
+    chroma950: clampNumber(e.chroma950, 0, 0.4, e.chroma),
     lightness50: e.lightness50,
     lightness950: e.lightness950,
     density: isValidDensity(e.density) ? e.density : 11,
     targetColorSpace: e.targetColorSpace,
-    generationVersion: 1,
+    generationVersion: 2,
   };
 }
 

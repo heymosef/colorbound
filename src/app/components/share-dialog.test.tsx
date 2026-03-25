@@ -94,7 +94,9 @@ describe('Share dialog flows', () => {
         palette={{
           name: 'Ocean',
           hue: 210,
+          chroma50: 0.12,
           chroma: 0.12,
+          chroma950: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
           density: 11,
@@ -106,12 +108,14 @@ describe('Share dialog flows', () => {
     expect(createSharedPalette).toHaveBeenCalledWith({
       name: 'Ocean',
       hue: 210,
+      chroma50: 0.12,
       chroma: 0.12,
+      chroma950: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
       density: 11,
       targetColorSpace: 'srgb',
-      generationVersion: 1,
+      generationVersion: 2,
     });
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
@@ -131,7 +135,9 @@ describe('Share dialog flows', () => {
         palettes={[{
           name: 'Ocean',
           hue: 210,
+          chroma50: 0.12,
           chroma: 0.12,
+          chroma950: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
           density: 11,
@@ -145,12 +151,14 @@ describe('Share dialog flows', () => {
       expect(createSharedCollection).toHaveBeenCalledWith([{
         name: 'Ocean',
         hue: 210,
+        chroma50: 0.12,
         chroma: 0.12,
+        chroma950: 0.12,
         lightness50: 0.985,
         lightness950: 0.025,
         density: 11,
         targetColorSpace: 'srgb',
-        generationVersion: 1,
+        generationVersion: 2,
       }], 'Brand Colors');
     });
     expect(await screen.findByDisplayValue('https://colorbound.test/collection/collection-1')).toBeInTheDocument();

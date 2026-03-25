@@ -27,7 +27,9 @@ function assertShareConfigured(): void {
 export interface SharedPaletteEntry {
   name: string;
   hue: number;
+  chroma50: number;
   chroma: number;
+  chroma950: number;
   lightness50: number;
   lightness950: number;
   density: 5 | 7 | 9 | 11;

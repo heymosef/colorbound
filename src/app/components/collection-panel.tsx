@@ -17,6 +17,8 @@ interface RightPanelProps {
   inlineMode?: boolean;
   /** Default tab to show in inline mode */
   defaultTab?: 'a11y' | 'export';
+  /** When true, the panel fills a fixed-height sidebar and manages its own scroll. */
+  fillHeight?: boolean;
 }
 
 export function CollectionPanel({
@@ -24,6 +26,7 @@ export function CollectionPanel({
   currentPalette,
   inlineMode,
   defaultTab,
+  fillHeight = true,
 }: RightPanelProps) {
   // Inline mode: render just the requested content without card/tabs wrapper
   if (inlineMode) {
@@ -35,8 +38,8 @@ export function CollectionPanel({
 
   // Default card mode (desktop right sidebar)
   return (
-    <Card className="h-full border-0 border-l border-border rounded-none shadow-none bg-card gap-0">
-      <Tabs defaultValue="a11y" className="h-full flex flex-col" onValueChange={(v) => {
+    <Card className={`${fillHeight ? 'h-full' : ''} border-0 rounded-none shadow-none bg-card gap-0`}>
+      <Tabs defaultValue="a11y" className={`${fillHeight ? 'h-full' : ''} flex flex-col`} onValueChange={(v) => {
         if (v === 'export') track('export_panel_opened');
       }}>
         <CardHeader className="pb-0 px-4 pt-4 shrink-0">
@@ -54,20 +57,39 @@ export function CollectionPanel({
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 px-4 pt-3 min-h-0 min-w-0" style={{ paddingBottom: 0 }}>
-          <TabsContent value="a11y" className="h-full mt-0 min-w-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              <ContrastPairSelector palette={currentPalette} inlineMode />
-            </ScrollArea>
-          </TabsContent>
+        <CardContent
+          className={`${fillHeight ? 'flex-1 min-h-0' : ''} px-4 pt-3 min-w-0`}
+          style={{ paddingBottom: fillHeight ? 0 : 16 }}
+        >
+          {fillHeight ? (
+            <>
+              <TabsContent value="a11y" className="h-full mt-0 min-w-0 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <ContrastPairSelector palette={currentPalette} inlineMode />
+                </ScrollArea>
+              </TabsContent>
 
-          <TabsContent value="export" className="h-full mt-0 min-w-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="py-1 px-1">
-                <ExportPanel inlineMode />
-              </div>
-            </ScrollArea>
-          </TabsContent>
+              <TabsContent value="export" className="h-full mt-0 min-w-0 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="py-1 px-1">
+                    <ExportPanel inlineMode />
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </>
+          ) : (
+            <>
+              <TabsContent value="a11y" className="mt-0 min-w-0">
+                <ContrastPairSelector palette={currentPalette} inlineMode />
+              </TabsContent>
+
+              <TabsContent value="export" className="mt-0 min-w-0">
+                <div className="py-1 px-1">
+                  <ExportPanel inlineMode />
+                </div>
+              </TabsContent>
+            </>
+          )}
         </CardContent>
       </Tabs>
     </Card>

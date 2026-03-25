@@ -54,7 +54,9 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
   return {
     name: 'Test',
     hue: 100,
+    chroma50: 0.15,
     chroma: 0.15,
+    chroma950: 0.15,
     lightness50: 0.985,
     lightness950: 0.025,
     density: DEFAULT_PALETTE_DENSITY,
@@ -69,7 +71,9 @@ function makeStoredPaletteEntry(overrides: Record<string, unknown> = {}) {
     id: 'pal-1',
     name: 'Blue',
     hue: 220,
+    chroma50: 0.18,
     chroma: 0.18,
+    chroma950: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
     density: DEFAULT_PALETTE_DENSITY,
@@ -127,7 +131,9 @@ describe('loadState / saveState round-trip', () => {
         name: 'Blue',
         tokens: [],
         hue: 220,
+        chroma50: 0.18,
         chroma: 0.18,
+        chroma950: 0.18,
         lightness50: 0.985,
         lightness950: 0.025,
         targetColorSpace: 'srgb',
@@ -262,7 +268,7 @@ describe('legacy migrations', () => {
     const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
 
     expect(loaded?.lastViewedSavedPaletteId).toBe('pal-p3');
-    expect(raw.version).toBe(7);
+    expect(raw.version).toBe(8);
     expect(raw.lastViewedSavedPaletteId).toBe('pal-p3');
   });
 
@@ -416,7 +422,7 @@ describe('duplicate palette migration', () => {
     expect(loaded?.collections[0].conflictedPalettes.map((palette) => palette.name)).toEqual([' ocean ']);
 
     const raw = JSON.parse(localStorage.getItem('color-token-generator')!);
-    expect(raw.version).toBe(7);
+    expect(raw.version).toBe(8);
     expect(raw.collections[0].palettes).toHaveLength(1);
     expect(raw.collections[0].conflictedPalettes).toHaveLength(1);
   });

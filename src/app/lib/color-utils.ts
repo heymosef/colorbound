@@ -14,7 +14,7 @@ export type TargetColorSpace = 'srgb' | 'p3';
 /** Which gamut the *original* (pre-mapping) OKLCH color falls in. */
 export type GamutFlag = 'srgb' | 'p3' | 'out';
 
-export const GENERATION_VERSION = 1;
+export const GENERATION_VERSION = 2;
 
 export interface ColorToken {
   step: number;
@@ -52,7 +52,9 @@ export interface Palette {
   name: string;
   tokens: ColorToken[];
   hue: number;
+  chroma50: number;
   chroma: number;
+  chroma950: number;
   /** Target OKLCH lightness for step 50 (lightest). 0–1, default 0.985. */
   lightness50: number;
   /** Target OKLCH lightness for step 950 (darkest). 0–1, default 0.025. */
@@ -272,6 +274,34 @@ function maxGamutChromaForHue(
   return Math.round(Math.min(lo, 0.4) * 200) / 200; // snap to 0.005 step
 }
 
+function maxGamutChromaAtLightness(
+  hue: number,
+  lightness: number,
+  inGamut: (l: number, c: number, h: number) => boolean,
+): number {
+  let lo = 0;
+  let hi = 0.4;
+
+  for (let i = 0; i < 20 && hi - lo > 0.0005; i++) {
+    const mid = (lo + hi) / 2;
+    if (inGamut(lightness, mid, hue)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+
+  return Math.round(Math.min(lo, 0.4) * 200) / 200;
+}
+
+export function maxSrgbChromaAtLightness(hue: number, lightness: number): number {
+  return maxGamutChromaAtLightness(hue, lightness, isInSrgbGamut);
+}
+
+export function maxP3ChromaAtLightness(hue: number, lightness: number): number {
+  return maxGamutChromaAtLightness(hue, lightness, isInP3Gamut);
+}
+
 // ─── Public conversion functions ───
 
 /** Convert a hex color string to OKLCH { l, c, h }. */
@@ -371,24 +401,69 @@ function oklchDiffers(a: OklchColor, b: OklchColor): boolean {
  * @param lightness50  Target OKLCH lightness for step 50 (lightest token). Default ~0.985.
  * @param lightness950 Target OKLCH lightness for step 950 (darkest token). Default ~0.025.
  */
+function resolvePaletteGenerationArgs(
+  chroma50OrChroma: number,
+  chromaOrLightness50: number,
+  chroma950OrLightness950: number,
+  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness950Maybe?: number,
+  targetColorSpaceMaybe: TargetColorSpace = 'srgb',
+) {
+  if (
+    typeof lightness50OrTargetColorSpace === 'number' &&
+    typeof lightness950Maybe === 'number'
+  ) {
+    return {
+      chroma50: chroma50OrChroma,
+      chroma: chromaOrLightness50,
+      chroma950: chroma950OrLightness950,
+      lightness50: lightness50OrTargetColorSpace,
+      lightness950: lightness950Maybe,
+      targetColorSpace: targetColorSpaceMaybe,
+    };
+  }
+
+  return {
+    chroma50: chroma50OrChroma,
+    chroma: chroma50OrChroma,
+    chroma950: chroma50OrChroma,
+    lightness50: chromaOrLightness50,
+    lightness950: chroma950OrLightness950,
+    targetColorSpace: lightness50OrTargetColorSpace === 'p3' ? 'p3' : 'srgb',
+  };
+}
+
 export function generatePalette(
   hue: number,
-  maxChroma: number,
-  lightness50: number,
-  lightness950: number,
-  targetColorSpace: TargetColorSpace = 'srgb',
+  chroma50OrChroma: number,
+  chromaOrLightness50: number,
+  chroma950OrLightness950: number,
+  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness950Maybe?: number,
+  targetColorSpaceMaybe: TargetColorSpace = 'srgb',
 ): ColorToken[] {
   const tokens: ColorToken[] = [];
+  const {
+    chroma50,
+    chroma: maxChroma,
+    chroma950,
+    lightness50,
+    lightness950,
+    targetColorSpace,
+  } = resolvePaletteGenerationArgs(
+    chroma50OrChroma,
+    chromaOrLightness50,
+    chroma950OrLightness950,
+    lightness50OrTargetColorSpace,
+    lightness950Maybe,
+    targetColorSpaceMaybe,
+  );
 
   const maxL = lightness50;
   const minL = lightness950;
-
-  // Pre-compute anchor lightness (step 500) and C/L ratio for proportional chroma scaling.
-  // The slider chroma value represents the chroma at the anchor lightness.
-  // All other steps scale proportionally: c = (chroma / anchorL) × l.
-  const anchorT = (500 - 50) / 900;
-  const anchorL = maxL - anchorT * (maxL - minL);
-  const chromaLightnessRatio = anchorL > 0.001 ? maxChroma / anchorL : 0;
+  const minStep = SCALE_STEPS[0];
+  const anchorStep = 500;
+  const maxStep = SCALE_STEPS[SCALE_STEPS.length - 1];
 
   for (const step of SCALE_STEPS) {
     // Map step to 0-1 range (50=bright, 950=dark)
@@ -398,22 +473,21 @@ export function generatePalette(
     // OKLCH lightness is perceptually uniform, so linear = even visual spacing.
     const l = maxL - t * (maxL - minL);
 
-    // Chroma: proportional C/L scaling (like oklch.fyi).
-    // Lighter steps get more chroma, darker steps less — matching the
-    // natural gamut shape. Per-step gamut mapping handles any
-    // out-of-gamut values at the extremes.
-    const c = Math.max(0, Math.min(0.4, chromaLightnessRatio * l));
+    const c = step <= anchorStep
+      ? chroma50 + ((maxChroma - chroma50) * (step - minStep)) / (anchorStep - minStep)
+      : maxChroma + ((chroma950 - maxChroma) * (step - anchorStep)) / (maxStep - anchorStep);
+    const authoredChroma = Math.max(0, Math.min(0.4, c));
     const effectiveHue = hue;
 
     // Original OKLCH (may be outside target gamuts)
-    const authoredColor: OklchColor = { l, c, h: effectiveHue };
+    const authoredColor: OklchColor = { l, c: authoredChroma, h: effectiveHue };
 
     // Classify gamut
-    const authoredGamut = classifyGamut(l, c, effectiveHue);
+    const authoredGamut = classifyGamut(l, authoredChroma, effectiveHue);
 
     // Gamut-mapped sRGB and P3 values
-    const srgbOklch = gamutMapToSrgb(l, c, effectiveHue);
-    const p3Oklch = gamutMapToP3(l, c, effectiveHue);
+    const srgbOklch = gamutMapToSrgb(l, authoredChroma, effectiveHue);
+    const p3Oklch = gamutMapToP3(l, authoredChroma, effectiveHue);
     const targetOklch = targetColorSpace === 'p3' ? p3Oklch : srgbOklch;
 
     const [r, g, b] = oklchMappedToRgb(srgbOklch.l, srgbOklch.c, srgbOklch.h);
@@ -452,14 +526,34 @@ export function generatePalette(
 // Generate dark mode optimized palette
 export function generateDarkPalette(
   hue: number,
-  maxChroma: number,
-  lightness50: number,
-  lightness950: number,
-  targetColorSpace: TargetColorSpace = 'srgb',
+  chroma50OrChroma: number,
+  chromaOrLightness50: number,
+  chroma950OrLightness950: number,
+  lightness50OrTargetColorSpace?: number | TargetColorSpace,
+  lightness950Maybe?: number,
+  targetColorSpaceMaybe: TargetColorSpace = 'srgb',
 ): ColorToken[] {
+  const {
+    chroma50,
+    chroma: maxChroma,
+    chroma950,
+    lightness50,
+    lightness950,
+    targetColorSpace,
+  } = resolvePaletteGenerationArgs(
+    chroma50OrChroma,
+    chromaOrLightness50,
+    chroma950OrLightness950,
+    lightness50OrTargetColorSpace,
+    lightness950Maybe,
+    targetColorSpaceMaybe,
+  );
+
   return generatePalette(
     hue,
+    chroma50 * 0.85,
     maxChroma * 0.85,
+    chroma950 * 0.85,
     lightness50 * 0.995,
     lightness950 * 1.2,
     targetColorSpace,
@@ -471,7 +565,9 @@ export function deriveDarkPalette(palette: Palette): Palette {
     ...palette,
     tokens: generateDarkPalette(
       palette.hue,
+      palette.chroma50,
       palette.chroma,
+      palette.chroma950,
       palette.lightness50,
       palette.lightness950,
       palette.targetColorSpace,

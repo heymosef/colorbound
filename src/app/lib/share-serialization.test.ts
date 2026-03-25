@@ -16,7 +16,9 @@ import { DEFAULT_PALETTE_DENSITY } from './palette-density';
 const VALID_CONFIG: PaletteConfig = {
   name: 'Ocean Blue',
   hue: 220,
+  chroma50: 0.18,
   chroma: 0.18,
+  chroma950: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
   density: DEFAULT_PALETTE_DENSITY,
@@ -74,7 +76,9 @@ describe('deserializePaletteConfig', () => {
     expect(result).toEqual({
       name: 'Untitled',
       hue: 120,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
       density: DEFAULT_PALETTE_DENSITY,
@@ -106,7 +110,9 @@ describe('deserializePaletteConfig', () => {
     expect(result).toEqual({
       name: 'Test',
       hue: 100,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 1,
       lightness950: 0,
       density: DEFAULT_PALETTE_DENSITY,
@@ -124,7 +130,9 @@ describe('deserializePaletteConfig', () => {
     expect(result).toEqual({
       name: 'Test',
       hue: 240,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
       density: DEFAULT_PALETTE_DENSITY,
@@ -212,7 +220,9 @@ describe('deserializeCollection', () => {
         {
           name: 'Partial',
           hue: 100,
+          chroma50: 0.18,
           chroma: 0.18,
+          chroma950: 0.18,
           lightness50: 0.985,
           lightness950: 0.025,
           density: DEFAULT_PALETTE_DENSITY,

@@ -29,7 +29,28 @@ import {
   formatP3,
   oklchToP3,
   oklchMappedToRgb,
+  GENERATION_VERSION,
 } from './color-utils';
+
+function generateFlatChromaPalette(
+  hue: number,
+  chroma: number,
+  lightness50: number,
+  lightness950: number,
+  targetColorSpace?: 'srgb' | 'p3',
+) {
+  return generatePalette(hue, chroma, chroma, chroma, lightness50, lightness950, targetColorSpace);
+}
+
+function generateFlatChromaDarkPalette(
+  hue: number,
+  chroma: number,
+  lightness50: number,
+  lightness950: number,
+  targetColorSpace?: 'srgb' | 'p3',
+) {
+  return generateDarkPalette(hue, chroma, chroma, chroma, lightness50, lightness950, targetColorSpace);
+}
 
 // ─── OKLCH → RGB Conversion ───
 
@@ -330,7 +351,7 @@ describe('oklchToP3', () => {
 // ─── Palette Generation ───
 
 describe('generatePalette', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
+  const tokens = generateFlatChromaPalette(210, 0.18, 0.985, 0.025);
 
   it('generates exactly 11 tokens', () => {
     expect(tokens).toHaveLength(11);
@@ -399,7 +420,7 @@ describe('generatePalette', () => {
   });
 
   it('uses the P3-resolved token as the canonical target in Display P3 mode', () => {
-    const p3Tokens = generatePalette(78, 0.115, 0.985, 0.125, 'p3');
+    const p3Tokens = generateFlatChromaPalette(78, 0.115, 0.985, 0.125, 'p3');
     const token50 = p3Tokens.find((t) => t.step === 50)!;
 
     expect(token50.targetColorSpace).toBe('p3');
@@ -409,7 +430,7 @@ describe('generatePalette', () => {
   });
 
   it('derives hex and rgb from the sRGB fallback token', () => {
-    const p3Tokens = generatePalette(78, 0.115, 0.985, 0.125, 'p3');
+    const p3Tokens = generateFlatChromaPalette(78, 0.115, 0.985, 0.125, 'p3');
     const token50 = p3Tokens.find((t) => t.step === 50)!;
     const [r, g, b] = oklchMappedToRgb(token50.srgbOklch.l, token50.srgbOklch.c, token50.srgbOklch.h);
 
@@ -420,13 +441,13 @@ describe('generatePalette', () => {
 
 describe('generateDarkPalette', () => {
   it('generates same number of tokens as light palette', () => {
-    const light = generatePalette(210, 0.18, 0.985, 0.025);
-    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025);
+    const light = generateFlatChromaPalette(210, 0.18, 0.985, 0.025);
+    const dark = generateFlatChromaDarkPalette(210, 0.18, 0.985, 0.025);
     expect(dark).toHaveLength(light.length);
   });
 
   it('has the same steps as light palette', () => {
-    const dark = generateDarkPalette(210, 0.18, 0.985, 0.025);
+    const dark = generateFlatChromaDarkPalette(210, 0.18, 0.985, 0.025);
     expect(dark.map(t => t.step)).toEqual(SCALE_STEPS);
   });
 });
@@ -436,13 +457,15 @@ describe('deriveDarkPalette', () => {
     const palette = {
       id: 'blue',
       name: 'Blue',
-      tokens: generatePalette(210, 0.18, 0.985, 0.025),
+      tokens: generateFlatChromaPalette(210, 0.18, 0.985, 0.025),
       hue: 210,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
       targetColorSpace: 'srgb' as const,
-      generationVersion: 1,
+      generationVersion: GENERATION_VERSION,
     };
 
     const darkPalette = deriveDarkPalette(palette);
@@ -488,7 +511,7 @@ describe('get500Oklch', () => {
   });
 
   it('matches the 500 token from generatePalette', () => {
-    const tokens = generatePalette(210, 0.18, 0.985, 0.025);
+    const tokens = generateFlatChromaPalette(210, 0.18, 0.985, 0.025);
     const token500 = tokens.find((t) => t.step === 500)!;
     const swatch = get500Oklch(210, 0.18, 0.985, 0.025);
     expect(swatch.l).toBeCloseTo(token500.oklch.l, 5);
@@ -563,13 +586,15 @@ describe('suggestPaletteName', () => {
 // ─── Export Functions ───
 
 describe('exportAsCSS', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
+  const tokens = generateFlatChromaPalette(210, 0.18, 0.985, 0.025);
   const palette = {
     id: 'test',
     name: 'Blue',
     tokens,
     hue: 210,
+    chroma50: 0.18,
     chroma: 0.18,
+    chroma950: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
   };
@@ -605,13 +630,15 @@ describe('exportAsCSS', () => {
 });
 
 describe('exportAsJSON', () => {
-  const tokens = generatePalette(210, 0.18, 0.985, 0.025);
+  const tokens = generateFlatChromaPalette(210, 0.18, 0.985, 0.025);
   const palette = {
     id: 'test',
     name: 'Blue',
     tokens,
     hue: 210,
+    chroma50: 0.18,
     chroma: 0.18,
+    chroma950: 0.18,
     lightness50: 0.985,
     lightness950: 0.025,
   };
@@ -637,18 +664,22 @@ describe('exportAsFigmaVariables', () => {
       {
         id: 'blue',
         name: 'Blue',
-        tokens: generatePalette(210, 0.18, 0.985, 0.025),
+        tokens: generateFlatChromaPalette(210, 0.18, 0.985, 0.025),
         hue: 210,
+        chroma50: 0.18,
         chroma: 0.18,
+        chroma950: 0.18,
         lightness50: 0.985,
         lightness950: 0.025,
       },
       {
         id: 'rose',
         name: 'Rose',
-        tokens: generatePalette(350, 0.16, 0.985, 0.025),
+        tokens: generateFlatChromaPalette(350, 0.16, 0.985, 0.025),
         hue: 350,
+        chroma50: 0.16,
         chroma: 0.16,
+        chroma950: 0.16,
         lightness50: 0.985,
         lightness950: 0.025,
       },
@@ -673,9 +704,11 @@ describe('exportAsFigmaTokens', () => {
     const palette = {
       id: 'primary',
       name: 'Primary',
-      tokens: generatePalette(110, 0.18, 0.985, 0.025),
+      tokens: generateFlatChromaPalette(110, 0.18, 0.985, 0.025),
       hue: 110,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
     };
@@ -698,9 +731,11 @@ describe('exportAsFigmaTokens', () => {
     const palette = {
       id: 'primary',
       name: 'Primary',
-      tokens: generatePalette(110, 0.18, 0.985, 0.025),
+      tokens: generateFlatChromaPalette(110, 0.18, 0.985, 0.025),
       hue: 110,
+      chroma50: 0.18,
       chroma: 0.18,
+      chroma950: 0.18,
       lightness50: 0.985,
       lightness950: 0.025,
     };
@@ -717,13 +752,15 @@ describe('exportAsFigmaTokens', () => {
     const palette = {
       id: 'gold',
       name: 'Gold',
-      tokens: generatePalette(78, 0.115, 0.985, 0.125, 'p3'),
+      tokens: generateFlatChromaPalette(78, 0.115, 0.985, 0.125, 'p3'),
       hue: 78,
+      chroma50: 0.115,
       chroma: 0.115,
+      chroma950: 0.115,
       lightness50: 0.985,
       lightness950: 0.125,
       targetColorSpace: 'p3' as const,
-      generationVersion: 1,
+      generationVersion: GENERATION_VERSION,
     };
 
     const json = exportAsFigmaTokens([palette]);
