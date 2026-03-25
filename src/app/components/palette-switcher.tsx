@@ -8,19 +8,36 @@
  * Uses Popover instead of heavier menu/select primitives so the switcher stays
  * inline with the current layout and avoids cross-tree portal behavior.
  */
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useMemo, useCallback, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Separator } from './ui/separator';
 import { Input } from './ui/input';
-import { ChevronDown, Check, Plus, Layers, Search } from 'lucide-react';
+import {
+  ChevronDown,
+  Check,
+  Plus,
+  Layers,
+  Search,
+  CopyPlus,
+  Share2,
+  FolderOutput,
+  FolderInput,
+  Trash2,
+} from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getRampDisplayColors } from '../lib/palette-preview';
 import { getPaletteSwitcherViewportClass } from './switcher-viewport';
+import { PopoverMenuItem } from './popover-menu-item';
 export {
   getRampColors,
   getRampDisplayColors,
   RAMP_SAMPLE_STEPS,
 } from '../lib/palette-preview';
+
+const LazyPaletteActionDialogs = lazy(async () => {
+  const module = await import('./palette-action-dialogs');
+  return { default: module.PaletteActionDialogs };
+});
 
 // ─── Sub-components ───
 
@@ -102,6 +119,11 @@ export interface PaletteSwitcherProps {
   variant?: 'default' | 'compact';
   /** Compact trigger sizing: 'sm' = header breadcrumb, 'lg' = mobile top bar */
   compactSize?: 'sm' | 'lg';
+  showPaletteActions?: boolean;
+  isEditingCollection?: boolean;
+  onDuplicate?: (name: string) => { ok: boolean; message?: string };
+  onDelete?: () => void;
+  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
 }
 
 export function PaletteSwitcher({
@@ -115,9 +137,17 @@ export function PaletteSwitcher({
   onNavigateToCollection,
   variant = 'default',
   compactSize = 'sm',
+  showPaletteActions = false,
+  isEditingCollection = false,
+  onDuplicate,
+  onDelete,
+  onCollectionAction,
 }: PaletteSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
+  const [dupOpen, setDupOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const filterInputId = 'palette-switcher-filter';
 
   // Reset state when popover closes
@@ -171,12 +201,19 @@ export function PaletteSwitcher({
 
   const hasCollection = collection.length > 0;
   const showFilter = collection.length > 5;
+  const showCollectionActions = showPaletteActions && isEditingCollection;
 
   /** Representative color for the compact variant (step 500 token) */
   const representativeColor = useMemo(() => {
     const t = currentPalette?.tokens?.find((tok) => tok.step === 500);
     return t?.hex ?? '#888888';
   }, [currentPalette?.tokens]);
+  const triggerAriaLabel = `${showPaletteActions ? 'Palette menu' : 'Switch palette'}. Currently editing: ${currentName}`;
+
+  const handlePaletteAction = useCallback((action: () => void) => {
+    setOpen(false);
+    action();
+  }, []);
 
   const triggerClassName =
     compactSize === 'lg'
@@ -190,7 +227,7 @@ export function PaletteSwitcher({
   const compactTrigger = (
     <PopoverTrigger
       className={triggerClassName}
-      aria-label={`Switch palette. Currently editing: ${currentName}`}
+      aria-label={triggerAriaLabel}
     >
       <div
         className="w-3.5 h-3.5 rounded-[3px] shrink-0"
@@ -210,7 +247,7 @@ export function PaletteSwitcher({
   const defaultTrigger = (
     <PopoverTrigger
       className="inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-      aria-label={`Switch palette. Currently editing: ${currentName}`}
+      aria-label={triggerAriaLabel}
     >
       <div
         className="w-3.5 h-3.5 rounded-[3px] shrink-0"
@@ -228,82 +265,147 @@ export function PaletteSwitcher({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      {variant === 'compact' ? compactTrigger : defaultTrigger}
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        {variant === 'compact' ? compactTrigger : defaultTrigger}
 
-      <PopoverContent
-        align="start"
-        side="bottom"
-        collisionPadding={8}
-        className="w-[var(--radix-popover-trigger-width)] min-w-[220px] max-h-[var(--radix-popover-content-available-height)] p-0 flex flex-col overflow-hidden"
-      >
-        {/* Filter */}
-        {showFilter && (
-          <div className="p-2 pb-0 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-              <Input
-                id={filterInputId}
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filter palettes…"
-                className="h-7 text-[13px] pl-7 pr-2"
-                aria-label="Filter palettes"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Palette list */}
-        <div className={`p-1 ${getPaletteSwitcherViewportClass()} overflow-y-auto`}>
-          {hasCollection ? (
-            <div role="listbox" aria-label="Saved palettes">
-              {filteredCollection.length > 0 ? (
-                filteredCollection.map((palette) => (
-                  <PaletteRow
-                    key={palette.id}
-                    palette={palette}
-                    isActive={palette.id === activePaletteId}
-                    onClick={() => handleRowClick(palette.id)}
-                  />
-                ))
-              ) : (
-                <p className="text-[11px] text-muted-foreground text-center py-4 px-2">
-                  No palettes match "{filter}"
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-4 px-2">
-              <p className="text-[11px] text-muted-foreground">
-                No saved palettes yet
-              </p>
+        <PopoverContent
+          align="start"
+          side="bottom"
+          collisionPadding={8}
+          className="w-[var(--radix-popover-trigger-width)] min-w-[220px] max-h-[var(--radix-popover-content-available-height)] p-0 flex flex-col overflow-hidden"
+        >
+          {/* Filter */}
+          {showFilter && (
+            <div className="p-2 pb-0 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                <Input
+                  id={filterInputId}
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Filter palettes…"
+                  className="h-7 text-[13px] pl-7 pr-2"
+                  aria-label="Filter palettes"
+                />
+              </div>
             </div>
           )}
-        </div>
 
-        <Separator className="shrink-0" />
+          {/* Palette list */}
+          <div className={`p-1 ${getPaletteSwitcherViewportClass()} overflow-y-auto`}>
+            {hasCollection ? (
+              <div role="listbox" aria-label="Saved palettes">
+                {filteredCollection.length > 0 ? (
+                  filteredCollection.map((palette) => (
+                    <PaletteRow
+                      key={palette.id}
+                      palette={palette}
+                      isActive={palette.id === activePaletteId}
+                      onClick={() => handleRowClick(palette.id)}
+                    />
+                  ))
+                ) : (
+                  <p className="text-[11px] text-muted-foreground text-center py-4 px-2">
+                    No palettes match "{filter}"
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4 px-2">
+                <p className="text-[11px] text-muted-foreground">
+                  No saved palettes yet
+                </p>
+              </div>
+            )}
+          </div>
 
-        {/* Footer actions */}
-        <div className="p-1 space-y-0.5 shrink-0">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground cursor-pointer focus-visible:bg-accent"
-            onClick={handleNewPalette}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New palette
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground cursor-pointer focus-visible:bg-accent"
-            onClick={handleViewAll}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            View all palettes
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
+          <Separator className="shrink-0" />
+
+          {/* Footer actions */}
+          <div className="p-1 space-y-0.5 shrink-0">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground cursor-pointer focus-visible:bg-accent"
+              onClick={handleNewPalette}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New palette
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground cursor-pointer focus-visible:bg-accent"
+              onClick={handleViewAll}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              View all palettes
+            </button>
+          </div>
+
+          {showPaletteActions && (
+            <>
+              <Separator className="shrink-0" />
+              <div className="p-1 space-y-0.5 shrink-0">
+                <PopoverMenuItem onClick={() => handlePaletteAction(() => setDupOpen(true))}>
+                  <CopyPlus className="w-3.5 h-3.5" />
+                  Duplicate palette
+                </PopoverMenuItem>
+                <PopoverMenuItem
+                  onClick={() => handlePaletteAction(() => setShareOpen(true))}
+                  disabled={isDirty}
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span className="flex flex-col items-start">
+                    <span>Share palette</span>
+                    {isDirty && <span className="text-[10px] text-muted-foreground font-normal">Save changes first</span>}
+                  </span>
+                </PopoverMenuItem>
+                {showCollectionActions && (
+                  <>
+                    <PopoverMenuItem
+                      onClick={() => handlePaletteAction(() => onCollectionAction?.('move', currentPalette))}
+                    >
+                      <FolderOutput className="w-3.5 h-3.5" />
+                      Move to collection…
+                    </PopoverMenuItem>
+                    <PopoverMenuItem
+                      onClick={() => handlePaletteAction(() => onCollectionAction?.('copy', currentPalette))}
+                    >
+                      <FolderInput className="w-3.5 h-3.5" />
+                      Duplicate to collection…
+                    </PopoverMenuItem>
+                  </>
+                )}
+                {showCollectionActions && onDelete && (
+                  <PopoverMenuItem
+                    onClick={() => handlePaletteAction(() => setDeleteOpen(true))}
+                    variant="destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete palette
+                  </PopoverMenuItem>
+                )}
+              </div>
+            </>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {(dupOpen || shareOpen || deleteOpen) && (
+        <Suspense fallback={null}>
+          <LazyPaletteActionDialogs
+            palette={currentPalette}
+            dupOpen={dupOpen}
+            shareOpen={shareOpen}
+            deleteOpen={deleteOpen}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            onDupOpenChange={setDupOpen}
+            onShareOpenChange={setShareOpen}
+            onDeleteOpenChange={setDeleteOpen}
+          />
+        </Suspense>
+      )}
+    </>
   );
 }

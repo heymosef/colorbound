@@ -2,23 +2,15 @@
  * Palette Workspace — main content area showing palette swatches,
  * token table, and UI preview.
  *
- * The toolbar shows the palette name, a More menu (⋮) with contextual
- * actions (duplicate, share, move/copy, delete), and a
- * ViewModeToggle (Light | Dark | Both). The toolbar layout is the same
- * regardless of dirty/clean state.
+ * The toolbar shows view/accessibility controls only.
  *
  * On mobile, the toolbar is hidden (hideToolbar) and actions are handled
- * by EditPalettePage's top bar and More menu.
+ * by EditPalettePage's top bar and the global header palette menu.
  */
 
-import React, { Suspense, lazy, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Separator } from './ui/separator';
-import {
-  Moon, Sun, MoreVertical,
-  CopyPlus, Trash2, Share2, FolderInput, FolderOutput,
-} from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { UIPreview } from './ui-preview';
@@ -28,7 +20,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from './ui/table';
 import { usePaletteContext } from '../lib/palette-context';
-import { PopoverMenuItem } from './popover-menu-item';
 import { track } from '../lib/analytics';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
@@ -53,11 +44,6 @@ interface PaletteWorkspaceProps {
   /** When true, fills the available region and manages its own scrolling. */
   fillHeight?: boolean;
 }
-
-const LazyPaletteActionDialogs = lazy(async () => {
-  const module = await import('./palette-action-dialogs');
-  return { default: module.PaletteActionDialogs };
-});
 
 function PaletteRow({
   palette,
@@ -106,147 +92,6 @@ function PaletteRow({
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── Shared overflow menu for desktop + mobile ───
-
-function PaletteMoreMenu({
-  isDirty,
-  isEditingCollection,
-  onDuplicate,
-  onDelete,
-  onCollectionAction,
-  palette,
-  triggerClassName = 'inline-flex items-center justify-center rounded-md h-7 w-7 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-}: {
-  isDirty?: boolean;
-  isEditingCollection?: boolean;
-  onDuplicate?: (name: string) => { ok: boolean; message?: string };
-  onDelete?: () => void;
-  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
-  palette: Palette;
-  triggerClassName?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [dupOpen, setDupOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const handleAction = (action: () => void) => {
-    setOpen(false);
-    action();
-  };
-
-  return (
-    <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          className={triggerClassName}
-          aria-label="More actions"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-[210px] p-1">
-          {/* Duplicate */}
-          <PopoverMenuItem onClick={() => handleAction(() => setDupOpen(true))}>
-            <CopyPlus className="w-3.5 h-3.5" />
-            Duplicate palette
-          </PopoverMenuItem>
-          {/* Share — opens share dialog, disabled when dirty */}
-          <PopoverMenuItem
-            onClick={() => handleAction(() => setShareOpen(true))}
-            disabled={isDirty}
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span className="flex flex-col items-start">
-              <span>Share palette</span>
-              {isDirty && <span className="text-[10px] text-muted-foreground font-normal">Save changes first</span>}
-            </span>
-          </PopoverMenuItem>
-
-          {/* Move / Copy to collection */}
-          {isEditingCollection && (
-            <>
-              <Separator className="my-1" />
-              <PopoverMenuItem
-                onClick={() => handleAction(() => onCollectionAction?.('move', palette))}
-              >
-                <FolderOutput className="w-3.5 h-3.5" />
-                Move to collection…
-              </PopoverMenuItem>
-              <PopoverMenuItem
-                onClick={() => handleAction(() => onCollectionAction?.('copy', palette))}
-              >
-                <FolderInput className="w-3.5 h-3.5" />
-                Duplicate to collection…
-              </PopoverMenuItem>
-            </>
-          )}
-
-          {/* Delete */}
-          {isEditingCollection && onDelete && (
-            <>
-              <Separator className="my-1" />
-              <PopoverMenuItem
-                onClick={() => handleAction(() => setDeleteOpen(true))}
-                variant="destructive"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete palette
-              </PopoverMenuItem>
-            </>
-          )}
-        </PopoverContent>
-      </Popover>
-
-      {(dupOpen || shareOpen || deleteOpen) && (
-        <Suspense fallback={null}>
-          <LazyPaletteActionDialogs
-            palette={palette}
-            dupOpen={dupOpen}
-            shareOpen={shareOpen}
-            deleteOpen={deleteOpen}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-            onDupOpenChange={setDupOpen}
-            onShareOpenChange={setShareOpen}
-            onDeleteOpenChange={setDeleteOpen}
-          />
-        </Suspense>
-      )}
-    </>
-  );
-}
-
-// Mobile top bar wrapper used by EditPalettePage.
-
-export function MobileMoreMenu({
-  isDirty,
-  isEditingCollection,
-  onRevert: _onRevert,
-  onDuplicate,
-  onDelete,
-  onCollectionAction,
-  palette,
-}: {
-  isDirty?: boolean;
-  isEditingCollection?: boolean;
-  onRevert?: () => void;
-  onDuplicate?: (name: string) => { ok: boolean; message?: string };
-  onDelete?: () => void;
-  onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
-  palette: Palette;
-}) {
-  return (
-    <PaletteMoreMenu
-      isDirty={isDirty}
-      isEditingCollection={isEditingCollection}
-      onDuplicate={onDuplicate}
-      onDelete={onDelete}
-      onCollectionAction={onCollectionAction}
-      palette={palette}
-    />
   );
 }
 
@@ -299,20 +144,11 @@ export function PaletteWorkspace({
       {!hideToolbar && (
         <div className="px-3 sm:px-5 py-3 border-b border-border bg-card sticky top-0 z-10">
           <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex items-center gap-1 min-w-0">
-              <h2 className="text-[14px] sm:text-[15px] font-medium truncate min-w-0">{palette.name}</h2>
-              <PaletteMoreMenu
-                isDirty={isDirty}
-                isEditingCollection={isEditingCollection}
-                onDuplicate={onDuplicate}
-                onDelete={onDelete}
-                onCollectionAction={onCollectionAction}
-                palette={palette}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <AlgorithmToggle value={contrastAlgorithm} onChange={setContrastAlgorithm} />
+            <div className="flex items-center gap-2 min-w-0">
               <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <AlgorithmToggle value={contrastAlgorithm} onChange={setContrastAlgorithm} />
             </div>
           </div>
         </div>

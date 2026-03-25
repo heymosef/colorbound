@@ -4,7 +4,7 @@
  * LAYOUT UX — Do not override without explicit user instructions:
  *
  * Mobile:
- *   - Top bar: PaletteSwitcher (compact) | Theme switcher + ⋮ More + Edit button
+ *   - Top bar: Collection switcher + PaletteSwitcher | Theme switcher + Edit button
  *   - Tabs: Preview | A11y | Export
  *   - ViewModeToggle: Light | Dark | Both (Preview tab only)
  *   - Controls Drawer: bottom sheet with PaletteControls + save/undo when dirty
@@ -15,7 +15,7 @@
  *
  * Desktop:
  *   - Left sidebar: PaletteControls (with save/undo when dirty)
- *   - Center: PaletteWorkspace (toolbar: name + ⋮ more + view toggle)
+ *   - Center: PaletteWorkspace (toolbar: view/accessibility toggles)
  *   - Right sidebar: CollectionPanel (a11y + export tabs)
  */
 
@@ -32,7 +32,7 @@ import {
 } from './ui/drawer';
 import { Sliders, Eye, Contrast, Download } from 'lucide-react';
 import { PaletteControls } from './palette-controls';
-import { PaletteWorkspace, MobileMoreMenu } from './palette-workspace';
+import { PaletteWorkspace } from './palette-workspace';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { AlgorithmToggle } from './contrast-indicator';
 import { usePaletteContext } from '../lib/palette-context';
@@ -348,7 +348,7 @@ function MobileLayout({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* ─── Mobile Top Bar: PaletteSwitcher(compact lg) | ⋮ Edit ─── */}
+      {/* ─── Mobile Top Bar: Collection switcher | Palette menu | Edit ─── */}
       <div className="px-3 py-2.5 border-b border-border bg-card flex items-center justify-between gap-2 shrink-0">
         {/* Left: CollectionSwitcher (icon-only) + PaletteSwitcher */}
         <div className="min-w-0 flex-1 flex items-center gap-1 text-muted-foreground">
@@ -377,21 +377,17 @@ function MobileLayout({
             onSelectPalette={onSelectPalette}
             onNewPalette={onNewPalette}
             onNavigateToCollection={onNavigateToCollection}
-          />
-        </div>
-
-        {/* Right: contextual actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <ThemeSwitcher theme={theme} setTheme={setTheme} />
-          <MobileMoreMenu
-            isDirty={isDirty}
+            showPaletteActions
             isEditingCollection={hasPersistedBaseline}
-            onRevert={onRevert}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
             onCollectionAction={onCollectionAction}
-            palette={currentPalette}
           />
+        </div>
+
+        {/* Right: editor utilities */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <ThemeSwitcher theme={theme} setTheme={setTheme} />
           <Button
             variant="outline"
             size="sm"
@@ -736,7 +732,6 @@ export function EditPalettePage() {
     controlsNode,
     currentPalette,
     darkPalette,
-    activePaletteId,
     hasPersistedBaseline,
     isDirty,
     onRevert: handleRevertChanges,

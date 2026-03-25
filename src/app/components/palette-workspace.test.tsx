@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { MobileMoreMenu, PaletteWorkspace } from './palette-workspace';
+import { PaletteWorkspace } from './palette-workspace';
 
 let paletteContextValue: any;
 
@@ -47,16 +47,6 @@ vi.mock('./ui-preview', () => ({
   UIPreview: () => <div>UI preview</div>,
 }));
 
-vi.mock('./palette-action-dialogs', () => ({
-  PaletteActionDialogs: ({ dupOpen, shareOpen, deleteOpen }: { dupOpen: boolean; shareOpen: boolean; deleteOpen: boolean }) => (
-    <div>
-      {dupOpen && <div>Duplicate dialog</div>}
-      {shareOpen && <div>Share dialog</div>}
-      {deleteOpen && <div>Delete dialog</div>}
-    </div>
-  ),
-}));
-
 vi.mock('../lib/use-supports-p3', () => ({
   useSupportsP3: () => false,
   getTokenDisplayColor: () => '#00aac8',
@@ -65,6 +55,18 @@ vi.mock('../lib/use-supports-p3', () => ({
 vi.mock('./palette-view-mode-toggle', () => ({
   ViewModeToggle: () => <div>View mode toggle</div>,
 }));
+
+function renderWorkspace(overrides: Record<string, unknown> = {}) {
+  const palette = (overrides.palette as ReturnType<typeof makePalette> | undefined) ?? makePalette();
+
+  return render(
+    <PaletteWorkspace
+      palette={palette}
+      darkPalette={(overrides.darkPalette as ReturnType<typeof makePalette> | undefined) ?? palette}
+      {...overrides}
+    />,
+  );
+}
 
 describe('Palette workspace collection actions', () => {
   beforeEach(() => {
@@ -84,86 +86,12 @@ describe('Palette workspace collection actions', () => {
     };
   });
 
-  it('keeps move to collection enabled in the desktop workspace when only one collection exists', async () => {
-    const palette = makePalette();
-    const onCollectionAction = vi.fn();
+  it('keeps the workspace toolbar focused on view controls instead of palette identity', () => {
+    renderWorkspace();
 
-    render(
-      <PaletteWorkspace
-        palette={palette}
-        darkPalette={palette}
-        isEditingCollection
-        onCollectionAction={onCollectionAction}
-      />,
-    );
-
-    fireEvent.click(screen.getByLabelText('More actions'));
-
-    const moveButton = await screen.findByRole('button', { name: /move to collection/i });
-    expect(moveButton).toBeEnabled();
-
-    fireEvent.click(moveButton);
-
-    expect(onCollectionAction).toHaveBeenCalledWith('move', palette);
-  });
-
-  it('keeps duplicate to collection enabled in the mobile menu when only one collection exists', async () => {
-    const palette = makePalette();
-    const onCollectionAction = vi.fn();
-
-    render(
-      <MobileMoreMenu
-        isEditingCollection
-        onCollectionAction={onCollectionAction}
-        palette={palette}
-      />,
-    );
-
-    fireEvent.click(screen.getByLabelText('More actions'));
-
-    const duplicateButton = await screen.findByRole('button', { name: /duplicate to collection/i });
-    expect(duplicateButton).toBeEnabled();
-
-    fireEvent.click(duplicateButton);
-
-    expect(onCollectionAction).toHaveBeenCalledWith('copy', palette);
-  });
-
-  it('loads the duplicate dialog only after the action is selected', async () => {
-    const palette = makePalette();
-
-    render(
-      <PaletteWorkspace
-        palette={palette}
-        darkPalette={palette}
-        onDuplicate={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByText('Duplicate dialog')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText('More actions'));
-    fireEvent.click(await screen.findByRole('button', { name: /duplicate palette/i }));
-
-    expect(await screen.findByText('Duplicate dialog')).toBeInTheDocument();
-  });
-
-  it('loads the share dialog only after the action is selected', async () => {
-    const palette = makePalette();
-
-    render(
-      <PaletteWorkspace
-        palette={palette}
-        darkPalette={palette}
-      />,
-    );
-
-    expect(screen.queryByText('Share dialog')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText('More actions'));
-    fireEvent.click(await screen.findByRole('button', { name: /share palette/i }));
-
-    expect(await screen.findByText('Share dialog')).toBeInTheDocument();
+    expect(screen.getByText('Algorithm toggle')).toBeInTheDocument();
+    expect(screen.getByText('View mode toggle')).toBeInTheDocument();
+    expect(screen.queryByText('Ocean')).not.toBeInTheDocument();
   });
 
   it('shows simplified Token Values headers and helper text', () => {
@@ -179,12 +107,7 @@ describe('Palette workspace collection actions', () => {
       ],
     };
 
-    render(
-      <PaletteWorkspace
-        palette={palette}
-        darkPalette={palette}
-      />,
-    );
+    renderWorkspace({ palette });
 
     const valuesTab = screen.getByRole('tab', { name: 'Token Values' });
     fireEvent.click(valuesTab);
@@ -200,12 +123,7 @@ describe('Palette workspace collection actions', () => {
   it('adds top clearance to the swatch rail without changing the swatch layout', () => {
     const palette = makePalette();
 
-    const { container } = render(
-      <PaletteWorkspace
-        palette={palette}
-        darkPalette={palette}
-      />,
-    );
+    const { container } = renderWorkspace({ palette });
 
     const swatchRail = container.querySelector('div.overflow-x-auto.pt-2.pb-2');
     expect(swatchRail).toBeInTheDocument();

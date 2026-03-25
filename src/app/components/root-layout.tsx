@@ -19,8 +19,11 @@ import {
   buildCollectionDraftEditorPath,
   buildCollectionPath,
   buildCollectionSavedEditorPath,
+  getEditorNavigationMode,
   isEditorRoute,
 } from '../lib/editor-routes';
+import type { Palette } from '../lib/color-utils';
+import { MoveToCollectionDialog } from './move-to-collection-dialog';
 
 type AppTheme = 'light' | 'dark' | 'system';
 
@@ -261,8 +264,8 @@ export function CollectionSwitcher({
  * Edit page:                  Collections  /  {CollectionName} ▾  /  ● PaletteName ▾
  * Shared pages:               (no breadcrumb — those pages have their own back link)
  *
- * The palette segment uses PaletteSwitcher (compact) for quick switching.
- * NO action buttons (Save/Duplicate/Share/More) live in the header.
+ * The palette segment hosts the shared palette menu on desktop/tablet
+ * edit pages so the switcher and actions live in the top nav.
  */
 function HeaderBreadcrumb() {
   const location = useLocation();
@@ -274,10 +277,19 @@ function HeaderBreadcrumb() {
     currentPalette,
     activePaletteId,
     activeCollection,
+    activeCollectionId,
     isDirty,
+    handleDuplicatePalette,
+    handleRemove,
     handleCreateCollection,
     handleSelectCollection,
   } = usePaletteContext();
+  const [pendingCollectionAction, setPendingCollectionAction] = useState<{
+    mode: 'move' | 'copy';
+    sourceCollectionId: string;
+    paletteId: string;
+    paletteName: string;
+  } | null>(null);
 
   const pathname = location.pathname;
   const isEdit = isEditorRoute(pathname);
@@ -285,7 +297,6 @@ function HeaderBreadcrumb() {
   const isCollectionsList = pathname === '/';
   const collectionSlug = activeCollection?.slug ?? '';
   const collectionName = activeCollection?.name ?? 'Collection';
-  const basePath = collectionSlug ? buildCollectionPath(collectionSlug) : '';
 
   // Determine if we're on a collection detail page (not edit, not shared, not root)
   const isCollectionDetail = !isEdit && !isShared && !isCollectionsList;
@@ -295,7 +306,7 @@ function HeaderBreadcrumb() {
       if (!collectionSlug) return;
       navigate(buildCollectionSavedEditorPath(collectionSlug, id));
     },
-    [collectionSlug, navigate]
+    [collectionSlug, navigate],
   );
 
   const handleCreateNewPalette = useCallback(() => {
@@ -306,8 +317,35 @@ function HeaderBreadcrumb() {
   }, [activeCollection, navigate]);
 
   const handleNavigateToCollection = useCallback(() => {
-    navigate(basePath || '/');
-  }, [navigate, basePath]);
+    navigate(collectionSlug ? buildCollectionPath(collectionSlug) : '/');
+  }, [collectionSlug, navigate]);
+
+  const handleDuplicateAndNavigate = useCallback((name: string) => {
+    const result = handleDuplicatePalette(name);
+    if (result.ok && activeCollection) {
+      navigate(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), {
+        replace: getEditorNavigationMode('copy') === 'replace',
+      });
+    }
+    return result;
+  }, [activeCollection, handleDuplicatePalette, navigate]);
+
+  const handleDeletePalette = useCallback(() => {
+    if (!activePaletteId || !activeCollection) return;
+    handleRemove(activePaletteId);
+    navigate(buildCollectionPath(activeCollection.slug));
+  }, [activeCollection, activePaletteId, handleRemove, navigate]);
+
+  const handleCollectionAction = useCallback((mode: 'move' | 'copy', palette: Palette) => {
+    if (!activeCollectionId) return;
+
+    setPendingCollectionAction({
+      mode,
+      sourceCollectionId: activeCollectionId,
+      paletteId: activePaletteId ?? palette.id,
+      paletteName: palette.name,
+    });
+  }, [activeCollectionId, activePaletteId]);
 
   // Shared pages: no header breadcrumb
   if (isShared) return null;
@@ -372,10 +410,11 @@ function HeaderBreadcrumb() {
 
           <li className="block text-muted-foreground/30 select-none text-[13px]" role="presentation" aria-hidden="true">/</li>
 
-          {/* Palette name with colored dot — opens PaletteSwitcher popover */}
+          {/* Palette menu lives in the top nav on editor routes */}
           <BreadcrumbItem>
             <PaletteSwitcher
               variant="compact"
+              compactSize="sm"
               collection={collection}
               currentPalette={currentPalette}
               activePaletteId={activePaletteId}
@@ -384,10 +423,30 @@ function HeaderBreadcrumb() {
               onSelectPalette={handleSelectPalette}
               onNewPalette={handleCreateNewPalette}
               onNavigateToCollection={handleNavigateToCollection}
+              showPaletteActions
+              isEditingCollection={!!activePaletteId}
+              onDuplicate={handleDuplicateAndNavigate}
+              onDelete={handleDeletePalette}
+              onCollectionAction={handleCollectionAction}
             />
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
+      {pendingCollectionAction && (
+        <MoveToCollectionDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingCollectionAction(null);
+            }
+          }}
+          sourceCollectionId={pendingCollectionAction.sourceCollectionId}
+          paletteId={pendingCollectionAction.paletteId}
+          paletteName={pendingCollectionAction.paletteName}
+          mode={pendingCollectionAction.mode}
+          onCreateCollection={handleCreateCollection}
+        />
+      )}
     </>
   );
 }
@@ -420,7 +479,7 @@ export function RootLayout() {
 
   // On mobile, hide the global header when on the edit page —
   // MobileLayout in EditPalettePage provides its own top bar
-  // (PaletteSwitcher + More + Edit).
+  // (Collection switcher + Palette menu + Edit).
   const isEditPage = isEditorRoute(location.pathname);
   const isHomePage = location.pathname === '/';
   const hideHeader = breakpoint === 'mobile' && isEditPage;
