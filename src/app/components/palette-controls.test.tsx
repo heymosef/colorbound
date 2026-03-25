@@ -36,7 +36,9 @@ describe('PaletteControls', () => {
         config={{
           name: 'Ocean',
           hue: 210,
+          chroma50: 0.12,
           chroma: 0.12,
+          chroma950: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
         }}
@@ -47,6 +49,8 @@ describe('PaletteControls', () => {
 
     expect(screen.queryByText('Neutral Palette')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Toggle neutral palette mode')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chroma Curve')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Chroma curve preview from step 50 to step 950')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Chroma')).toBeInTheDocument();
   });
 
@@ -59,7 +63,9 @@ describe('PaletteControls', () => {
         config={{
           name: 'Ocean',
           hue: 210,
+          chroma50: 0.12,
           chroma: 0.12,
+          chroma950: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
         }}
@@ -96,7 +102,9 @@ describe('PaletteControls', () => {
         config={{
           name: 'Ocean',
           hue: 210,
+          chroma50: 0.12,
           chroma: 0.12,
+          chroma950: 0.12,
           lightness50: 0.985,
           lightness950: 0.025,
         }}

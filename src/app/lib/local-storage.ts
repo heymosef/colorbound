@@ -7,6 +7,7 @@
 // v5: duplicate palette names migrated into conflictedPalettes
 // v6: remembered last-viewed saved palette id for draft seeding
 // v7: density persisted per palette/config
+// v8: chroma50/chroma950 persisted per palette/config
 
 import { GENERATION_VERSION, generatePalette, generateId, type Palette } from './color-utils';
 import { findPaletteLocation } from './collection-operations';
@@ -26,7 +27,7 @@ import {
 } from './palette-name-validation';
 
 const STORAGE_KEY = 'color-token-generator';
-const CURRENT_VERSION = 7;
+const CURRENT_VERSION = 8;
 
 // ─── Stored types (lightweight, no derived tokens) ───
 
@@ -34,7 +35,9 @@ interface StoredPaletteEntry {
   id: string;
   name: string;
   hue: number;
+  chroma50: number;
   chroma: number;
+  chroma950: number;
   lightness50: number;
   lightness950: number;
   density: 5 | 7 | 9 | 11;
@@ -114,7 +117,61 @@ interface StoredStateV7 {
   hasCompletedFirstRun?: boolean;
 }
 
+interface StoredStateV8 {
+  version: 8;
+  collections: StoredCollection[];
+  activeCollectionId: string | null;
+  activePaletteId: string | null;
+  lastViewedSavedPaletteId: string | null;
+  config: PaletteConfig;
+  nameManuallyEdited: boolean;
+  contrastAlgorithm: ContrastAlgorithm;
+  isDirty: boolean;
+  hasCompletedFirstRun?: boolean;
+}
+
 // ─── Migration helpers ───
+
+function withStoredChromaEndpoints<T extends {
+  chroma?: unknown;
+  chroma50?: unknown;
+  chroma950?: unknown;
+}>(value: T) {
+  const fallback = typeof value.chroma === 'number' && Number.isFinite(value.chroma)
+    ? Math.min(0.4, Math.max(0, value.chroma))
+    : 0.18;
+
+  return {
+    chroma50: typeof value.chroma50 === 'number' && Number.isFinite(value.chroma50)
+      ? Math.min(0.4, Math.max(0, value.chroma50))
+      : fallback,
+    chroma950: typeof value.chroma950 === 'number' && Number.isFinite(value.chroma950)
+      ? Math.min(0.4, Math.max(0, value.chroma950))
+      : fallback,
+  };
+}
+
+function hasValidStoredEntryCoreFields(entry: unknown): entry is {
+  id: string;
+  name: string;
+  hue: number;
+  chroma: number;
+  lightness50: number;
+  lightness950: number;
+} {
+  if (!entry || typeof entry !== 'object') return false;
+  const obj = entry as Record<string, unknown>;
+
+  return (
+    typeof obj.id === 'string' &&
+    obj.id.length > 0 &&
+    typeof obj.name === 'string' &&
+    isValidNumber(obj.hue, 0, 360) &&
+    isValidNumber(obj.chroma, 0, 0.5) &&
+    isValidNumber(obj.lightness50, 0, 1) &&
+    isValidNumber(obj.lightness950, 0, 1)
+  );
+}
 
 function migrateEntryV2ToV3(entry: StoredPaletteEntryV2): StoredPaletteEntry {
   const { lightness50, lightness950 } = legacyRangeToLightness(entry.blackRange, entry.whiteRange);
@@ -122,7 +179,9 @@ function migrateEntryV2ToV3(entry: StoredPaletteEntryV2): StoredPaletteEntry {
     id: entry.id,
     name: entry.name,
     hue: entry.hue,
+    chroma50: entry.chroma,
     chroma: entry.chroma,
+    chroma950: entry.chroma,
     lightness50,
     lightness950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -138,7 +197,9 @@ function migrateConfigV2ToV3(config: Record<string, unknown>): PaletteConfig {
   return {
     name: (config.name as string) || 'Untitled',
     hue: (config.hue as number) ?? 240,
+    chroma50: (config.chroma as number) ?? 0.18,
     chroma: (config.chroma as number) ?? 0.18,
+    chroma950: (config.chroma as number) ?? 0.18,
     lightness50,
     lightness950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -148,11 +209,12 @@ function migrateConfigV2ToV3(config: Record<string, unknown>): PaletteConfig {
 }
 
 function migrateEntryV3ToV4(entry: Record<string, unknown>): StoredPaletteEntry | null {
-  if (!isValidStoredEntryBase(entry)) return null;
+  if (!hasValidStoredEntryCoreFields(entry)) return null;
   return {
     id: entry.id,
     name: entry.name,
     hue: entry.hue,
+    ...withStoredChromaEndpoints(entry),
     chroma: entry.chroma,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
@@ -180,7 +242,9 @@ function paletteToStored(p: Palette): StoredPaletteEntry {
     id: p.id,
     name: p.name,
     hue: p.hue,
+    chroma50: p.chroma50,
     chroma: p.chroma,
+    chroma950: p.chroma950,
     lightness50: p.lightness50,
     lightness950: p.lightness950,
     density: p.density,
@@ -192,7 +256,9 @@ function paletteToStored(p: Palette): StoredPaletteEntry {
 function storedToPalette(entry: StoredPaletteEntry): Palette {
   const tokens = generatePalette(
     entry.hue,
+    entry.chroma50,
     entry.chroma,
+    entry.chroma950,
     entry.lightness50,
     entry.lightness950,
     entry.targetColorSpace,
@@ -202,7 +268,9 @@ function storedToPalette(entry: StoredPaletteEntry): Palette {
     name: entry.name,
     tokens,
     hue: entry.hue,
+    chroma50: entry.chroma50,
     chroma: entry.chroma,
+    chroma950: entry.chroma950,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
     density: entry.density,
@@ -226,6 +294,7 @@ function collectionToStored(c: Collection): StoredCollection {
 function normalizeConfig(config: PaletteConfig): PaletteConfig {
   return {
     ...config,
+    ...withStoredChromaEndpoints(config),
     density: isPaletteDensity(config.density) ? config.density : DEFAULT_PALETTE_DENSITY,
     targetColorSpace: config.targetColorSpace === 'p3' ? 'p3' : 'srgb',
     generationVersion: config.generationVersion ?? GENERATION_VERSION,
@@ -292,7 +361,9 @@ function isValidConfig(c: unknown): c is PaletteConfig {
     typeof obj.name === 'string' &&
     obj.name.length > 0 &&
     isValidNumber(obj.hue, 0, 360) &&
+    isValidNumber(obj.chroma50, 0, 0.5) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
+    isValidNumber(obj.chroma950, 0, 0.5) &&
     isValidNumber(obj.lightness50, 0, 1) &&
     isValidNumber(obj.lightness950, 0, 1) &&
     isPaletteDensity(obj.density) &&
@@ -309,7 +380,9 @@ function isValidStoredEntryBase(e: unknown): e is Omit<StoredPaletteEntry, 'dens
     obj.id.length > 0 &&
     typeof obj.name === 'string' &&
     isValidNumber(obj.hue, 0, 360) &&
+    isValidNumber(obj.chroma50, 0, 0.5) &&
     isValidNumber(obj.chroma, 0, 0.5) &&
+    isValidNumber(obj.chroma950, 0, 0.5) &&
     isValidNumber(obj.lightness50, 0, 1) &&
     isValidNumber(obj.lightness950, 0, 1)
   );
@@ -399,7 +472,21 @@ function migrateV3toV4(v3: StoredStateV3): StoredStateV4 {
 }
 
 function migrateV4toV5(v4: StoredStateV4): StoredStateV5 {
-  const sanitizedCollections = v4.collections.map((collection) => sanitizeStoredCollection(collection).collection);
+  const sanitizedCollections = v4.collections.map((collection) => {
+    const normalizedCollection: StoredCollection = {
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => migrateEntryV6ToV7(palette as unknown as Record<string, unknown>))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: Array.isArray(collection.conflictedPalettes)
+        ? collection.conflictedPalettes
+            .map((palette) => migrateEntryV6ToV7(palette as unknown as Record<string, unknown>))
+            .filter((palette): palette is StoredPaletteEntry => palette !== null)
+        : [],
+    };
+
+    return sanitizeStoredCollection(normalizedCollection).collection;
+  });
 
   return {
     version: 5,
@@ -440,12 +527,13 @@ function migrateV5toV6(v5: StoredStateV5): StoredStateV6 {
 }
 
 function migrateEntryV6ToV7(entry: StoredPaletteEntry | Record<string, unknown>): StoredPaletteEntry | null {
-  if (!isValidStoredEntryBase(entry)) return null;
+  if (!hasValidStoredEntryCoreFields(entry)) return null;
 
   return {
     id: entry.id,
     name: entry.name,
     hue: entry.hue,
+    ...withStoredChromaEndpoints(entry),
     chroma: entry.chroma,
     lightness50: entry.lightness50,
     lightness950: entry.lightness950,
@@ -454,6 +542,29 @@ function migrateEntryV6ToV7(entry: StoredPaletteEntry | Record<string, unknown>)
       : DEFAULT_PALETTE_DENSITY,
     targetColorSpace: (entry as Record<string, unknown>).targetColorSpace === 'p3' ? 'p3' : 'srgb',
     generationVersion: GENERATION_VERSION,
+  };
+}
+
+function migrateV7toV8(v7: StoredStateV7): StoredStateV8 {
+  return {
+    version: 8,
+    collections: v7.collections.map((collection) => ({
+      ...collection,
+      palettes: collection.palettes
+        .map((palette) => migrateEntryV6ToV7(palette as unknown as Record<string, unknown>))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+      conflictedPalettes: (collection.conflictedPalettes ?? [])
+        .map((palette) => migrateEntryV6ToV7(palette as unknown as Record<string, unknown>))
+        .filter((palette): palette is StoredPaletteEntry => palette !== null),
+    })),
+    activeCollectionId: v7.activeCollectionId,
+    activePaletteId: v7.activePaletteId,
+    lastViewedSavedPaletteId: v7.lastViewedSavedPaletteId,
+    config: normalizeConfig(v7.config),
+    nameManuallyEdited: v7.nameManuallyEdited,
+    contrastAlgorithm: v7.contrastAlgorithm,
+    isDirty: v7.isDirty,
+    hasCompletedFirstRun: v7.hasCompletedFirstRun,
   };
 }
 
@@ -539,16 +650,21 @@ export function loadState(): HydratedState | null {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }
 
+    if (parsed.version === 7) {
+      parsed = migrateV7toV8(parsed as StoredStateV7);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     if (parsed.version !== CURRENT_VERSION) return null;
 
-    const v7 = parsed as StoredStateV7;
+    const v8 = parsed as StoredStateV8;
 
     // Validate config
-    if (!isValidConfig(v7.config)) return null;
+    if (!isValidConfig(v8.config)) return null;
 
     // Validate & rebuild collections
-    const validStoredCollections = Array.isArray(v7.collections)
-      ? v7.collections.filter(isValidStoredCollection)
+    const validStoredCollections = Array.isArray(v8.collections)
+      ? v8.collections.filter(isValidStoredCollection)
       : [];
 
     let didSanitizeCollections = false;
@@ -562,30 +678,30 @@ export function loadState(): HydratedState | null {
 
     // Validate activeCollectionId still exists
     const activeCollectionId =
-      typeof v7.activeCollectionId === 'string' &&
-      collections.some((c) => c.id === v7.activeCollectionId)
-        ? v7.activeCollectionId
+      typeof v8.activeCollectionId === 'string' &&
+      collections.some((c) => c.id === v8.activeCollectionId)
+        ? v8.activeCollectionId
         : collections.length > 0 ? collections[0].id : null;
 
     // Validate activePaletteId still exists within the active collection
     const activeCollection = collections.find((c) => c.id === activeCollectionId);
     const activePaletteId =
-      typeof v7.activePaletteId === 'string' &&
-      activeCollection?.palettes.some((p) => p.id === v7.activePaletteId)
-        ? v7.activePaletteId
+      typeof v8.activePaletteId === 'string' &&
+      activeCollection?.palettes.some((p) => p.id === v8.activePaletteId)
+        ? v8.activePaletteId
         : null;
 
     const lastViewedSavedPaletteId =
-      typeof v7.lastViewedSavedPaletteId === 'string' &&
-      findPaletteLocation(collections, v7.lastViewedSavedPaletteId)
-        ? v7.lastViewedSavedPaletteId
+      typeof v8.lastViewedSavedPaletteId === 'string' &&
+      findPaletteLocation(collections, v8.lastViewedSavedPaletteId)
+        ? v8.lastViewedSavedPaletteId
         : null;
 
     const shouldPersistNormalizedState =
       didSanitizeCollections ||
-      activeCollectionId !== v7.activeCollectionId ||
-      activePaletteId !== v7.activePaletteId ||
-      lastViewedSavedPaletteId !== v7.lastViewedSavedPaletteId;
+      activeCollectionId !== v8.activeCollectionId ||
+      activePaletteId !== v8.activePaletteId ||
+      lastViewedSavedPaletteId !== v8.lastViewedSavedPaletteId;
 
     if (shouldPersistNormalizedState) {
       localStorage.setItem(
@@ -596,11 +712,11 @@ export function loadState(): HydratedState | null {
           activeCollectionId,
           activePaletteId,
           lastViewedSavedPaletteId,
-          config: normalizeConfig(v7.config),
-          nameManuallyEdited: typeof v7.nameManuallyEdited === 'boolean' ? v7.nameManuallyEdited : false,
-          contrastAlgorithm: v7.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-          isDirty: typeof v7.isDirty === 'boolean' ? v7.isDirty : false,
-          hasCompletedFirstRun: typeof v7.hasCompletedFirstRun === 'boolean' ? v7.hasCompletedFirstRun : true,
+          config: normalizeConfig(v8.config),
+          nameManuallyEdited: typeof v8.nameManuallyEdited === 'boolean' ? v8.nameManuallyEdited : false,
+          contrastAlgorithm: v8.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+          isDirty: typeof v8.isDirty === 'boolean' ? v8.isDirty : false,
+          hasCompletedFirstRun: typeof v8.hasCompletedFirstRun === 'boolean' ? v8.hasCompletedFirstRun : true,
         }),
       );
     }
@@ -610,11 +726,11 @@ export function loadState(): HydratedState | null {
       activeCollectionId,
       activePaletteId,
       lastViewedSavedPaletteId,
-      config: normalizeConfig(v7.config),
-      nameManuallyEdited: typeof v7.nameManuallyEdited === 'boolean' ? v7.nameManuallyEdited : false,
-      contrastAlgorithm: v7.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
-      isDirty: typeof v7.isDirty === 'boolean' ? v7.isDirty : false,
-      hasCompletedFirstRun: typeof v7.hasCompletedFirstRun === 'boolean' ? v7.hasCompletedFirstRun : true,
+      config: normalizeConfig(v8.config),
+      nameManuallyEdited: typeof v8.nameManuallyEdited === 'boolean' ? v8.nameManuallyEdited : false,
+      contrastAlgorithm: v8.contrastAlgorithm === 'apca' ? 'apca' : 'wcag',
+      isDirty: typeof v8.isDirty === 'boolean' ? v8.isDirty : false,
+      hasCompletedFirstRun: typeof v8.hasCompletedFirstRun === 'boolean' ? v8.hasCompletedFirstRun : true,
     };
   } catch {
     return null;
@@ -637,7 +753,7 @@ export function saveState(state: {
       throw new Error('Duplicate active palette names cannot be persisted');
     }
 
-    const stored: StoredStateV7 = {
+    const stored: StoredStateV8 = {
       version: CURRENT_VERSION,
       collections: state.collections.map(collectionToStored),
       activeCollectionId: state.activeCollectionId,

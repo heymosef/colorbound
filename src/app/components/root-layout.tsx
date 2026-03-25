@@ -424,10 +424,18 @@ export function RootLayout() {
   const isEditPage = isEditorRoute(location.pathname);
   const isHomePage = location.pathname === '/';
   const hideHeader = breakpoint === 'mobile' && isEditPage;
+  const usesDocumentScrollLayout = isEditPage && breakpoint !== 'mobile';
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme }}>
-      <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      <div
+        data-layout-shell={usesDocumentScrollLayout ? 'document' : 'viewport'}
+        className={`flex flex-col bg-background text-foreground ${
+          usesDocumentScrollLayout
+            ? 'min-h-screen supports-[min-height:100dvh]:min-h-[100dvh]'
+            : 'h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden'
+        }`}
+      >
         {/* App Header — hidden on mobile edit page (MobileLayout has its own top bar) */}
         {!hideHeader && (
           <header className="h-12 border-b border-border bg-card flex items-center justify-between px-3 sm:px-5 shrink-0">
@@ -459,7 +467,7 @@ export function RootLayout() {
         )}
 
         {/* Page content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className={`flex-1 flex ${usesDocumentScrollLayout ? 'min-h-0' : 'overflow-hidden'}`}>
           <PaletteContentWrapper />
         </div>
       </div>

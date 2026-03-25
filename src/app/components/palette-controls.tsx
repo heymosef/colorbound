@@ -21,7 +21,18 @@ import { Info, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { track } from "../lib/analytics";
 import type { OklchColor, GamutFlag } from "../lib/color-utils";
-import { oklchToRgb, rgbToHex, hexToOklch, classifyGamut, maxSrgbChromaForHue, maxP3ChromaForHue, gamutMapToSrgb, formatOklch } from "../lib/color-utils";
+import {
+  oklchToRgb,
+  rgbToHex,
+  hexToOklch,
+  classifyGamut,
+  maxSrgbChromaAtLightness,
+  maxSrgbChromaForHue,
+  maxP3ChromaAtLightness,
+  maxP3ChromaForHue,
+  gamutMapToSrgb,
+  formatOklch,
+} from "../lib/color-utils";
 import { suggestPaletteName } from "../lib/color-utils";
 import type { PaletteConfig } from "../lib/palette-context";
 import { DEFAULT_PALETTE_DENSITY, PALETTE_DENSITY_OPTIONS } from "../lib/palette-density";
@@ -160,6 +171,8 @@ export function PaletteControls({
   const [hexError, setHexError] = useState(false);
   const targetColorSpace = config.targetColorSpace ?? 'srgb';
   const currentDensity = config.density ?? DEFAULT_PALETTE_DENSITY;
+  const chroma50 = config.chroma50 ?? config.chroma;
+  const chroma950 = config.chroma950 ?? config.chroma;
   const hasPaletteNameError = !!paletteNameError;
 
   // Compute gamut status for the identity swatch (500 step equivalent)
@@ -177,13 +190,37 @@ export function PaletteControls({
       : maxSrgbChromaForHue(config.hue, config.lightness50, config.lightness950, 0),
     [config.hue, config.lightness50, config.lightness950, targetColorSpace],
   );
+  const chroma50Cap = useMemo(
+    () => targetColorSpace === 'p3'
+      ? maxP3ChromaAtLightness(config.hue, config.lightness50)
+      : maxSrgbChromaAtLightness(config.hue, config.lightness50),
+    [config.hue, config.lightness50, targetColorSpace],
+  );
+  const chroma950Cap = useMemo(
+    () => targetColorSpace === 'p3'
+      ? maxP3ChromaAtLightness(config.hue, config.lightness950)
+      : maxSrgbChromaAtLightness(config.hue, config.lightness950),
+    [config.hue, config.lightness950, targetColorSpace],
+  );
 
-  // Auto-clamp chroma when the cap shrinks below current value
+  // Auto-clamp chroma anchors when the cap shrinks below current value
   useEffect(() => {
+    const nextPartial: Partial<PaletteConfig> = {};
+
     if (config.chroma > chromaCap) {
-      onConfigChange({ chroma: chromaCap });
+      nextPartial.chroma = chromaCap;
     }
-  }, [chromaCap]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (chroma50 > chroma50Cap) {
+      nextPartial.chroma50 = chroma50Cap;
+    }
+    if (chroma950 > chroma950Cap) {
+      nextPartial.chroma950 = chroma950Cap;
+    }
+
+    if (Object.keys(nextPartial).length > 0) {
+      onConfigChange(nextPartial);
+    }
+  }, [chroma50, chroma50Cap, chroma950, chroma950Cap, chromaCap, config.chroma, onConfigChange]);
 
   const isValidHex = (v: string): boolean => {
     const stripped = v.replace('#', '');
@@ -203,7 +240,7 @@ export function PaletteControls({
     if (onApplyHex) {
       onApplyHex(hue, chroma);
     } else {
-      onConfigChange({ hue, chroma });
+      onConfigChange({ hue, chroma50: chroma, chroma, chroma950: chroma });
     }
     const name = hasPersistedBaseline
       ? config.name
@@ -227,7 +264,7 @@ export function PaletteControls({
   };
 
   return (
-    <Card className="h-full border-0 border-r border-border rounded-none shadow-none bg-card">
+    <Card className="h-full border-0 rounded-none shadow-none bg-card">
       <CardContent className="px-4 pt-4 pb-4 space-y-5">
         {/* Panel title */}
         <div className="flex items-center justify-between">
@@ -305,11 +342,11 @@ export function PaletteControls({
         {/* Color space / gamut target */}
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
-            <Label className="text-[13px]">Palette Target</Label>
+            <Label className="text-[13px]">Gamut</Label>
             <Tooltip>
               <TooltipTrigger
                 className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                aria-label="Info about Color Space"
+                aria-label="Info about Gamut"
               >
                 <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
@@ -392,6 +429,14 @@ export function PaletteControls({
           />
         </div>
 
+        <Separator />
+
+        <div className="space-y-1">
+          <p className="text-[12px] text-muted-foreground">
+            Chroma Distribution
+          </p>
+        </div>
+
         {/* ── Chroma Slider ── DO NOT REMOVE without explicit user request ── */}
         <SliderField
           id="chroma"
@@ -403,6 +448,30 @@ export function PaletteControls({
           onChange={(v) => onConfigChange({ chroma: v })}
           tooltip={`Controls color intensity at the anchor step (500). Max ${targetColorSpace.toUpperCase()}-safe: ${chromaCap.toFixed(3)}`}
           displayValue={config.chroma.toFixed(3)}
+        />
+
+        <SliderField
+          id="chroma-50"
+          label="Step 50"
+          value={chroma50}
+          min={0}
+          max={chroma50Cap}
+          step={0.005}
+          onChange={(v) => onConfigChange({ chroma50: v })}
+          tooltip={`Controls the lightest token's intensity. Max ${targetColorSpace.toUpperCase()}-safe at step 50: ${chroma50Cap.toFixed(3)}`}
+          displayValue={chroma50.toFixed(3)}
+        />
+
+        <SliderField
+          id="chroma-950"
+          label="Step 950"
+          value={chroma950}
+          min={0}
+          max={chroma950Cap}
+          step={0.005}
+          onChange={(v) => onConfigChange({ chroma950: v })}
+          tooltip={`Controls the darkest token's intensity. Max ${targetColorSpace.toUpperCase()}-safe at step 950: ${chroma950Cap.toFixed(3)}`}
+          displayValue={chroma950.toFixed(3)}
         />
 
         <Separator />
@@ -482,8 +551,6 @@ export function PaletteControls({
           </div>
         </div>
 
-        <Separator />
-
         {/* Palette Name */}
         <div className="space-y-2">
           <Label htmlFor="palette-name" className="text-[13px]">
@@ -508,7 +575,6 @@ export function PaletteControls({
         {onClose ? (
           /* Mobile: always show Save + Cancel, no icons */
           <>
-            <Separator />
             <div className="flex flex-col gap-1.5">
               <Button
                 size="sm"
@@ -542,7 +608,6 @@ export function PaletteControls({
         ) : (onSave || onAddToCollection) ? (
           /* Tablet/Desktop: always show save/undo actions */
           <>
-            <Separator />
             <div className="flex flex-col gap-1.5">
               <Button
                 size="sm"

@@ -17,7 +17,9 @@ import type { SharedPaletteEntry } from './share-api';
 const DEFAULTS: Readonly<PaletteConfig> = {
   name: 'Untitled',
   hue: 240,
+  chroma50: 0.18,
   chroma: 0.18,
+  chroma950: 0.18,
   lightness50: 0.985,
   lightness950: 0.025,
   density: DEFAULT_PALETTE_DENSITY,
@@ -52,7 +54,9 @@ export function serializePaletteConfig(config: PaletteConfig): SharedPaletteEntr
   return {
     name: safeString(config.name, 100, DEFAULTS.name),
     hue: clamp(config.hue, 0, 360, DEFAULTS.hue),
+    chroma50: clamp(config.chroma50, 0, 0.4, config.chroma),
     chroma: clamp(config.chroma, 0, 0.4, DEFAULTS.chroma),
+    chroma950: clamp(config.chroma950, 0, 0.4, config.chroma),
     lightness50: clamp(config.lightness50, 0, 1, DEFAULTS.lightness50),
     lightness950: clamp(config.lightness950, 0, 1, DEFAULTS.lightness950),
     density: isPaletteDensity(config.density) ? config.density : DEFAULTS.density,
@@ -85,7 +89,7 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
   const obj = payload as Record<string, unknown>;
 
   // Require at least one recognizable field to proceed
-  const hasAnyField = ['hue', 'chroma', 'name', 'lightness50', 'lightness950', 'blackRange', 'whiteRange'].some(
+  const hasAnyField = ['hue', 'chroma50', 'chroma', 'chroma950', 'name', 'lightness50', 'lightness950', 'blackRange', 'whiteRange'].some(
     (k) => k in obj,
   );
   if (!hasAnyField) return null;
@@ -107,6 +111,8 @@ export function deserializePaletteConfig(payload: unknown): PaletteConfig | null
     name: safeString(obj.name, 100, DEFAULTS.name),
     hue: clamp(obj.hue, 0, 360, DEFAULTS.hue),
     chroma: clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma),
+    chroma50: clamp(obj.chroma50, 0, 0.4, clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma)),
+    chroma950: clamp(obj.chroma950, 0, 0.4, clamp(obj.chroma, 0, 0.4, DEFAULTS.chroma)),
     lightness50: l50,
     lightness950: l950,
     density: isPaletteDensity(obj.density) ? obj.density : DEFAULTS.density,
@@ -152,9 +158,13 @@ export function configToPalette(
   id: string,
 ): Palette {
   const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
+  const chroma50 = config.chroma50 ?? config.chroma;
+  const chroma950 = config.chroma950 ?? config.chroma;
   const tokens = generatePalette(
     config.hue,
+    chroma50,
     config.chroma,
+    chroma950,
     config.lightness50,
     config.lightness950,
     config.targetColorSpace,
@@ -164,7 +174,9 @@ export function configToPalette(
     name: config.name,
     tokens,
     hue: config.hue,
+    chroma50,
     chroma: config.chroma,
+    chroma950,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
@@ -179,9 +191,13 @@ export function configToDarkPalette(
   id: string,
 ): Palette {
   const density = isPaletteDensity(config.density) ? config.density : DEFAULTS.density;
+  const chroma50 = config.chroma50 ?? config.chroma;
+  const chroma950 = config.chroma950 ?? config.chroma;
   const tokens = generateDarkPalette(
     config.hue,
+    chroma50,
     config.chroma,
+    chroma950,
     config.lightness50,
     config.lightness950,
     config.targetColorSpace,
@@ -191,7 +207,9 @@ export function configToDarkPalette(
     name: config.name,
     tokens,
     hue: config.hue,
+    chroma50,
     chroma: config.chroma,
+    chroma950,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,

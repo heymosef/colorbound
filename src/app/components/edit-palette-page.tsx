@@ -111,7 +111,7 @@ function CollectionPanelFallback({ inlineMode = false }: { inlineMode?: boolean 
 
   return (
     <div
-      className="h-full border-l border-border bg-card px-4 pt-4"
+      className="border-l border-border bg-card px-4 pt-4 pb-4"
       role="status"
       aria-label="Loading panel"
     >
@@ -153,39 +153,38 @@ function DesktopLayout({
   collection: any[];
 }) {
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex flex-1 min-w-0">
       <aside
-        className="w-[280px] shrink-0 overflow-y-auto"
+        className="w-[280px] shrink-0 border-r border-border bg-card"
         role="complementary"
         aria-label="Palette controls"
       >
         {controlsNode()}
       </aside>
 
-      <main className="flex-1 overflow-hidden flex flex-col" role="main" aria-label="Palette workspace">
-        <div className="flex-1 overflow-hidden">
-          <PaletteWorkspace
-            palette={currentPalette}
-            darkPalette={darkPalette}
-            isEditingCollection={hasPersistedBaseline}
-            isDirty={isDirty}
-            onRevert={onRevert}
-            onSave={onSave}
-            onAddToCollection={onAddToCollection}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-            onCollectionAction={onCollectionAction}
-          />
-        </div>
+      <main className="flex-1 min-w-0" role="main" aria-label="Palette workspace">
+        <PaletteWorkspace
+          palette={currentPalette}
+          darkPalette={darkPalette}
+          isEditingCollection={hasPersistedBaseline}
+          isDirty={isDirty}
+          onRevert={onRevert}
+          onSave={onSave}
+          onAddToCollection={onAddToCollection}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onCollectionAction={onCollectionAction}
+          fillHeight={false}
+        />
       </main>
 
       <aside
-        className="w-[320px] shrink-0 overflow-hidden"
+        className="w-[320px] shrink-0 border-l border-border bg-card"
         role="complementary"
         aria-label="Accessibility and export"
       >
         <Suspense fallback={<CollectionPanelFallback />}>
-          <LazyCollectionPanel collection={collection} currentPalette={currentPalette} />
+          <LazyCollectionPanel collection={collection} currentPalette={currentPalette} fillHeight={false} />
         </Suspense>
       </aside>
     </div>
@@ -221,17 +220,17 @@ function TabletLayout({
   collection: any[];
 }) {
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex flex-1 min-w-0">
       <aside
-        className="w-[260px] shrink-0 overflow-y-auto"
+        className="w-[260px] shrink-0 border-r border-border bg-card"
         role="complementary"
         aria-label="Palette controls"
       >
         {controlsNode()}
       </aside>
 
-      <main className="flex-1 overflow-hidden flex flex-col" role="main" aria-label="Palette workspace">
-        <Tabs defaultValue="preview" className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 min-w-0" role="main" aria-label="Palette workspace">
+        <Tabs defaultValue="preview" className="flex flex-col">
           <div className="px-4 pt-2 shrink-0">
             <TabsList className="h-8 w-full">
               <TabsTrigger value="preview" className="text-[11px] flex-1 h-6">
@@ -248,7 +247,7 @@ function TabletLayout({
               </TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="preview" className="flex-1 overflow-hidden mt-0">
+          <TabsContent value="preview" className="mt-0">
             <PaletteWorkspace
               palette={currentPalette}
               darkPalette={darkPalette}
@@ -260,9 +259,10 @@ function TabletLayout({
               onDuplicate={onDuplicate}
               onDelete={onDelete}
               onCollectionAction={onCollectionAction}
+              fillHeight={false}
             />
           </TabsContent>
-          <TabsContent value="accessibility" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
+          <TabsContent value="accessibility" className="mt-0 px-3 pt-3 pb-6">
             <Suspense fallback={<CollectionPanelFallback inlineMode />}>
               <LazyCollectionPanel
                 collection={collection}
@@ -272,7 +272,7 @@ function TabletLayout({
               />
             </Suspense>
           </TabsContent>
-          <TabsContent value="export" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
+          <TabsContent value="export" className="mt-0 px-3 pt-3 pb-6">
             <Suspense fallback={<CollectionPanelFallback inlineMode />}>
               <LazyCollectionPanel
                 collection={collection}

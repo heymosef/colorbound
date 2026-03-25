@@ -740,7 +740,7 @@ export function UIPreview({ palette }: UIPreviewProps) {
 
         {/* Container-query masonry grid: responds to panel width, not viewport */}
         <div className="@container">
-          <div className="columns-1 @[480px]:columns-2 @[800px]:columns-3 gap-4">
+          <div className="columns-1 @[560px]:columns-2 @[1120px]:columns-3 gap-4">
             <div className="break-inside-avoid mb-4"><SubscriptionsCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><CalendarCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><CookieSettingsCard palette={palette} /></div>

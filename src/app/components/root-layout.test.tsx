@@ -106,6 +106,7 @@ describe('RootLayout route classification', () => {
       screen.getByLabelText('Switch palette. Currently editing: Cyan'),
     ).toBeInTheDocument();
     expect(document.querySelector('[data-slot="collection-icon"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-layout-shell="document"]')).toBeInTheDocument();
   });
 
   it('shows the palette switcher in the header for collection saved editor routes', () => {
@@ -122,6 +123,7 @@ describe('RootLayout route classification', () => {
     expect(
       screen.queryByLabelText('Switch palette. Currently editing: Cyan'),
     ).not.toBeInTheDocument();
+    expect(document.querySelector('[data-layout-shell="viewport"]')).toBeInTheDocument();
   });
 
   it('uses a 192px max-height collection switcher viewport', () => {

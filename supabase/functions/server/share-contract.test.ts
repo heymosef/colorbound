@@ -9,7 +9,7 @@ import {
 } from './share-contract';
 
 describe('share-contract', () => {
-  it('accepts the canonical five-field payload without group or isNeutral', () => {
+  it('accepts the canonical payload without group or isNeutral', () => {
     expect(normalizePaletteEntry({
       name: 'Ocean',
       hue: 210,
@@ -19,9 +19,14 @@ describe('share-contract', () => {
     })).toEqual({
       name: 'Ocean',
       hue: 210,
+      chroma50: 0.12,
       chroma: 0.12,
+      chroma950: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: 11,
+      targetColorSpace: 'srgb',
+      generationVersion: 2,
     });
   });
 
@@ -58,22 +63,30 @@ describe('share-contract', () => {
     const sanitized = sanitizePaletteEntry({
       name: 'A'.repeat(120),
       hue: 210,
+      chroma50: 0.12,
       chroma: 0.12,
+      chroma950: 0.12,
       lightness50: 0.985,
       lightness950: 0.025,
+      density: 11,
+      targetColorSpace: 'srgb',
+      generationVersion: 2,
     });
 
     expect(sanitized.name).toHaveLength(100);
   });
 
   it('exports the current schema contract metadata', () => {
-    expect(SHARE_SCHEMA_VERSION).toBe(3);
+    expect(SHARE_SCHEMA_VERSION).toBe(5);
     expect(CANONICAL_SHARE_FIELDS).toEqual([
       'name',
       'hue',
+      'chroma50',
       'chroma',
+      'chroma950',
       'lightness50',
       'lightness950',
+      'density',
       'targetColorSpace',
       'generationVersion',
     ]);

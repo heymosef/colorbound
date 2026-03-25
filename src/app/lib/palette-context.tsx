@@ -63,7 +63,9 @@ function createDefaultConfig(hue?: number): PaletteConfig {
   return {
     name: suggestPaletteName(h, DEFAULT_CHROMA),
     hue: h,
+    chroma50: DEFAULT_CHROMA,
     chroma: DEFAULT_CHROMA,
+    chroma950: DEFAULT_CHROMA,
     lightness50: DEFAULT_LIGHTNESS_50,
     lightness950: DEFAULT_LIGHTNESS_950,
     density: DEFAULT_PALETTE_DENSITY,
@@ -76,6 +78,8 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
   const h = hue ?? Math.floor(Math.random() * 360);
   const targetColorSpace = seedPalette?.targetColorSpace ?? DEFAULT_TARGET_COLOR_SPACE;
   const chroma = seedPalette?.chroma ?? DEFAULT_CHROMA;
+  const chroma50 = seedPalette?.chroma50 ?? chroma;
+  const chroma950 = seedPalette?.chroma950 ?? chroma;
   const lightness50 = seedPalette?.lightness50 ?? DEFAULT_LIGHTNESS_50;
   const lightness950 = seedPalette?.lightness950 ?? DEFAULT_LIGHTNESS_950;
   const density = seedPalette?.density ?? DEFAULT_PALETTE_DENSITY;
@@ -83,7 +87,9 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
   return {
     name: suggestPaletteName(h, chroma, lightness50, lightness950),
     hue: h,
+    chroma50,
     chroma,
+    chroma950,
     lightness50,
     lightness950,
     density,
@@ -94,9 +100,13 @@ function buildDraftSeedConfig(seedPalette?: Palette | null, hue?: number): Palet
 
 function buildPalette(config: PaletteConfig, id?: string): Palette {
   const density = config.density ?? DEFAULT_PALETTE_DENSITY;
+  const chroma50 = config.chroma50 ?? config.chroma;
+  const chroma950 = config.chroma950 ?? config.chroma;
   const tokens = generatePalette(
     config.hue,
+    chroma50,
     config.chroma,
+    chroma950,
     config.lightness50,
     config.lightness950,
     config.targetColorSpace,
@@ -106,7 +116,9 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
     name: config.name,
     tokens,
     hue: config.hue,
+    chroma50,
     chroma: config.chroma,
+    chroma950,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
@@ -117,9 +129,13 @@ function buildPalette(config: PaletteConfig, id?: string): Palette {
 
 function buildDarkPalette(config: PaletteConfig): Palette {
   const density = config.density ?? DEFAULT_PALETTE_DENSITY;
+  const chroma50 = config.chroma50 ?? config.chroma;
+  const chroma950 = config.chroma950 ?? config.chroma;
   const tokens = generateDarkPalette(
     config.hue,
+    chroma50,
     config.chroma,
+    chroma950,
     config.lightness50,
     config.lightness950,
     config.targetColorSpace,
@@ -129,7 +145,9 @@ function buildDarkPalette(config: PaletteConfig): Palette {
     name: config.name,
     tokens,
     hue: config.hue,
+    chroma50,
     chroma: config.chroma,
+    chroma950,
     lightness50: config.lightness50,
     lightness950: config.lightness950,
     density,
@@ -250,7 +268,9 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setConfig({
       name: palette.name,
       hue: palette.hue,
+      chroma50: palette.chroma50 ?? palette.chroma,
       chroma: palette.chroma,
+      chroma950: palette.chroma950 ?? palette.chroma,
       lightness50: palette.lightness50,
       lightness950: palette.lightness950,
       density: palette.density ?? DEFAULT_PALETTE_DENSITY,
@@ -756,7 +776,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
   const handleApplyHex = useCallback((hue: number, chroma: number) => {
     setConfig((prev) => {
-      const next = { ...prev, hue, chroma };
+      const next = { ...prev, hue, chroma50: chroma, chroma, chroma950: chroma };
       if (!hasPersistedBaseline) {
         next.name = suggestPaletteName(next.hue, next.chroma, next.lightness50, next.lightness950);
       }
