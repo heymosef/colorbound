@@ -17,6 +17,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
 import { Info, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { track } from "../lib/analytics";
@@ -36,6 +41,7 @@ import {
 import { suggestPaletteName } from "../lib/color-utils";
 import type { PaletteConfig } from "../lib/palette-context";
 import { DEFAULT_PALETTE_DENSITY, PALETTE_DENSITY_OPTIONS } from "../lib/palette-density";
+import { useBreakpoint } from "../lib/use-breakpoint";
 
 interface PaletteControlsProps {
   config: PaletteConfig;
@@ -74,6 +80,57 @@ function HuePreview({
   );
 }
 
+function InfoHint({
+  label,
+  children,
+  contentClassName = "max-w-[200px]",
+}: {
+  label: string;
+  children: React.ReactNode;
+  contentClassName?: string;
+}) {
+  const breakpoint = useBreakpoint();
+  const isDesktop = breakpoint === 'desktop';
+  const trigger = (
+    <button
+      type="button"
+      className="inline-flex items-center justify-center rounded-sm text-muted-foreground transition-colors cursor-pointer hover:text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+      aria-label={`Info about ${label}`}
+    >
+      <Info className="w-3.5 h-3.5" />
+    </button>
+  );
+
+  if (isDesktop) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {trigger}
+        </TooltipTrigger>
+        <TooltipContent side="right" className={contentClassName}>
+          <p className="text-[12px]">{children}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        {trigger}
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={6}
+        className={`w-auto px-3 py-2.5 ${contentClassName}`}
+      >
+        <p className="text-[12px]">{children}</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function SliderField({
   id,
   label,
@@ -103,20 +160,9 @@ function SliderField({
             {label}
           </Label>
           {tooltip && (
-            <Tooltip>
-              <TooltipTrigger
-                className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                aria-label={`Info about ${label}`}
-              >
-                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                className="max-w-[200px]"
-              >
-                <p className="text-[12px]">{tooltip}</p>
-              </TooltipContent>
-            </Tooltip>
+            <InfoHint label={label}>
+              {tooltip}
+            </InfoHint>
           )}
         </div>
         <span className="text-[12px] text-muted-foreground tabular-nums font-mono">
@@ -280,20 +326,9 @@ export function PaletteControls({
             <Label htmlFor="from-hex" className="text-[13px]">
               Hex value
             </Label>
-            <Tooltip>
-              <TooltipTrigger
-                className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                aria-label="Info about Hex value"
-              >
-                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                className="max-w-[200px]"
-              >
-                <p className="text-[12px]">Paste a hex color to extract its hue and chroma</p>
-              </TooltipContent>
-            </Tooltip>
+            <InfoHint label="Hex value">
+              Paste a hex color to extract its hue and chroma
+            </InfoHint>
           </div>
           <div className="flex gap-2">
             <div className={`relative flex-1 min-w-0 flex items-center rounded-lg border border-input shadow-xs has-[input:focus-visible]:ring-ring/50 has-[input:focus-visible]:ring-[3px] has-[input:focus-visible]:border-ring ${hexError ? 'border-destructive dark:border-destructive-foreground has-[input:focus-visible]:ring-destructive/30' : ''}`}>
@@ -343,19 +378,9 @@ export function PaletteControls({
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
             <Label className="text-[13px]">Gamut</Label>
-            <Tooltip>
-              <TooltipTrigger
-                className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                aria-label="Info about Gamut"
-              >
-                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[220px]">
-                <p className="text-[12px]">
-                  Chooses the palette's canonical target gamut. Preview, values, copy, and OKLCH export all follow this target.
-                </p>
-              </TooltipContent>
-            </Tooltip>
+            <InfoHint label="Gamut" contentClassName="max-w-[220px]">
+              Chooses the palette&apos;s canonical target gamut. Preview, values, copy, and OKLCH export all follow this target.
+            </InfoHint>
           </div>
           <div className="flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5" role="radiogroup" aria-label="Gamut target">
             <button
@@ -394,20 +419,9 @@ export function PaletteControls({
               <Label htmlFor="hue" className="text-[13px]">
                 Hue
               </Label>
-              <Tooltip>
-                <TooltipTrigger
-                  className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  aria-label="Info about Hue"
-                >
-                  <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent
-                  side="right"
-                  className="max-w-[200px]"
-                >
-                  <p className="text-[12px]">The base hue angle on the color wheel</p>
-                </TooltipContent>
-              </Tooltip>
+              <InfoHint label="Hue">
+                The base hue angle on the color wheel
+              </InfoHint>
             </div>
             <span className="text-[12px] text-muted-foreground tabular-nums font-mono">
               {config.hue}°
@@ -518,19 +532,9 @@ export function PaletteControls({
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
             <Label className="text-[13px]">Density</Label>
-            <Tooltip>
-              <TooltipTrigger
-                className="inline-flex rounded-sm outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                aria-label="Info about Density"
-              >
-                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[220px]">
-                <p className="text-[12px]">
-                  Controls how many canonical steps are shown. The palette still generates on the full 50-950 scale.
-                </p>
-              </TooltipContent>
-            </Tooltip>
+            <InfoHint label="Density" contentClassName="max-w-[220px]">
+              Controls how many canonical steps are shown. The palette still generates on the full 50-950 scale.
+            </InfoHint>
           </div>
           <div className="flex items-center rounded-md border border-border bg-muted p-0.5 gap-0.5" role="radiogroup" aria-label="Density">
             {PALETTE_DENSITY_OPTIONS.map((density) => (

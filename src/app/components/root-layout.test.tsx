@@ -56,6 +56,7 @@ function makePaletteContextValue(collectionCount = 1) {
       lightness950: 0.025,
     },
     currentPalette: palette,
+    activeCollectionId: activeCollection?.id ?? null,
     activePaletteId: 'palette-1',
     activeCollection,
     isDirty: false,
@@ -63,6 +64,8 @@ function makePaletteContextValue(collectionCount = 1) {
     handleUpdateInCollection: vi.fn(),
     handleAddToCollection: vi.fn(),
     startDraftPalette: vi.fn(),
+    handleDuplicatePalette: vi.fn(() => ({ ok: true, paletteId: 'palette-2', collectionId: 'collection-1', name: 'Cyan Copy' })),
+    handleRemove: vi.fn(),
     handleCreateCollection: vi.fn(() => ({ id: 'collection-2', slug: 'new-collection' })),
     handleSelectCollection: vi.fn(),
   };
@@ -99,29 +102,29 @@ describe('RootLayout route classification', () => {
     paletteContextValue = makePaletteContextValue();
   });
 
-  it('shows the palette switcher in the header for collection draft editor routes', () => {
+  it('shows the palette menu in the header for collection draft editor routes', () => {
     renderAt('/my-collection/edit');
 
     expect(
-      screen.getByLabelText('Switch palette. Currently editing: Cyan'),
+      screen.getByLabelText('Palette menu. Currently editing: Cyan'),
     ).toBeInTheDocument();
     expect(document.querySelector('[data-slot="collection-icon"]')).toBeInTheDocument();
     expect(document.querySelector('[data-layout-shell="document"]')).toBeInTheDocument();
   });
 
-  it('shows the palette switcher in the header for collection saved editor routes', () => {
+  it('shows the palette menu in the header for collection saved editor routes', () => {
     renderAt('/my-collection/edit/palette-1');
 
     expect(
-      screen.getByLabelText('Switch palette. Currently editing: Cyan'),
+      screen.getByLabelText('Palette menu. Currently editing: Cyan'),
     ).toBeInTheDocument();
   });
 
-  it('does not show the palette switcher in the header for collection detail routes', () => {
+  it('does not show the palette menu in the header for collection detail routes', () => {
     renderAt('/my-collection');
 
     expect(
-      screen.queryByLabelText('Switch palette. Currently editing: Cyan'),
+      screen.queryByLabelText('Palette menu. Currently editing: Cyan'),
     ).not.toBeInTheDocument();
     expect(document.querySelector('[data-layout-shell="viewport"]')).toBeInTheDocument();
   });

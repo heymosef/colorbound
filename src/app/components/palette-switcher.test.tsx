@@ -5,6 +5,16 @@ import { PaletteSwitcher } from './palette-switcher';
 import type { Palette, ColorToken } from '../lib/color-utils';
 import { SCALE_STEPS } from '../lib/color-utils';
 
+vi.mock('./palette-action-dialogs', () => ({
+  PaletteActionDialogs: ({ dupOpen, shareOpen, deleteOpen }: { dupOpen: boolean; shareOpen: boolean; deleteOpen: boolean }) => (
+    <div>
+      {dupOpen && <div>Duplicate dialog</div>}
+      {shareOpen && <div>Share dialog</div>}
+      {deleteOpen && <div>Delete dialog</div>}
+    </div>
+  ),
+}));
+
 // ─── Helper: build a minimal Palette for testing ───
 
 function makeToken(step: number, hex = '#aabbcc'): ColorToken {
@@ -323,5 +333,90 @@ describe('PaletteSwitcher', () => {
     fireEvent.click(screen.getByLabelText(/Switch palette/));
     const densityLabel = screen.getByText('Density 11');
     expect(densityLabel.className).toContain('tabular-nums');
+  });
+
+  it('uses a palette-menu aria label when current-palette actions are enabled', () => {
+    render(
+      <PaletteSwitcher
+        {...defaultProps({
+          showPaletteActions: true,
+        })}
+      />
+    );
+
+    expect(
+      screen.getByLabelText('Palette menu. Currently editing: Blue')
+    ).toBeInTheDocument();
+  });
+
+  it('shows current-palette actions inside the unified menu when enabled', () => {
+    render(
+      <PaletteSwitcher
+        {...defaultProps({
+          showPaletteActions: true,
+          isEditingCollection: true,
+          activePaletteId: 'pal-1',
+          onDuplicate: vi.fn(),
+          onDelete: vi.fn(),
+          onCollectionAction: vi.fn(),
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText(/Palette menu/));
+
+    expect(screen.getByText('Duplicate palette')).toBeInTheDocument();
+    expect(screen.getByText('Share palette')).toBeInTheDocument();
+    expect(screen.getByText('Move to collection…')).toBeInTheDocument();
+    expect(screen.getByText('Duplicate to collection…')).toBeInTheDocument();
+    expect(screen.getByText('Delete palette')).toBeInTheDocument();
+  });
+
+  it('places switcher rows first, then library actions, then palette actions', () => {
+    render(
+      <PaletteSwitcher
+        {...defaultProps({
+          collection: [
+            makePalette({ id: 'a', name: 'Success' }),
+            makePalette({ id: 'b', name: 'Info' }),
+            makePalette({ id: 'c', name: 'Neutral' }),
+          ],
+          activePaletteId: 'a',
+          currentName: 'Success',
+          showPaletteActions: true,
+          isEditingCollection: true,
+          onDuplicate: vi.fn(),
+          onDelete: vi.fn(),
+          onCollectionAction: vi.fn(),
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText(/Palette menu/));
+
+    const listRow = screen.getByRole('option', { name: /Success/ });
+    const newPalette = screen.getByText('New palette');
+    const duplicatePalette = screen.getByText('Duplicate palette');
+
+    expect(listRow.compareDocumentPosition(newPalette) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(newPalette.compareDocumentPosition(duplicatePalette) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('loads the duplicate dialog only after the unified menu action is selected', async () => {
+    render(
+      <PaletteSwitcher
+        {...defaultProps({
+          showPaletteActions: true,
+          onDuplicate: vi.fn(),
+        })}
+      />
+    );
+
+    expect(screen.queryByText('Duplicate dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/Palette menu/));
+    fireEvent.click(screen.getByText('Duplicate palette'));
+
+    expect(await screen.findByText('Duplicate dialog')).toBeInTheDocument();
   });
 });

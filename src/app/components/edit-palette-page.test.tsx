@@ -142,27 +142,23 @@ vi.mock('./palette-controls', () => ({
 }));
 
 vi.mock('./palette-workspace', () => ({
-  PaletteWorkspace: ({ onDuplicate, onDelete }: any) => (
+  PaletteWorkspace: ({ onDuplicate, onDelete, hideToolbar }: any) => (
     <div>
       <div>Workspace</div>
-      {onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Duplicate palette</button> : null}
-      {onDelete ? <button onClick={onDelete}>Delete palette</button> : null}
-    </div>
-  ),
-  MobileMoreMenu: ({ onDuplicate, onDelete }: any) => (
-    <div>
-      {onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Mobile duplicate palette</button> : null}
-      {onDelete ? <button onClick={onDelete}>Mobile delete palette</button> : null}
+      {!hideToolbar && onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Duplicate palette</button> : null}
+      {!hideToolbar && onDelete ? <button onClick={onDelete}>Delete palette</button> : null}
     </div>
   ),
 }));
 
 vi.mock('./palette-switcher', () => ({
-  PaletteSwitcher: ({ onNewPalette, onSelectPalette, onNavigateToCollection }: any) => (
+  PaletteSwitcher: ({ onNewPalette, onSelectPalette, onNavigateToCollection, onDuplicate, onDelete }: any) => (
     <div>
       <button onClick={onNewPalette}>New palette</button>
       <button onClick={() => onSelectPalette?.('saved-2')}>Switch palette</button>
       <button onClick={onNavigateToCollection}>View all palettes</button>
+      {onDuplicate ? <button onClick={() => onDuplicate('Cyan Copy')}>Duplicate palette</button> : null}
+      {onDelete ? <button onClick={onDelete}>Delete palette</button> : null}
     </div>
   ),
 }));
@@ -488,7 +484,7 @@ describe('EditPalettePage draft save flow', () => {
 
     const router = renderAt('/my-collection/edit/saved-1');
 
-    fireEvent.click(screen.getByText('Mobile duplicate palette'));
+    fireEvent.click(screen.getByText('Duplicate palette'));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
