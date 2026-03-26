@@ -1,12 +1,15 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { RootLayout } from './components/root-layout';
 import { HomeEntryPage } from './components/home-entry-page';
+import { ChunkErrorBoundary } from './components/chunk-error-boundary';
 import { isFirstTimeUser } from './lib/first-time-detection';
+import { lazyImport } from './lib/lazy-import';
 
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: RootLayout,
+    ErrorBoundary: ChunkErrorBoundary,
     children: [
       /**
        * ROUTING LOGIC:
@@ -19,18 +22,18 @@ export const router = createBrowserRouter([
        * - `/c/:shareId` → Shared collection import
        */
       { index: true, loader: () => ({ isFirstTime: isFirstTimeUser() }), Component: HomeEntryPage },
-      { path: 'edit/:paletteId?', lazy: () => import('./route-modules/edit-palette.route') },
+      { path: 'edit/:paletteId?', lazy: lazyImport(() => import('./route-modules/edit-palette.route')) },
       {
         path: 'p/:shareId',
-        lazy: () => import('./route-modules/shared-palette.route'),
+        lazy: lazyImport(() => import('./route-modules/shared-palette.route')),
       },
       {
         path: 'c/:shareId',
-        lazy: () => import('./route-modules/shared-collection.route'),
+        lazy: lazyImport(() => import('./route-modules/shared-collection.route')),
       },
-      { path: ':collectionSlug/edit', lazy: () => import('./route-modules/edit-palette.route') },
-      { path: ':collectionSlug/edit/:paletteId', lazy: () => import('./route-modules/edit-palette.route') },
-      { path: ':collectionSlug', lazy: () => import('./route-modules/collection-detail.route') },
+      { path: ':collectionSlug/edit', lazy: lazyImport(() => import('./route-modules/edit-palette.route')) },
+      { path: ':collectionSlug/edit/:paletteId', lazy: lazyImport(() => import('./route-modules/edit-palette.route')) },
+      { path: ':collectionSlug', lazy: lazyImport(() => import('./route-modules/collection-detail.route')) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
