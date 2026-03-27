@@ -206,8 +206,7 @@ export function CollectionShareRuntime({
   name?: string;
 }) {
   const generateCollectionShareLink = useCallback(async () => {
-    const sanitizedPalettes = palettes.map((palette) => serializePaletteConfig(palette));
-    const result = await createSharedCollection(sanitizedPalettes, name);
+    const result = await createSharedCollection(palettes, name);
     track('collection_shared', { palette_count: palettes.length });
     return buildShareUrl('collection', result.id);
   }, [name, palettes]);

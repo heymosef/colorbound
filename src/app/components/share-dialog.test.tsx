@@ -148,6 +148,8 @@ describe('Share dialog flows', () => {
           lightness50: 0.985,
           lightness950: 0.025,
           density: 11,
+          targetColorSpace: 'srgb',
+          generationVersion: 6,
         }]}
       />,
     );

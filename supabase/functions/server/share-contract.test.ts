@@ -162,4 +162,45 @@ describe('share-contract', () => {
       'A palette with this name already exists in this collection.',
     );
   });
+
+  it('preserves non-default density when explicitly provided', () => {
+    const result = normalizePaletteEntry({
+      name: 'Compact',
+      hue: 210,
+      chroma: 0.12,
+      lightness50: 0.985,
+      lightness950: 0.025,
+      density: 5,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.density).toBe(5);
+  });
+
+  it('defaults density to 11 when missing', () => {
+    const result = normalizePaletteEntry({
+      name: 'No Density',
+      hue: 210,
+      chroma: 0.12,
+      lightness50: 0.985,
+      lightness950: 0.025,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.density).toBe(11);
+  });
+
+  it('preserves non-default density through normalize → sanitize', () => {
+    for (const density of [5, 7, 9] as const) {
+      const normalized = normalizePaletteEntry({
+        name: `Density ${density}`,
+        hue: 210,
+        chroma: 0.12,
+        lightness50: 0.985,
+        lightness950: 0.025,
+        density,
+      });
+      expect(normalized).not.toBeNull();
+      const sanitized = sanitizePaletteEntry(normalized!);
+      expect(sanitized.density).toBe(density);
+    }
+  });
 });
