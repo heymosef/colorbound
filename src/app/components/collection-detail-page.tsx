@@ -46,13 +46,13 @@ export function CollectionDetailPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-4 max-w-sm px-4">
-          <h2 className="text-[16px] mb-1">Collection not found</h2>
+          <h2 className="text-[16px] mb-1">Project not found</h2>
           <p className="text-[13px] text-muted-foreground">
-            No collection matches the URL "{collectionSlug}".
+            No project matches the URL "{collectionSlug}".
           </p>
           <Button onClick={() => navigate('/')} className="h-9 text-[13px]">
             <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Back to collections
+            Back to projects
           </Button>
         </div>
       </div>

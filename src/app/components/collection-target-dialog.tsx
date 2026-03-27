@@ -42,7 +42,7 @@ export function CollectionTargetDialog({
   collections,
   emptyTitle,
   emptyDescription,
-  createLabel = 'Create collection',
+  createLabel = 'Create project',
   errorMessage,
   onSelect,
   onCreateCollection,

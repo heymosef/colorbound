@@ -32,7 +32,7 @@ export function validateCollectionName(
       normalizedName,
       uniquenessKey,
       error: 'empty',
-      message: 'Collection name is required',
+      message: 'Project name is required',
     };
   }
 
@@ -50,7 +50,7 @@ export function validateCollectionName(
       normalizedName,
       uniquenessKey,
       error: 'duplicate',
-      message: 'Collection name must be unique',
+      message: 'Project name must be unique',
     };
   }
 

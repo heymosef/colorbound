@@ -233,7 +233,7 @@ describe('serializeCollection', () => {
 
   it('defaults the collection name', () => {
     const result = serializeCollection([VALID_CONFIG]);
-    expect(result.name).toBe('My Collection');
+    expect(result.name).toBe('My Project');
   });
 });
 

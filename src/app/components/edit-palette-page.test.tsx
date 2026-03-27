@@ -61,8 +61,8 @@ function buildContext(overrides: Record<string, unknown> = {}) {
     collections: [
       {
         id: 'collection-1',
-        name: 'My Collection',
-        slug: 'my-collection',
+        name: 'My Project',
+        slug: 'my-project',
         palettes: [savedPalette],
       },
     ],
@@ -95,8 +95,8 @@ function buildContext(overrides: Record<string, unknown> = {}) {
     handleApplyHex: vi.fn(),
     activeCollection: {
       id: 'collection-1',
-      name: 'My Collection',
-      slug: 'my-collection',
+      name: 'My Project',
+      slug: 'my-project',
       palettes: [savedPalette],
     },
     handleCreateCollection: vi.fn(),
@@ -219,8 +219,8 @@ describe('EditPalettePage draft save flow', () => {
         collections: [
           {
             id: 'collection-1',
-            name: 'My Collection',
-            slug: 'my-collection',
+            name: 'My Project',
+            slug: 'my-project',
             palettes: [savedPalette],
           },
         ],
@@ -233,12 +233,12 @@ describe('EditPalettePage draft save flow', () => {
       return { ok: true, paletteId: 'saved-1', collectionId: 'collection-1' };
     });
 
-    const router = renderAt('/my-collection/edit');
+    const router = renderAt('/my-project/edit');
 
     fireEvent.click(screen.getByText('Save palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-1');
     });
 
     expect(handleAddToCollection).toHaveBeenCalledTimes(1);
@@ -253,8 +253,8 @@ describe('EditPalettePage draft save flow', () => {
         collections: [
           {
             id: 'collection-1',
-            name: 'My Collection',
-            slug: 'my-collection',
+            name: 'My Project',
+            slug: 'my-project',
             palettes: [savedPalette],
           },
         ],
@@ -267,12 +267,12 @@ describe('EditPalettePage draft save flow', () => {
       return { ok: true, paletteId: 'saved-new', collectionId: 'collection-1' };
     });
 
-    const router = renderAt('/my-collection/edit');
+    const router = renderAt('/my-project/edit');
 
     fireEvent.click(screen.getByText('Save palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-new');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-new');
     });
 
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
@@ -280,7 +280,7 @@ describe('EditPalettePage draft save flow', () => {
   });
 
   it('renders desktop sidebar borders on the layout columns', () => {
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
     const complements = screen.getAllByRole('complementary');
     const controlsSidebar = complements.find((node) => node.getAttribute('aria-label') === 'Palette controls');
@@ -297,8 +297,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
       ],
@@ -309,10 +309,10 @@ describe('EditPalettePage draft save flow', () => {
       currentPalette: savedPalette,
     });
 
-    const router = renderAt('/my-collection/edit');
+    const router = renderAt('/my-project/edit');
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-1');
     });
 
     expect(startDraftPalette).not.toHaveBeenCalled();
@@ -326,8 +326,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
       ],
@@ -345,12 +345,12 @@ describe('EditPalettePage draft save flow', () => {
       },
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('New palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit');
+      expect(router.state.location.pathname).toBe('/my-project/edit');
     });
 
     expect(startDraftPalette).toHaveBeenCalledWith('collection-1');
@@ -365,8 +365,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
       ],
@@ -390,8 +390,8 @@ describe('EditPalettePage draft save flow', () => {
         collections: [
           {
             id: 'collection-1',
-            name: 'My Collection',
-            slug: 'my-collection',
+            name: 'My Project',
+            slug: 'my-project',
             palettes: [savedPalette, duplicatedPalette],
           },
         ],
@@ -412,12 +412,12 @@ describe('EditPalettePage draft save flow', () => {
       return { ok: true, paletteId: 'saved-2', collectionId: 'collection-1', name: 'Cyan Copy' };
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Duplicate palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(router.state.historyAction).toBe('PUSH');
@@ -435,8 +435,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
       ],
@@ -460,8 +460,8 @@ describe('EditPalettePage draft save flow', () => {
         collections: [
           {
             id: 'collection-1',
-            name: 'My Collection',
-            slug: 'my-collection',
+            name: 'My Project',
+            slug: 'my-project',
             palettes: [savedPalette, duplicatedPalette],
           },
         ],
@@ -482,12 +482,12 @@ describe('EditPalettePage draft save flow', () => {
       return { ok: true, paletteId: 'saved-2', collectionId: 'collection-1', name: 'Cyan Copy' };
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Duplicate palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(router.state.historyAction).toBe('PUSH');
@@ -501,8 +501,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
       ],
@@ -526,8 +526,8 @@ describe('EditPalettePage draft save flow', () => {
         collections: [
           {
             id: 'collection-1',
-            name: 'My Collection',
-            slug: 'my-collection',
+            name: 'My Project',
+            slug: 'my-project',
             palettes: [],
           },
         ],
@@ -539,12 +539,12 @@ describe('EditPalettePage draft save flow', () => {
       });
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Delete palette'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection');
+      expect(router.state.location.pathname).toBe('/my-project');
     });
 
     expect(handleRemove).toHaveBeenCalledWith('saved-1');
@@ -552,10 +552,10 @@ describe('EditPalettePage draft save flow', () => {
   });
 
   it('still shows not-found feedback for a real invalid palette URL', async () => {
-    const router = renderAt('/my-collection/edit/missing');
+    const router = renderAt('/my-project/edit/missing');
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection');
+      expect(router.state.location.pathname).toBe('/my-project');
     });
 
     expect(toastInfo).toHaveBeenCalledWith('Palette not found');
@@ -571,8 +571,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette, otherPalette],
         },
       ],
@@ -590,7 +590,7 @@ describe('EditPalettePage draft save flow', () => {
       },
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Switch palette'));
 
@@ -600,7 +600,7 @@ describe('EditPalettePage draft save flow', () => {
     fireEvent.click(screen.getByText('Discard changes'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(handleRevertChanges).toHaveBeenCalledWith({ silent: true });
@@ -619,8 +619,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette, otherPalette],
         },
       ],
@@ -644,13 +644,13 @@ describe('EditPalettePage draft save flow', () => {
       name: 'Cyan',
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Switch palette'));
     fireEvent.click(await screen.findByText('Save and leave'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(handleUpdateInCollection).toHaveBeenCalledTimes(1);
@@ -666,8 +666,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette, otherPalette],
         },
       ],
@@ -690,12 +690,12 @@ describe('EditPalettePage draft save flow', () => {
       message: 'A palette with this name already exists in this collection.',
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Switch palette'));
     fireEvent.click(await screen.findByText('Save and leave'));
 
-    expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+    expect(router.state.location.pathname).toBe('/my-project/edit/saved-1');
     expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
   });
 
@@ -708,8 +708,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [otherPalette],
         },
       ],
@@ -732,17 +732,17 @@ describe('EditPalettePage draft save flow', () => {
       collectionId: 'collection-1',
     });
 
-    const router = renderAt('/my-collection/edit');
+    const router = renderAt('/my-project/edit');
 
     fireEvent.click(screen.getByText('Switch palette'));
 
     expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
-    expect(screen.getByText('Add to collection and leave')).toBeInTheDocument();
+    expect(screen.getByText('Add to project and leave')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Add to collection and leave'));
+    fireEvent.click(screen.getByText('Add to project and leave'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(handleAddToCollection).toHaveBeenCalledTimes(1);
@@ -757,8 +757,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [otherPalette],
         },
       ],
@@ -776,13 +776,13 @@ describe('EditPalettePage draft save flow', () => {
       },
     });
 
-    const router = renderAt('/my-collection/edit');
+    const router = renderAt('/my-project/edit');
 
     fireEvent.click(screen.getByText('Switch palette'));
     fireEvent.click(await screen.findByText('Discard changes'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection/edit/saved-2');
+      expect(router.state.location.pathname).toBe('/my-project/edit/saved-2');
     });
 
     expect(handleDiscardDraftChanges).toHaveBeenCalledWith({ silent: true });
@@ -798,8 +798,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette, otherPalette],
         },
       ],
@@ -817,14 +817,14 @@ describe('EditPalettePage draft save flow', () => {
       },
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Switch palette'));
     expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
     expect(screen.queryByText('Keep editing')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-    expect(router.state.location.pathname).toBe('/my-collection/edit/saved-1');
+    expect(router.state.location.pathname).toBe('/my-project/edit/saved-1');
     await waitFor(() => {
       expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
     });
@@ -833,7 +833,7 @@ describe('EditPalettePage draft save flow', () => {
     fireEvent.click(await screen.findByText('Discard changes'));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/my-collection');
+      expect(router.state.location.pathname).toBe('/my-project');
     });
   });
 
@@ -846,8 +846,8 @@ describe('EditPalettePage draft save flow', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [savedPalette],
         },
         {
@@ -871,7 +871,7 @@ describe('EditPalettePage draft save flow', () => {
       },
     });
 
-    const router = renderAt('/my-collection/edit/saved-1');
+    const router = renderAt('/my-project/edit/saved-1');
 
     fireEvent.click(screen.getByText('Switch collection'));
     fireEvent.click(await screen.findByText('Discard changes'));
@@ -891,7 +891,7 @@ describe('EditPalettePage deferred collection panel loading', () => {
   it('keeps the collection panel out of the mobile preview tab until a side panel tab is selected', async () => {
     breakpoint = 'mobile';
 
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(screen.queryByText('Collection panel')).not.toBeInTheDocument();
@@ -904,7 +904,7 @@ describe('EditPalettePage deferred collection panel loading', () => {
   });
 
   it('renders the collection panel in the desktop side rail', async () => {
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(await screen.findByText('Collection panel')).toBeInTheDocument();

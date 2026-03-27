@@ -47,6 +47,10 @@ export type DuplicatePaletteResult =
   | { ok: true; paletteId: string; collectionId: string; name: string }
   | PaletteMutationFailure;
 
+export type DuplicateCollectionResult =
+  | { ok: true; id: string; slug: string; name: string }
+  | { ok: false; error: 'collection_not_found'; message: string };
+
 export type ImportPaletteToCollectionResult =
   | { ok: true; paletteId: string; collectionId: string; collectionSlug: string; name: string }
   | { ok: false; error: 'collection_not_found'; message: string };
@@ -107,6 +111,7 @@ export interface PaletteContextValue {
   handleCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };
   handleRenameCollection: (collectionId: string, name: string) => CollectionRenameResult;
   handleDeleteCollection: (collectionId: string) => boolean;
+  handleDuplicateCollection: (collectionId: string) => DuplicateCollectionResult;
   handleSelectCollection: (collectionId: string) => void;
   handleMovePalette: (sourceCollectionId: string, paletteId: string, targetCollectionId: string) => MovePaletteOperationResult;
   handleCopyPalette: (sourceCollectionId: string, paletteId: string, targetCollectionId: string) => CopyPaletteOperationResult;
@@ -123,5 +128,6 @@ export interface CollectionsContextValue {
   handleCreateCollection: (name?: string, options?: CreateCollectionOptions) => { id: string; slug: string };
   handleRenameCollection: (collectionId: string, name: string) => CollectionRenameResult;
   handleDeleteCollection: (collectionId: string) => boolean;
+  handleDuplicateCollection: (collectionId: string) => DuplicateCollectionResult;
   handleSelectCollection: (collectionId: string) => void;
 }

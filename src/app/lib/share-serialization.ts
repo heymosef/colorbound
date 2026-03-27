@@ -85,7 +85,7 @@ export function serializeCollection(
   name?: string,
 ): { palettes: SharedPaletteEntry[]; name: string } {
   return {
-    name: safeString(name, 100, 'My Collection'),
+    name: safeString(name, 100, 'My Project'),
     palettes: palettes.map((config) => serializePaletteConfig(config)),
   };
 }

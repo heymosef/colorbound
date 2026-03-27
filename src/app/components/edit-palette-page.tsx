@@ -338,7 +338,7 @@ function MobileLayout({
   const { contrastAlgorithm, setContrastAlgorithm, collections, activeCollection, handleCreateCollection } = usePaletteContext();
 
   const navigate = useNavigate();
-  const collectionName = activeCollection?.name ?? 'Collection';
+  const collectionName = activeCollection?.name ?? 'Project';
 
   useEffect(() => {
     if (controlsOpenSignal > 0) {
@@ -782,7 +782,7 @@ export function EditPalettePage() {
               blocker.proceed?.();
             }}
           >
-            {isEditingSavedPalette ? 'Save and leave' : 'Add to collection and leave'}
+            {isEditingSavedPalette ? 'Save and leave' : 'Add to project and leave'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

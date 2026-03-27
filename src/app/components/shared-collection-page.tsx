@@ -200,7 +200,7 @@ export function SharedCollectionPage() {
 
   // Deserialize through trust boundary
   const deserialized = useMemo(() => deserializeCollection(data), [data]);
-  const collectionName = deserialized?.name ?? 'Shared Collection';
+  const collectionName = deserialized?.name ?? 'Shared Project';
 
   // Build full palette objects from deserialized entries
   const entries: DeserializedEntry[] = useMemo(() => {
@@ -221,7 +221,7 @@ export function SharedCollectionPage() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    track('shared_collection_viewed', { share_id: shareId, palette_count: entries.length });
+    track('shared_project_viewed', { share_id: shareId, palette_count: entries.length });
   }, [shareId, entries.length]);
 
   const toggleSelection = useCallback((index: number) => {
@@ -262,7 +262,7 @@ export function SharedCollectionPage() {
       toast.error('No palettes selected', { duration: 2000 });
       return;
     }
-    track('shared_collection_imported', { share_id: shareId, palette_count: selected.size });
+    track('shared_project_imported', { share_id: shareId, palette_count: selected.size });
     if (selected.size === 1) {
       const idx = Array.from(selected)[0];
       const entry = entries[idx];
@@ -287,9 +287,9 @@ export function SharedCollectionPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-4 max-w-sm px-4">
-          <h2 className="text-[16px] mb-1">Invalid collection data</h2>
+          <h2 className="text-[16px] mb-1">Invalid project data</h2>
           <p className="text-[13px] text-muted-foreground">
-            This collection contains no valid palette entries.
+            This project contains no valid palette entries.
           </p>
           <Button onClick={() => navigate('/')} className="h-9 text-[13px]">
             <PaletteIcon className="w-4 h-4 mr-1.5" />
@@ -323,7 +323,7 @@ export function SharedCollectionPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Shared Collection</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Shared Project</p>
               </div>
               <h1 className="text-[20px] sm:text-[24px] font-semibold">{collectionName}</h1>
               <div className="flex items-center gap-2 mt-0.5">

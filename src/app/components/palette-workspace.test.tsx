@@ -76,8 +76,8 @@ describe('Palette workspace collection actions', () => {
       collections: [
         {
           id: 'collection-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           palettes: [makePalette()],
         },
       ],

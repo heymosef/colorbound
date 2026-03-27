@@ -366,13 +366,13 @@ export function PaletteSwitcher({
                       onClick={() => handlePaletteAction(() => onCollectionAction?.('move', currentPalette))}
                     >
                       <FolderOutput className="w-3.5 h-3.5" />
-                      Move to collection…
+                      Move to project…
                     </PopoverMenuItem>
                     <PopoverMenuItem
                       onClick={() => handlePaletteAction(() => onCollectionAction?.('copy', currentPalette))}
                     >
                       <FolderInput className="w-3.5 h-3.5" />
-                      Duplicate to collection…
+                      Duplicate to project…
                     </PopoverMenuItem>
                   </>
                 )}

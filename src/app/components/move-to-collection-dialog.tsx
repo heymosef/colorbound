@@ -69,8 +69,8 @@ export function MoveToCollectionDialog({
     : `Duplicate "${paletteName}"`;
 
   const description = mode === 'move'
-    ? 'Choose a collection to move this palette to. It will be removed from the current collection.'
-    : 'Choose a collection to copy this palette to. The original stays in the current collection.';
+    ? 'Choose a project to move this palette to. It will be removed from the current project.'
+    : 'Choose a project to copy this palette to. The original stays in the current project.';
 
   return (
     <CollectionTargetDialog
@@ -83,8 +83,8 @@ export function MoveToCollectionDialog({
         name: collection.name,
         paletteCount: collection.palettes.length,
       }))}
-      emptyTitle="No destination collections yet"
-      emptyDescription={`Create a collection to continue this ${mode === 'move' ? 'move' : 'duplicate'} flow.`}
+      emptyTitle="No destination projects yet"
+      emptyDescription={`Create a project to continue this ${mode === 'move' ? 'move' : 'duplicate'} flow.`}
       onSelect={handleSelect}
       onCreateCollection={onCreateCollection}
     />

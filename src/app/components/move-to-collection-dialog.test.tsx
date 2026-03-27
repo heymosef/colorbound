@@ -45,8 +45,8 @@ function DialogHarness({
       onCreateCollection={() => {
         const createdCollection = {
           id: 'created',
-          name: 'Untitled Collection',
-          slug: 'untitled-collection',
+          name: 'Untitled Project',
+          slug: 'untitled-project',
           palettes: [],
         };
         setCollections((prev) => [...prev, createdCollection]);
@@ -134,11 +134,11 @@ describe('MoveToCollectionDialog', () => {
       ok: true,
       collections: [
         { id: 'source', name: 'Source', slug: 'source', palettes: [] },
-        { id: 'created', name: 'Untitled Collection', slug: 'untitled-collection', palettes: [] },
+        { id: 'created', name: 'Untitled Project', slug: 'untitled-project', palettes: [] },
       ],
       sourceCollectionId: 'source',
       targetCollectionId: 'created',
-      targetCollectionSlug: 'untitled-collection',
+      targetCollectionSlug: 'untitled-project',
       paletteId: 'palette-1',
       palette: { id: 'palette-1', name: 'Ocean', tokens: [] },
     });
@@ -147,17 +147,17 @@ describe('MoveToCollectionDialog', () => {
       { id: 'source', name: 'Source', slug: 'source', palettes: [] },
     ]);
 
-    expect(screen.getByText('No destination collections yet')).toBeInTheDocument();
+    expect(screen.getByText('No destination projects yet')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /create collection/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create project/i }));
 
-    const createdCollectionButton = await screen.findByRole('button', { name: /untitled collection/i });
+    const createdCollectionButton = await screen.findByRole('button', { name: /untitled project/i });
     expect(router.state.location.pathname).toBe('/source/edit/palette-1');
 
     fireEvent.click(createdCollectionButton);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/untitled-collection/edit/palette-1');
+      expect(router.state.location.pathname).toBe('/untitled-project/edit/palette-1');
     });
 
     expect(handleMovePalette).toHaveBeenCalledWith('source', 'palette-1', 'created');
@@ -168,11 +168,11 @@ describe('MoveToCollectionDialog', () => {
       ok: true,
       collections: [
         { id: 'source', name: 'Source', slug: 'source', palettes: [] },
-        { id: 'created', name: 'Untitled Collection', slug: 'untitled-collection', palettes: [] },
+        { id: 'created', name: 'Untitled Project', slug: 'untitled-project', palettes: [] },
       ],
       sourceCollectionId: 'source',
       targetCollectionId: 'created',
-      targetCollectionSlug: 'untitled-collection',
+      targetCollectionSlug: 'untitled-project',
       sourcePaletteId: 'palette-1',
       newPaletteId: 'palette-2',
       palette: { id: 'palette-2', name: 'Ocean', tokens: [] },
@@ -182,11 +182,11 @@ describe('MoveToCollectionDialog', () => {
       { id: 'source', name: 'Source', slug: 'source', palettes: [] },
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: /create collection/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /untitled collection/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /untitled project/i }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/untitled-collection/edit/palette-2');
+      expect(router.state.location.pathname).toBe('/untitled-project/edit/palette-2');
     });
 
     expect(handleCopyPalette).toHaveBeenCalledWith('source', 'palette-1', 'created');

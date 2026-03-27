@@ -7,7 +7,7 @@ vi.mock('../lib/palette-context', () => ({
   usePaletteContext: () => ({
     activeCollection: {
       id: 'collection-1',
-      name: 'My Collection',
+      name: 'My Project',
       palettes: [
         { id: 'palette-1', name: 'Ocean' },
       ],
