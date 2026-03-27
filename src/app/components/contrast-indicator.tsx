@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
@@ -6,6 +6,7 @@ import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 import { Check, X, AlertTriangle, Shield, ChevronDown, CircleCheck, CircleX } from 'lucide-react';
 import type { ColorToken, Palette } from '../lib/color-utils';
+import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { relativeLuminance, wcag2Contrast, getWcag2Rating, apcaContrast, getApcaRating } from '../lib/color-utils';
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
@@ -475,12 +476,23 @@ export function ContrastPairSelector({ palette, inlineMode }: { palette: Palette
   const [bgStep, setBgStep] = useState('50');
   const supportsP3 = useSupportsP3();
 
-  const tokens = palette?.tokens ?? [];
+  const visibleTokens = palette ? getVisiblePaletteTokens(palette) : [];
 
-  const fgHex = useMemo(() => resolveStepHex(tokens, fgStep), [tokens, fgStep]);
-  const bgHex = useMemo(() => resolveStepHex(tokens, bgStep), [tokens, bgStep]);
-  const fgDisplayCss = useMemo(() => resolveStepDisplayCss(tokens, fgStep, supportsP3), [tokens, fgStep, supportsP3]);
-  const bgDisplayCss = useMemo(() => resolveStepDisplayCss(tokens, bgStep, supportsP3), [tokens, bgStep, supportsP3]);
+  useEffect(() => {
+    const visibleSteps = visibleTokens.map((t) => String(t.step));
+    if (visibleSteps.length === 0) return;
+    if (!visibleSteps.includes(fgStep)) {
+      setFgStep(visibleSteps[visibleSteps.length - 1]);
+    }
+    if (!visibleSteps.includes(bgStep)) {
+      setBgStep(visibleSteps[0]);
+    }
+  }, [visibleTokens]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fgHex = useMemo(() => resolveStepHex(visibleTokens, fgStep), [visibleTokens, fgStep]);
+  const bgHex = useMemo(() => resolveStepHex(visibleTokens, bgStep), [visibleTokens, bgStep]);
+  const fgDisplayCss = useMemo(() => resolveStepDisplayCss(visibleTokens, fgStep, supportsP3), [visibleTokens, fgStep, supportsP3]);
+  const bgDisplayCss = useMemo(() => resolveStepDisplayCss(visibleTokens, bgStep, supportsP3), [visibleTokens, bgStep, supportsP3]);
 
   const result = useMemo(() => {
     if (!fgHex || !bgHex) return null;
@@ -531,7 +543,7 @@ export function ContrastPairSelector({ palette, inlineMode }: { palette: Palette
           <StepSelector
             value={fgStep}
             onChange={setFgStep}
-            tokens={palette.tokens}
+            tokens={visibleTokens}
             label="Select foreground step"
           />
         </div>
@@ -540,7 +552,7 @@ export function ContrastPairSelector({ palette, inlineMode }: { palette: Palette
           <StepSelector
             value={bgStep}
             onChange={setBgStep}
-            tokens={palette.tokens}
+            tokens={visibleTokens}
             label="Select background step"
           />
         </div>
