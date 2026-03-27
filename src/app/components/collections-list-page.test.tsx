@@ -54,11 +54,11 @@ describe('CollectionsListPage rename validation', () => {
     fireEvent.click(screen.getByLabelText('Options for Marketing'));
     fireEvent.click(screen.getByText('Rename'));
 
-    const input = screen.getByLabelText('Edit collection name');
+    const input = screen.getByLabelText('Edit project name');
     fireEvent.change(input, { target: { value: '  product team  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(screen.getByText('Collection name must be unique')).toBeInTheDocument();
+    expect(screen.getByText('Project name must be unique')).toBeInTheDocument();
     expect(handleRenameCollection).not.toHaveBeenCalled();
   });
 });

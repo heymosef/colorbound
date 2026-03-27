@@ -23,6 +23,7 @@ import type {
   CollectionsContextValue,
   ContrastAlgorithm,
   CreateCollectionOptions,
+  DuplicateCollectionResult,
   DuplicatePaletteResult,
   ImportPaletteToCollectionResult,
   PaletteConfig,
@@ -422,8 +423,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setLastViewedSavedPaletteId(snapshot.id);
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-    toast.success(`Added "${validation.normalizedName}" to collection`, { duration: 2000 });
-    announcePolite(`Added ${validation.normalizedName} to collection`);
+    toast.success(`Added "${validation.normalizedName}" to project`, { duration: 2000 });
+    announcePolite(`Added ${validation.normalizedName} to project`);
     track('palette_saved', { palette_name: validation.normalizedName });
     return { ok: true, paletteId: snapshot.id, collectionId: activeCollectionId };
   }, [activeCollection, activeCollectionId, config.name, currentPalette, updateActiveCollectionPalettes, validateNameInCollection]);
@@ -458,7 +459,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     setConfig((prev) => ({ ...prev, name: validation.normalizedName }));
     setIsDirty(false);
     setHasCompletedFirstRun(true);
-    toast.success(`Updated "${validation.normalizedName}" in collection`, { duration: 2000 });
+    toast.success(`Updated "${validation.normalizedName}" in project`, { duration: 2000 });
     announcePolite(`Saved ${validation.normalizedName}`);
     return {
       ok: true,
@@ -514,8 +515,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
         setActivePaletteId(null);
         setIsDirty(false);
       }
-      toast('Palette removed from collection', { duration: 2000 });
-      announce(`Removed ${removedName} from collection`);
+      toast('Palette removed from project', { duration: 2000 });
+      announce(`Removed ${removedName} from project`);
       track('palette_deleted');
     },
     [activePaletteId, updateActiveCollectionPalettes, collection]
@@ -592,7 +593,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       return {
         ok: false,
         error: 'collection_not_found',
-        message: 'Collection not found',
+        message: 'Project not found',
       };
     }
 
@@ -651,7 +652,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     });
 
     // Deduplicate collection name with "(2)" suffix
-    const baseName = collectionName || 'Imported Collection';
+    const baseName = collectionName || 'Imported Project';
     const existingNames = new Set(collections.map((c) => c.name));
     const finalName = deduplicateName(baseName, existingNames);
 
@@ -840,7 +841,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
   const handleCreateCollection = useCallback((name?: string, options?: CreateCollectionOptions): { id: string; slug: string } => {
     const activate = options?.activate ?? true;
-    const baseName = name || 'Untitled Collection';
+    const baseName = name || 'Untitled Project';
     const existingNames = new Set(collections.map((c) => c.name));
     const finalName = deduplicateName(baseName, existingNames);
 
@@ -867,8 +868,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     }
     setHasCompletedFirstRun(true);
     toast.success(`Created "${finalName}"`, { duration: 2000 });
-    announcePolite(`Created collection ${finalName}`);
-    track('collection_created');
+    announcePolite(`Created project ${finalName}`);
+    track('project_created');
     return { id: newCollection.id, slug: finalSlug };
   }, [collections]);
 
@@ -894,8 +895,8 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
           : collection
       )
     );
-    announcePolite(`Renamed collection to ${normalizedName}`);
-    track('collection_renamed');
+    announcePolite(`Renamed project to ${normalizedName}`);
+    track('project_renamed');
     return {
       ok: true,
       collectionId,
@@ -906,7 +907,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
   const handleDeleteCollection = useCallback((collectionId: string): boolean => {
     if (collections.length <= 1) {
-      toast.error('Cannot delete the last collection', { duration: 2000 });
+      toast.error('Cannot delete the last project', { duration: 2000 });
       return false;
     }
 
@@ -933,11 +934,60 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       setLastViewedSavedPaletteId(null);
     }
 
-    toast.success('Collection deleted', { duration: 2000 });
-    announce('Collection deleted');
-    track('collection_deleted');
+    toast.success('Project deleted', { duration: 2000 });
+    announce('Project deleted');
+    track('project_deleted');
     return true;
   }, [activeCollectionId, activePaletteId, collections, lastViewedSavedPaletteId]);
+
+  const handleDuplicateCollection = useCallback((collectionId: string): DuplicateCollectionResult => {
+    const sourceCollection = collections.find((c) => c.id === collectionId);
+    if (!sourceCollection) {
+      return { ok: false, error: 'collection_not_found', message: 'Collection not found' };
+    }
+
+    const baseName = `${sourceCollection.name} (Copy)`;
+    const existingNames = new Set(collections.map((c) => c.name));
+    const finalName = deduplicateName(baseName, existingNames);
+
+    const baseSlug = toSlug(finalName);
+    const existingSlugs = new Set(collections.map((c) => c.slug));
+    const finalSlug = deduplicateSlug(baseSlug, existingSlugs);
+
+    const now = new Date().toISOString();
+    const copiedPalettes: Palette[] = sourceCollection.palettes.map((p) => ({
+      ...p,
+      id: generateId(),
+      tokens: [...p.tokens],
+    }));
+    const copiedConflicted: Palette[] = (sourceCollection.conflictedPalettes ?? []).map((p) => ({
+      ...p,
+      id: generateId(),
+      tokens: [...p.tokens],
+    }));
+
+    const newCollection: Collection = {
+      id: generateId(),
+      name: finalName,
+      slug: finalSlug,
+      createdAt: now,
+      lastModifiedAt: now,
+      palettes: copiedPalettes,
+      conflictedPalettes: copiedConflicted,
+    };
+
+    setCollections((prev) => [...prev, newCollection]);
+    setActiveCollectionId(newCollection.id);
+    setActivePaletteId(null);
+    setIsDirty(false);
+    setHasCompletedFirstRun(true);
+
+    toast.success(`Duplicated "${sourceCollection.name}"`, { duration: 2000 });
+    announcePolite(`Duplicated project ${sourceCollection.name} as ${finalName}`);
+    track('project_duplicated');
+
+    return { ok: true, id: newCollection.id, slug: finalSlug, name: finalName };
+  }, [collections]);
 
   const handleSelectCollection = useCallback((collectionId: string) => {
     setActiveCollectionId(collectionId);
@@ -960,7 +1010,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       setEditorFromPalette(operation.palette, operation.targetCollectionId);
     }
 
-    const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'collection';
+    const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'project';
     toast.success(`Moved to "${targetName}"`, { duration: 2000 });
     announce(`Moved palette to ${targetName}`);
     track('palette_moved');
@@ -981,10 +1031,10 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       setEditorFromPalette(operation.palette, operation.targetCollectionId);
     }
 
-    const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'collection';
+    const targetName = operation.collections.find((collection) => collection.id === targetCollectionId)?.name ?? 'project';
     toast.success(`Copied to "${targetName}"`, { duration: 2000 });
     announcePolite(`Duplicated palette to ${targetName}`);
-    track('palette_copied_to_collection');
+    track('palette_copied_to_project');
     return operation;
   }, [activePaletteId, collections, setEditorFromPalette]);
 
@@ -1009,7 +1059,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
 
     // Update PostHog person properties with current counts
     const totalPalettes = collections.reduce((sum, c) => sum + c.palettes.length, 0);
-    setUserProperties({ palette_count: totalPalettes, collection_count: collections.length });
+    setUserProperties({ palette_count: totalPalettes, project_count: collections.length });
 
     // Debounce: wait 300ms after the last state change before persisting
     saveTimeoutRef.current = setTimeout(() => {
@@ -1136,6 +1186,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleCreateCollection,
       handleRenameCollection,
       handleDeleteCollection,
+      handleDuplicateCollection,
       handleSelectCollection,
       handleMovePalette,
       handleCopyPalette,
@@ -1181,6 +1232,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleCreateCollection,
       handleRenameCollection,
       handleDeleteCollection,
+      handleDuplicateCollection,
       handleSelectCollection,
       handleMovePalette,
       handleCopyPalette,
@@ -1199,6 +1251,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleCreateCollection,
       handleRenameCollection,
       handleDeleteCollection,
+      handleDuplicateCollection,
       handleSelectCollection,
     }),
     [
@@ -1210,6 +1263,7 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
       handleCreateCollection,
       handleRenameCollection,
       handleDeleteCollection,
+      handleDuplicateCollection,
       handleSelectCollection,
     ]
   );

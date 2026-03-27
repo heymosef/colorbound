@@ -518,8 +518,8 @@ function migrateV1toV2(v1: StoredStateV1): StoredStateV2 {
   const now = new Date().toISOString();
   const defaultCollection: StoredCollectionV2 = {
     id: generateId(),
-    name: 'My Collection',
-    slug: 'my-collection',
+    name: 'My Project',
+    slug: 'my-project',
     createdAt: now,
     lastModifiedAt: now,
     palettes: Array.isArray(v1.collection)
@@ -1026,8 +1026,8 @@ export function createDefaultCollection(palettes: Palette[] = []): Collection {
   const now = new Date().toISOString();
   return {
     id: generateId(),
-    name: 'My Collection',
-    slug: 'my-collection',
+    name: 'My Project',
+    slug: 'my-project',
     createdAt: now,
     lastModifiedAt: now,
     palettes,

@@ -258,7 +258,7 @@ function ExportSettings({
 
   const scopeItems = [
     { value: 'palette', label: 'Current Palette' },
-    { value: 'collection', label: `Collection (${collectionCount})`, disabled: collectionCount === 0 },
+    { value: 'collection', label: `Project (${collectionCount})`, disabled: collectionCount === 0 },
   ];
 
   return (

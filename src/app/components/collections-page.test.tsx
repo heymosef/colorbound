@@ -60,11 +60,11 @@ describe('CollectionsPage rename validation', () => {
     fireEvent.click(screen.getByLabelText('Options for Marketing'));
     fireEvent.click(screen.getByText('Rename'));
 
-    const input = screen.getByLabelText('Edit collection name');
+    const input = screen.getByLabelText('Edit project name');
     fireEvent.change(input, { target: { value: 'product   team' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(screen.getByText('Collection name must be unique')).toBeInTheDocument();
+    expect(screen.getByText('Project name must be unique')).toBeInTheDocument();
     expect(handleRenameCollection).not.toHaveBeenCalled();
   });
 
@@ -128,8 +128,8 @@ describe('CollectionsPage rename validation', () => {
     render(<RouterProvider router={router} />);
 
     fireEvent.click(screen.getByLabelText('Options for Marketing'));
-    fireEvent.click(screen.getByText('Delete collection'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete collection' }));
+    fireEvent.click(screen.getByText('Delete project'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete project' }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');

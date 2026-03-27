@@ -106,7 +106,7 @@ describe('share action lazy boundaries', () => {
 
     expect(screen.queryByText('Collection share runtime')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /share collection/i }));
+    fireEvent.click(screen.getByRole('button', { name: /share project/i }));
 
     expect(await screen.findByText('Collection share runtime')).toBeInTheDocument();
   });

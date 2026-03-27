@@ -294,7 +294,7 @@ describe('Shared pages', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /open in editor/i }));
-    fireEvent.click(screen.getByRole('button', { name: /create collection/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create project/i }));
 
     const createdButton = await screen.findByRole('button', { name: /imported into/i });
     fireEvent.click(createdButton);

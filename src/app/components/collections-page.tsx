@@ -15,6 +15,7 @@ import {
   Trash2,
   Pencil,
   Check,
+  CopyPlus,
   Palette as PaletteIcon,
   ArrowLeft,
 } from 'lucide-react';
@@ -353,9 +354,10 @@ export function CollectionsPage() {
     handleDeleteConflictedPalette,
     handleRenameCollection,
     handleDeleteCollection,
+    handleDuplicateCollection,
   } = usePaletteContext();
 
-  useDocumentTitle(`${activeCollection?.name ?? 'Collection'} — Colorbound`);
+  useDocumentTitle(`${activeCollection?.name ?? 'Project'} — Colorbound`);
 
   const collectionSlug = activeCollection?.slug ?? '';
 
@@ -373,7 +375,7 @@ export function CollectionsPage() {
     if (activeCollection) {
       const validation = validateCollectionName(editCollectionName, collections, { excludeCollectionId: activeCollection.id });
       if (!validation.valid) {
-        setCollectionNameError(validation.message ?? 'Collection name is required');
+        setCollectionNameError(validation.message ?? 'Project name is required');
         return;
       }
 
@@ -384,7 +386,7 @@ export function CollectionsPage() {
       }
 
       setCollectionNameError(null);
-      announcePolite(`Renamed collection to "${validation.normalizedName}"`);
+      announcePolite(`Renamed project to "${validation.normalizedName}"`);
       navigate(buildCollectionPath(result.slug), { replace: true });
     }
     setEditingCollectionName(false);
@@ -418,7 +420,7 @@ export function CollectionsPage() {
           className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          All collections
+          All projects
         </Link>
 
         {/* Page header */}
@@ -445,7 +447,7 @@ export function CollectionsPage() {
                     }}
                     className="h-8 text-[16px] px-2 font-semibold"
                     autoFocus
-                    aria-label="Edit collection name"
+                    aria-label="Edit project name"
                     aria-invalid={!!collectionNameError}
                   />
                   <Button size="sm" variant="ghost" onClick={handleSaveCollectionName} className="h-8 px-2">
@@ -454,7 +456,7 @@ export function CollectionsPage() {
                 </div>
               ) : (
                 <>
-                  <h2 className="text-[18px]">{activeCollection?.name ?? 'My Collection'}</h2>
+                  <h2 className="text-[18px]">{activeCollection?.name ?? 'My Project'}</h2>
                   <p className="text-[13px] text-muted-foreground">
                     {collection.length === 0
                       ? 'No palettes yet — create your first one'
@@ -470,7 +472,7 @@ export function CollectionsPage() {
               <Popover open={collectionMenuOpen} onOpenChange={setCollectionMenuOpen}>
                 <PopoverTrigger
                   className="inline-flex items-center justify-center rounded-md h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] shrink-0"
-                  aria-label={`Options for ${activeCollection?.name ?? 'collection'}`}
+                  aria-label={`Options for ${activeCollection?.name ?? 'project'}`}
                 >
                   <MoreVertical className="w-4 h-4" />
                 </PopoverTrigger>
@@ -484,6 +486,18 @@ export function CollectionsPage() {
                     <Pencil className="w-3.5 h-3.5" />
                     Rename
                   </PopoverMenuItem>
+                  <PopoverMenuItem onClick={() => {
+                    setCollectionMenuOpen(false);
+                    if (activeCollection) {
+                      const result = handleDuplicateCollection(activeCollection.id);
+                      if (result.ok) {
+                        navigate(buildCollectionPath(result.slug));
+                      }
+                    }
+                  }}>
+                    <CopyPlus className="w-3.5 h-3.5" />
+                    Duplicate
+                  </PopoverMenuItem>
                   <Separator className="my-1" />
                   <PopoverMenuItem
                     onClick={() => {
@@ -494,7 +508,7 @@ export function CollectionsPage() {
                     disabled={!canDeleteCollection}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Delete collection
+                    Delete project
                   </PopoverMenuItem>
                 </PopoverContent>
               </Popover>
@@ -504,7 +518,7 @@ export function CollectionsPage() {
             {collection.length > 0 && (
               <ShareCollectionButton
                 palettes={collection.map((palette) => serializePaletteConfig(palette))}
-                name={activeCollection?.name ?? 'My Collection'}
+                name={activeCollection?.name ?? 'My Project'}
               />
             )}
             <Button onClick={handleNew}>
@@ -543,7 +557,7 @@ export function CollectionsPage() {
               <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
                 <PaletteIcon className="w-7 h-7 text-muted-foreground/50" />
               </div>
-              <p className="text-[15px] text-foreground mb-1">No palettes in your collection</p>
+              <p className="text-[15px] text-foreground mb-1">No palettes in your project</p>
               <p className="text-[13px] text-muted-foreground mb-6 max-w-sm">
                 Create your first palette to start building perceptually balanced color tokens for
                 your design system.
@@ -575,7 +589,7 @@ export function CollectionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{activeCollection?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently destroy this collection and{' '}
+              This will permanently destroy this project and{' '}
               <strong>all {totalPaletteCount} palette{totalPaletteCount !== 1 ? 's' : ''}</strong>{' '}
               inside it. This action cannot be undone.
             </AlertDialogDescription>
@@ -586,7 +600,7 @@ export function CollectionsPage() {
               onClick={handleDeleteCurrentCollection}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Delete collection
+              Delete project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

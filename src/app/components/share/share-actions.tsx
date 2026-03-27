@@ -136,10 +136,10 @@ export function CollectionShareAction({
         <Button
           variant="outline"
           className={className}
-          aria-label="Share collection"
+          aria-label="Share project"
         >
           <Share2 />
-          Share collection
+          Share project
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">

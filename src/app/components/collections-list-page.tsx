@@ -24,6 +24,7 @@ import {
   Check,
   ArrowUpDown,
   Layers,
+  CopyPlus,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -63,7 +64,7 @@ function CollectionSwatches({ collection }: { collection: Collection }) {
   }
 
   return (
-    <div className="flex items-center gap-1" role="img" aria-label={`Collection colors: ${swatches.length} palette preview${swatches.length !== 1 ? 's' : ''}`}>
+    <div className="flex items-center gap-1" role="img" aria-label={`Project colors: ${swatches.length} palette preview${swatches.length !== 1 ? 's' : ''}`}>
       {swatches.map((color, i) => (
         <div
           key={i}
@@ -81,11 +82,13 @@ function CollectionSwatches({ collection }: { collection: Collection }) {
 function CollectionOptionsMenu({
   collection,
   onRename,
+  onDuplicate,
   onDelete,
   canDelete,
 }: {
   collection: Collection;
   onRename: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   canDelete: boolean;
 }) {
@@ -108,6 +111,10 @@ function CollectionOptionsMenu({
             <Pencil className="w-3.5 h-3.5" />
             Rename
           </PopoverMenuItem>
+          <PopoverMenuItem onClick={() => { setMenuOpen(false); onDuplicate(); }}>
+            <CopyPlus className="w-3.5 h-3.5" />
+            Duplicate
+          </PopoverMenuItem>
           <Separator className="my-1" />
           <PopoverMenuItem
             onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
@@ -127,7 +134,7 @@ function CollectionOptionsMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{collection.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently destroy this collection and{' '}
+              This will permanently destroy this project and{' '}
               <strong>all {totalPaletteCount} palette{totalPaletteCount !== 1 ? 's' : ''}</strong>{' '}
               inside it. This action cannot be undone.
             </AlertDialogDescription>
@@ -138,7 +145,7 @@ function CollectionOptionsMenu({
               onClick={onDelete}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Delete collection
+              Delete project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -167,7 +174,7 @@ function SortSelector({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         className="inline-flex items-center gap-1.5 rounded-md h-9 px-3 text-[13px] border border-border hover:bg-accent transition-colors cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-        aria-label={`Sort collections: ${labels[value]}`}
+        aria-label={`Sort projects: ${labels[value]}`}
       >
         <ArrowUpDown className="w-3.5 h-3.5" />
         {labels[value]}
@@ -195,6 +202,7 @@ function CollectionCard({
   collections,
   onOpen,
   onRename,
+  onDuplicate,
   onDelete,
   canDelete,
 }: {
@@ -202,6 +210,7 @@ function CollectionCard({
   collections: Collection[];
   onOpen: () => void;
   onRename: (name: string) => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   canDelete: boolean;
 }) {
@@ -213,14 +222,14 @@ function CollectionCard({
   const handleSave = () => {
     const validation = validateCollectionName(editName, collections, { excludeCollectionId: collection.id });
     if (!validation.valid) {
-      setNameError(validation.message ?? 'Collection name is required');
+      setNameError(validation.message ?? 'Project name is required');
       return;
     }
 
     onRename(validation.normalizedName);
     setNameError(null);
     setEditing(false);
-    announcePolite(`Renamed collection to "${validation.normalizedName}"`);
+    announcePolite(`Renamed project to "${validation.normalizedName}"`);
   };
 
   const relativeDate = useMemo(() => {
@@ -247,7 +256,7 @@ function CollectionCard({
       }}
       tabIndex={0}
       role="button"
-      aria-label={`Open ${collection.name} collection`}
+      aria-label={`Open ${collection.name} project`}
     >
       <CardContent className="p-4" style={{ padding: '1rem' }}>
         <div className="space-y-3">
@@ -274,7 +283,7 @@ function CollectionCard({
                     }}
                     className="h-7 text-[13px] px-2"
                     autoFocus
-                    aria-label="Edit collection name"
+                    aria-label="Edit project name"
                     aria-invalid={!!nameError}
                   />
                   <Button size="sm" variant="ghost" onClick={handleSave} className="h-7 px-2">
@@ -300,6 +309,7 @@ function CollectionCard({
               <CollectionOptionsMenu
                 collection={collection}
                 onRename={() => { setEditName(collection.name); setEditing(true); }}
+                onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 canDelete={canDelete}
               />
@@ -341,7 +351,7 @@ function CollectionCard({
 // ─── Main page ───
 
 export function CollectionsListPage() {
-  useDocumentTitle('Collections — Colorbound');
+  useDocumentTitle('Projects — Colorbound');
   const navigate = useNavigate();
   const {
     collections,
@@ -351,6 +361,7 @@ export function CollectionsListPage() {
     handleRenameCollection,
     handleDeleteCollection,
     handleSelectCollection,
+    handleDuplicateCollection,
   } = useCollectionsContext();
 
   const sortedCollections = useMemo(() => {
@@ -390,10 +401,10 @@ export function CollectionsListPage() {
               <Layers className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-[18px]">Collections</h2>
+              <h2 className="text-[18px]">Projects</h2>
               <p className="text-[13px] text-muted-foreground">
                 <span className="tabular-nums">{collections.length}</span>
-                {` collection${collections.length !== 1 ? 's' : ''}`}
+                {` project${collections.length !== 1 ? 's' : ''}`}
               </p>
             </div>
           </div>
@@ -401,7 +412,7 @@ export function CollectionsListPage() {
             <SortSelector value={collectionSortBy} onChange={setCollectionSortBy} />
             <Button onClick={handleNew}>
               <Plus />
-              New collection
+              New project
             </Button>
           </div>
         </div>
@@ -415,6 +426,12 @@ export function CollectionsListPage() {
               collections={collections}
               onOpen={() => handleOpenCollection(col)}
               onRename={(name) => handleRenameCollection(col.id, name)}
+              onDuplicate={() => {
+                const result = handleDuplicateCollection(col.id);
+                if (result.ok) {
+                  navigate(`/${result.slug}`);
+                }
+              }}
               onDelete={() => handleDeleteCollection(col.id)}
               canDelete={collections.length > 1}
             />

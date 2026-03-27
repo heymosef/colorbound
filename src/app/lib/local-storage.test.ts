@@ -120,7 +120,7 @@ describe('loadState / saveState round-trip', () => {
     const loaded = loadState();
     expect(loaded).not.toBeNull();
     expect(loaded!.collections).toHaveLength(1);
-    expect(loaded!.collections[0].name).toBe('My Collection');
+    expect(loaded!.collections[0].name).toBe('My Project');
     expect(loaded!.activeCollectionId).toBe(defaultCol.id);
     expect(loaded!.activePaletteId).toBeNull();
     expect(raw.version).toBe(12);
@@ -205,8 +205,8 @@ describe('legacy migrations', () => {
     const loaded = loadState();
     expect(loaded).not.toBeNull();
     expect(loaded!.collections).toHaveLength(1);
-    expect(loaded!.collections[0].name).toBe('My Collection');
-    expect(loaded!.collections[0].slug).toBe('my-collection');
+    expect(loaded!.collections[0].name).toBe('My Project');
+    expect(loaded!.collections[0].slug).toBe('my-project');
     expect(loaded!.collections[0].palettes).toHaveLength(2);
     expect(loaded!.collections[0].palettes[0].name).toBe('Blue');
     expect(loaded!.collections[0].palettes[1].name).toBe('Slate');
@@ -241,8 +241,8 @@ describe('legacy migrations', () => {
       collections: [
         {
           id: 'col-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           createdAt: '2024-01-01T00:00:00.000Z',
           lastModifiedAt: '2024-01-01T00:00:00.000Z',
           palettes: [
@@ -301,8 +301,8 @@ describe('legacy migrations', () => {
       collections: [
         {
           id: 'col-1',
-          name: 'My Collection',
-          slug: 'my-collection',
+          name: 'My Project',
+          slug: 'my-project',
           createdAt: '2024-01-01T00:00:00.000Z',
           lastModifiedAt: '2024-01-01T00:00:00.000Z',
           palettes: [
@@ -572,8 +572,8 @@ describe('duplicate palette migration', () => {
 describe('createDefaultCollection', () => {
   it('creates a collection with expected defaults', () => {
     const col = createDefaultCollection();
-    expect(col.name).toBe('My Collection');
-    expect(col.slug).toBe('my-collection');
+    expect(col.name).toBe('My Project');
+    expect(col.slug).toBe('my-project');
     expect(col.palettes).toHaveLength(0);
     expect(col.conflictedPalettes).toEqual([]);
     expect(col.id).toBeTruthy();

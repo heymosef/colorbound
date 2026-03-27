@@ -33,7 +33,7 @@ describe('isFirstTimeUser', () => {
   it('returns true when state exists with empty collections and hasCompletedFirstRun false', () => {
     mockLoadState.mockReturnValue({
       ...BASE_STATE,
-      collections: [{ id: 'c1', name: 'My Collection', slug: 'my-collection', createdAt: '', lastModifiedAt: '', palettes: [], conflictedPalettes: [] }],
+      collections: [{ id: 'c1', name: 'My Project', slug: 'my-project', createdAt: '', lastModifiedAt: '', palettes: [], conflictedPalettes: [] }],
       hasCompletedFirstRun: false,
     });
     expect(isFirstTimeUser()).toBe(true);
@@ -43,7 +43,7 @@ describe('isFirstTimeUser', () => {
     mockLoadState.mockReturnValue({
       ...BASE_STATE,
       collections: [{
-        id: 'c1', name: 'My Collection', slug: 'my-collection', createdAt: '', lastModifiedAt: '',
+        id: 'c1', name: 'My Project', slug: 'my-project', createdAt: '', lastModifiedAt: '',
         palettes: [{ id: 'p1' } as never],
         conflictedPalettes: [],
       }],
@@ -55,7 +55,7 @@ describe('isFirstTimeUser', () => {
   it('returns false when hasCompletedFirstRun is true (one-way latch), even with no palettes', () => {
     mockLoadState.mockReturnValue({
       ...BASE_STATE,
-      collections: [{ id: 'c1', name: 'My Collection', slug: 'my-collection', createdAt: '', lastModifiedAt: '', palettes: [], conflictedPalettes: [] }],
+      collections: [{ id: 'c1', name: 'My Project', slug: 'my-project', createdAt: '', lastModifiedAt: '', palettes: [], conflictedPalettes: [] }],
       hasCompletedFirstRun: true,
     });
     expect(isFirstTimeUser()).toBe(false);

@@ -367,8 +367,8 @@ describe('PaletteSwitcher', () => {
 
     expect(screen.getByText('Duplicate palette')).toBeInTheDocument();
     expect(screen.getByText('Share palette')).toBeInTheDocument();
-    expect(screen.getByText('Move to collection…')).toBeInTheDocument();
-    expect(screen.getByText('Duplicate to collection…')).toBeInTheDocument();
+    expect(screen.getByText('Move to project…')).toBeInTheDocument();
+    expect(screen.getByText('Duplicate to project…')).toBeInTheDocument();
     expect(screen.getByText('Delete palette')).toBeInTheDocument();
   });
 

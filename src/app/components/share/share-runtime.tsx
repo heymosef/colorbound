@@ -207,7 +207,7 @@ export function CollectionShareRuntime({
 }) {
   const generateCollectionShareLink = useCallback(async () => {
     const result = await createSharedCollection(palettes, name);
-    track('collection_shared', { palette_count: palettes.length });
+    track('project_shared', { palette_count: palettes.length });
     return buildShareUrl('collection', result.id);
   }, [name, palettes]);
 

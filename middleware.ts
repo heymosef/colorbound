@@ -45,7 +45,7 @@ function buildOgHtml(
 const PALETTE_FALLBACK_TITLE = 'Shared OKLCH palette \u2014 Colorbound';
 const PALETTE_FALLBACK_DESC =
   'Preview a perceptually uniform OKLCH color palette. Explore token ramps, check contrast, and import it into your workspace with Colorbound.';
-const COLLECTION_FALLBACK_TITLE = 'Shared OKLCH collection \u2014 Colorbound';
+const COLLECTION_FALLBACK_TITLE = 'Shared OKLCH project \u2014 Colorbound';
 const COLLECTION_FALLBACK_DESC =
   'Browse a shared set of OKLCH color palettes. Preview ramps, compare swatches, and import them into your workspace with Colorbound.';
 
@@ -105,14 +105,14 @@ export default async function middleware(request: Request) {
       );
       if (res.ok) {
         const data = await res.json();
-        const name = data?.name ?? 'Collection';
+        const name = data?.name ?? 'Project';
         const count = Array.isArray(data?.palettes)
           ? data.palettes.length
           : 0;
         return new Response(
           buildOgHtml(
-            `${name} \u2014 OKLCH color collection via Colorbound`,
-            `Browse ${count} perceptually uniform OKLCH palette${count !== 1 ? 's' : ''} in ${name}. Preview ramps, compare palettes, copy tokens, and import the collection into Colorbound.`,
+            `${name} \u2014 OKLCH color project via Colorbound`,
+            `Browse ${count} perceptually uniform OKLCH palette${count !== 1 ? 's' : ''} in ${name}. Preview ramps, compare palettes, copy tokens, and import the project into Colorbound.`,
             canonicalUrl,
           ),
           { headers: { 'content-type': 'text/html; charset=utf-8' } },

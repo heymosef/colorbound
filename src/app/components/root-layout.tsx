@@ -8,7 +8,7 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
 } from './ui/breadcrumb';
-import { Sun, Moon, Monitor, ChevronDown, Plus, Check, LayoutGrid } from 'lucide-react';
+import { Sun, Moon, Monitor, ChevronDown, Plus, Check, LayoutGrid, CopyPlus } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import { PaletteSwitcher } from './palette-switcher';
 import { useBreakpoint } from '../lib/use-breakpoint';
@@ -170,6 +170,7 @@ export function CollectionSwitcher({
   onSelect,
   onCreateNew,
   onViewAll,
+  onDuplicate,
   showNameOnMobile = false,
 }: {
   collections: Collection[];
@@ -178,6 +179,7 @@ export function CollectionSwitcher({
   onSelect: (slug: string, id: string) => void;
   onCreateNew: () => void;
   onViewAll?: () => void;
+  onDuplicate?: (id: string) => void;
   showNameOnMobile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -186,7 +188,7 @@ export function CollectionSwitcher({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         className="inline-flex items-center gap-2 rounded-md h-8 px-2 text-left transition-colors hover:bg-accent cursor-pointer outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-        aria-label={`Collection: ${collectionName}. Click to switch.`}
+        aria-label={`Project: ${collectionName}. Click to switch.`}
       >
         <CollectionIcon className="w-3.5 h-3.5 shrink-0" />
         <span className={`${showNameOnMobile ? 'inline' : 'hidden sm:inline'} text-[13px] font-medium truncate max-w-[160px] sm:max-w-[200px]`}>{collectionName}</span>
@@ -235,7 +237,7 @@ export function CollectionSwitcher({
             }}
           >
             <Plus className="w-3.5 h-3.5" />
-            New collection
+            New project
           </button>
           {onViewAll && (
             <button
@@ -247,10 +249,28 @@ export function CollectionSwitcher({
               }}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              View all collections
+              View all projects
             </button>
           )}
         </div>
+        {onDuplicate && activeCollectionId && (
+          <>
+            <Separator className="shrink-0" />
+            <div className="p-1 shrink-0">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] transition-colors cursor-pointer outline-none select-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent"
+                onClick={() => {
+                  onDuplicate(activeCollectionId);
+                  setOpen(false);
+                }}
+              >
+                <CopyPlus className="w-3.5 h-3.5" />
+                Duplicate project
+              </button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -283,6 +303,7 @@ function HeaderBreadcrumb() {
     handleRemove,
     handleCreateCollection,
     handleSelectCollection,
+    handleDuplicateCollection,
   } = usePaletteContext();
   const [pendingCollectionAction, setPendingCollectionAction] = useState<{
     mode: 'move' | 'copy';
@@ -296,7 +317,7 @@ function HeaderBreadcrumb() {
   const isShared = pathname.startsWith('/p/') || pathname.startsWith('/c/');
   const isCollectionsList = pathname === '/';
   const collectionSlug = activeCollection?.slug ?? '';
-  const collectionName = activeCollection?.name ?? 'Collection';
+  const collectionName = activeCollection?.name ?? 'Project';
 
   // Determine if we're on a collection detail page (not edit, not shared, not root)
   const isCollectionDetail = !isEdit && !isShared && !isCollectionsList;
@@ -347,6 +368,13 @@ function HeaderBreadcrumb() {
     });
   }, [activeCollectionId, activePaletteId]);
 
+  const handleDuplicateAndNavigateCollection = useCallback((collectionId: string) => {
+    const result = handleDuplicateCollection(collectionId);
+    if (result.ok) {
+      navigate(buildCollectionPath(result.slug));
+    }
+  }, [handleDuplicateCollection, navigate]);
+
   // Shared pages: no header breadcrumb
   if (isShared) return null;
 
@@ -374,6 +402,7 @@ function HeaderBreadcrumb() {
                   navigate(buildCollectionPath(slug));
                 }}
                 onViewAll={() => navigate('/')}
+                onDuplicate={handleDuplicateAndNavigateCollection}
                 showNameOnMobile
               />
             </BreadcrumbItem>
@@ -405,6 +434,7 @@ function HeaderBreadcrumb() {
                 navigate(buildCollectionPath(slug));
               }}
               onViewAll={() => navigate('/')}
+              onDuplicate={handleDuplicateAndNavigateCollection}
             />
           </BreadcrumbItem>
 

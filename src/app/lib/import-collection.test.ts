@@ -45,8 +45,8 @@ describe('import collection behavior', () => {
     });
 
     act(() => {
-      const created = result.current.handleCreateCollection('Imported Collection');
-      expect(created.slug).toBe('imported-collection');
+      const created = result.current.handleCreateCollection('Imported Project');
+      expect(created.slug).toBe('imported-project');
     });
 
     const entries = [
@@ -75,25 +75,25 @@ describe('import collection behavior', () => {
 
     let importResult: { count: number; collectionSlug: string } | undefined;
     act(() => {
-      importResult = result.current.handleImportCollection(entries, 'Imported Collection');
+      importResult = result.current.handleImportCollection(entries, 'Imported Project');
     });
 
     expect(importResult).toEqual({
       count: 3,
-      collectionSlug: 'imported-collection-2',
+      collectionSlug: 'imported-project-2',
       conflictCount: 0,
     });
 
     const collectionSlugs = result.current.collections.map((collection) => collection.slug);
     expect(collectionSlugs).toEqual([
-      'my-collection',
-      'imported-collection',
-      'imported-collection-2',
+      'my-project',
+      'imported-project',
+      'imported-project-2',
     ]);
 
     const importedCollection = result.current.collections.at(-1);
-    expect(importedCollection?.name).toBe('Imported Collection (2)');
-    expect(importedCollection?.slug).toBe('imported-collection-2');
+    expect(importedCollection?.name).toBe('Imported Project (2)');
+    expect(importedCollection?.slug).toBe('imported-project-2');
     expect(importedCollection?.palettes.map((palette) => palette.name)).toEqual([
       'First import',
       'Second import',
@@ -140,12 +140,12 @@ describe('import collection behavior', () => {
           targetColorSpace: 'srgb',
           generationVersion: 1,
         },
-      ], 'Imported Collection');
+      ], 'Imported Project');
     });
 
     expect(importResult).toEqual({
       count: 2,
-      collectionSlug: 'imported-collection',
+      collectionSlug: 'imported-project',
       conflictCount: 1,
     });
 

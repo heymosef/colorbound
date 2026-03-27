@@ -35,8 +35,8 @@ const palette = {
 function makeCollection(index: number) {
   return {
     id: `collection-${index + 1}`,
-    name: index === 0 ? 'My Collection' : `Collection ${index + 1}`,
-    slug: index === 0 ? 'my-collection' : `collection-${index + 1}`,
+    name: index === 0 ? 'My Project' : `Project ${index + 1}`,
+    slug: index === 0 ? 'my-project' : `project-${index + 1}`,
     palettes: [palette],
   };
 }
@@ -103,7 +103,7 @@ describe('RootLayout route classification', () => {
   });
 
   it('shows the palette menu in the header for collection draft editor routes', () => {
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
     expect(
       screen.getByLabelText('Palette menu. Currently editing: Cyan'),
@@ -113,7 +113,7 @@ describe('RootLayout route classification', () => {
   });
 
   it('shows the palette menu in the header for collection saved editor routes', () => {
-    renderAt('/my-collection/edit/palette-1');
+    renderAt('/my-project/edit/palette-1');
 
     expect(
       screen.getByLabelText('Palette menu. Currently editing: Cyan'),
@@ -121,7 +121,7 @@ describe('RootLayout route classification', () => {
   });
 
   it('does not show the palette menu in the header for collection detail routes', () => {
-    renderAt('/my-collection');
+    renderAt('/my-project');
 
     expect(
       screen.queryByLabelText('Palette menu. Currently editing: Cyan'),
@@ -132,9 +132,9 @@ describe('RootLayout route classification', () => {
   it('uses a 192px max-height collection switcher viewport', () => {
     paletteContextValue = makePaletteContextValue(6);
 
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
-    fireEvent.click(screen.getByLabelText('Collection: My Collection. Click to switch.'));
+    fireEvent.click(screen.getByLabelText('Project: My Project. Click to switch.'));
 
     const viewport = document.body.querySelector('div[class*="max-h-[192px]"][class*="overflow-y-auto"]');
     expect(viewport).not.toBeNull();
@@ -144,7 +144,7 @@ describe('RootLayout route classification', () => {
   it('hides the global header on mobile draft editor routes', () => {
     breakpoint = 'mobile';
 
-    renderAt('/my-collection/edit');
+    renderAt('/my-project/edit');
 
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe('RootLayout route classification', () => {
   it('hides the global header on mobile saved editor routes', () => {
     breakpoint = 'mobile';
 
-    renderAt('/my-collection/edit/palette-1');
+    renderAt('/my-project/edit/palette-1');
 
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   });

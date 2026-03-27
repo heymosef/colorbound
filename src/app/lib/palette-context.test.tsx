@@ -298,7 +298,7 @@ describe('PaletteProvider naming behavior', () => {
           targetColorSpace: 'srgb',
           generationVersion: 1,
         },
-      ], 'Imported Collection');
+      ], 'Imported Project');
     });
 
     const importedCollection = result.current.activeCollection;
@@ -680,7 +680,7 @@ describe('PaletteProvider naming behavior', () => {
     expect(importResult).toEqual({
       ok: false,
       error: 'collection_not_found',
-      message: 'Collection not found',
+      message: 'Project not found',
     });
   });
 
