@@ -11,7 +11,7 @@ import {
 import type { PaletteConfig } from './palette-context-types';
 import type { SharedPaletteEntry } from './share-api';
 import { DEFAULT_DARK_CURVE, DEFAULT_LIGHT_CURVE, GENERATION_VERSION } from './color-utils';
-import { DEFAULT_PALETTE_DENSITY } from './palette-density';
+import { DEFAULT_PALETTE_DENSITY, getVisiblePaletteTokens, type PaletteDensity } from './palette-density';
 
 const VALID_CONFIG: PaletteConfig = {
   name: 'Ocean Blue',
@@ -328,5 +328,77 @@ describe('configToDarkPalette', () => {
     expect(palette.lightCurve).toBe(DEFAULT_LIGHT_CURVE);
     expect(palette.darkCurve).toBe(DEFAULT_DARK_CURVE);
     expect(palette.generationVersion).toBe(GENERATION_VERSION);
+  });
+});
+
+// ─── Non-default density preservation ───
+
+describe('density preservation through share pipeline', () => {
+  const NON_DEFAULT_DENSITIES: PaletteDensity[] = [5, 7, 9];
+
+  describe('serializePaletteConfig', () => {
+    it.each(NON_DEFAULT_DENSITIES)('preserves density %i', (density) => {
+      const config = { ...VALID_CONFIG, density };
+      const result = serializePaletteConfig(config);
+      expect(result.density).toBe(density);
+    });
+  });
+
+  describe('deserializePaletteConfig', () => {
+    it.each(NON_DEFAULT_DENSITIES)('preserves density %i', (density) => {
+      const result = deserializePaletteConfig({ ...VALID_ENTRY, density });
+      expect(result).not.toBeNull();
+      expect(result!.density).toBe(density);
+    });
+
+    it('defaults missing density to DEFAULT_PALETTE_DENSITY', () => {
+      const { density: _, ...entryWithoutDensity } = VALID_ENTRY;
+      const result = deserializePaletteConfig(entryWithoutDensity);
+      expect(result).not.toBeNull();
+      expect(result!.density).toBe(DEFAULT_PALETTE_DENSITY);
+    });
+  });
+
+  describe('serialize → deserialize round-trip', () => {
+    it.each(NON_DEFAULT_DENSITIES)('round-trips density %i', (density) => {
+      const config = { ...VALID_CONFIG, density };
+      const serialized = serializePaletteConfig(config);
+      const deserialized = deserializePaletteConfig(serialized);
+      expect(deserialized).not.toBeNull();
+      expect(deserialized!.density).toBe(density);
+    });
+  });
+
+  describe('serializeCollection / deserializeCollection with mixed densities', () => {
+    it('preserves per-palette density through collection round-trip', () => {
+      const palettes: PaletteConfig[] = [
+        { ...VALID_CONFIG, name: 'Dense', density: 5 },
+        { ...VALID_CONFIG, name: 'Medium', density: 7 },
+        { ...VALID_CONFIG, name: 'Full', density: 11 },
+      ];
+      const serialized = serializeCollection(palettes, 'Mixed');
+      const deserialized = deserializeCollection(serialized);
+      expect(deserialized).not.toBeNull();
+      expect(deserialized!.entries).toHaveLength(3);
+      expect(deserialized!.entries[0].density).toBe(5);
+      expect(deserialized!.entries[1].density).toBe(7);
+      expect(deserialized!.entries[2].density).toBe(11);
+    });
+  });
+
+  describe('configToPalette with non-default density', () => {
+    it.each(NON_DEFAULT_DENSITIES)('builds palette with density %i', (density) => {
+      const config = { ...VALID_CONFIG, density };
+      const palette = configToPalette(config, 'test-id');
+      expect(palette.density).toBe(density);
+      expect(palette.tokens).toHaveLength(11); // always 11 canonical tokens
+    });
+
+    it.each(NON_DEFAULT_DENSITIES)('palette with density %i yields correct visible token count', (density) => {
+      const config = { ...VALID_CONFIG, density };
+      const palette = configToPalette(config, 'test-id');
+      const visible = getVisiblePaletteTokens(palette);
+      expect(visible).toHaveLength(density);
+    });
   });
 });

@@ -82,4 +82,15 @@ describe('palette-density', () => {
     expect(sanitizePaletteDensity(6)).toBe(DEFAULT_PALETTE_DENSITY);
     expect(sanitizePaletteDensity(undefined)).toBe(DEFAULT_PALETTE_DENSITY);
   });
+
+  it.each([
+    [5, 5],
+    [7, 7],
+    [9, 9],
+    [11, 11],
+  ] as const)('getVisiblePaletteTokens returns %i tokens for density %i', (density, expectedCount) => {
+    const palette = makePalette(density);
+    const visible = getVisiblePaletteTokens(palette);
+    expect(visible).toHaveLength(expectedCount);
+  });
 });
