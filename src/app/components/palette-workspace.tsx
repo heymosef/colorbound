@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Sliders } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { UIPreview } from './ui-preview';
@@ -43,6 +43,8 @@ interface PaletteWorkspaceProps {
   onViewModeChange?: (v: ViewMode) => void;
   /** When true, fills the available region and manages its own scrolling. */
   fillHeight?: boolean;
+  /** Mobile: render palette controls as an additional inner tab */
+  controlsNode?: React.ReactNode;
 }
 
 function PaletteRow({
@@ -110,6 +112,7 @@ export function PaletteWorkspace({
   viewMode: controlledViewMode,
   onViewModeChange,
   fillHeight = true,
+  controlsNode,
 }: PaletteWorkspaceProps) {
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>('light');
 
@@ -220,11 +223,18 @@ export function PaletteWorkspace({
         )}
 
         {/* Token Table */}
-        <Tabs defaultValue="preview" className="w-full" onValueChange={(v) => {
+        <Tabs defaultValue={controlsNode ? "controls" : "preview"} className="w-full" onValueChange={(v) => {
           if (v === 'values') track('token_values_tab_viewed');
           if (v === 'preview') track('ui_preview_viewed');
+          if (v === 'controls') track('mobile_controls_tab_viewed');
         }}>
           <TabsList className="h-8">
+            {controlsNode && (
+              <TabsTrigger value="controls" className="text-[12px] h-6">
+                <Sliders className="w-3 h-3 mr-1" />
+                Palette Controls
+              </TabsTrigger>
+            )}
             <TabsTrigger value="preview" className="text-[12px] h-6">
               UI Preview
             </TabsTrigger>
@@ -232,6 +242,12 @@ export function PaletteWorkspace({
               Token Values
             </TabsTrigger>
           </TabsList>
+
+          {controlsNode && (
+            <TabsContent value="controls" className="mt-0 overflow-y-auto">
+              {controlsNode}
+            </TabsContent>
+          )}
 
           <TabsContent value="preview" className="mt-4">
             <UIPreview palette={activePalette} />

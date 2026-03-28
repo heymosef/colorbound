@@ -37,8 +37,6 @@ import {
   maxSrgbChromaForHue,
   maxP3ChromaAtLightness,
   maxP3ChromaForHue,
-  gamutMapToSrgb,
-  formatOklch,
 } from "../lib/color-utils";
 import { suggestPaletteName } from "../lib/color-utils";
 import type { PaletteConfig } from "../lib/palette-context";
@@ -71,23 +69,6 @@ function isFailedMutationResult(value: unknown): value is { ok: false } {
   return typeof value === 'object' && value !== null && 'ok' in value && (value as { ok?: boolean }).ok === false;
 }
 
-function HuePreview({
-  hue,
-  chroma,
-}: {
-  hue: number;
-  chroma: number;
-}) {
-  const previewChroma = Math.min(chroma, 0.2);
-  const mapped = gamutMapToSrgb(0.65, previewChroma, hue);
-  return (
-    <div
-      className="w-full h-10 rounded-lg border border-border"
-      style={{ backgroundColor: formatOklch(mapped) }}
-      aria-label={`Preview color: hue ${hue}, chroma ${chroma.toFixed(2)}`}
-    />
-  );
-}
 
 function InfoHint({
   label,
@@ -422,12 +403,6 @@ export function PaletteControls({
 
         {/* Hue */}
         <div className="space-y-2">
-          <div className="md:hidden">
-            <HuePreview
-              hue={config.hue}
-              chroma={config.chroma}
-            />
-          </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Label htmlFor="hue" className="text-[13px]">

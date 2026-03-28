@@ -4,10 +4,10 @@
  * LAYOUT UX — Do not override without explicit user instructions:
  *
  * Mobile:
- *   - Top bar: Collection switcher + PaletteSwitcher | Theme switcher + Edit button
+ *   - Top bar: Collection switcher + PaletteSwitcher | Theme switcher
  *   - Tabs: Preview | A11y | Export
  *   - ViewModeToggle: Light | Dark | Both (Preview tab only)
- *   - Controls Drawer: bottom sheet with PaletteControls + save/undo when dirty
+ *   - PaletteControls: inline tab inside PaletteWorkspace (Palette Controls | UI Preview | Token Values)
  *
  * Tablet:
  *   - Left sidebar: PaletteControls (with save/undo when dirty)
@@ -23,14 +23,7 @@ import React, { Suspense, lazy, useState, useCallback, useEffect, useRef } from 
 import { useNavigate, useParams, useBlocker, useLocation } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-} from './ui/drawer';
-import { Sliders, Eye, Contrast, Download } from 'lucide-react';
+import { Eye, Contrast, Download } from 'lucide-react';
 import { PaletteControls } from './palette-controls';
 import { PaletteWorkspace } from './palette-workspace';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
@@ -309,7 +302,6 @@ function MobileLayout({
   onSelectPalette,
   onNewPalette,
   onNavigateToCollection,
-  controlsOpenSignal,
 }: {
   controlsNode: (onClose?: () => void) => React.ReactNode;
   config: { name: string };
@@ -328,9 +320,7 @@ function MobileLayout({
   onSelectPalette: (id: string) => void;
   onNewPalette: () => void;
   onNavigateToCollection: () => void;
-  controlsOpenSignal: number;
 }) {
-  const [controlsOpen, setControlsOpen] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<ViewMode>('light');
   const [mobileTab, setMobileTab] = useState('preview');
 
@@ -339,12 +329,6 @@ function MobileLayout({
 
   const navigate = useNavigate();
   const collectionName = activeCollection?.name ?? 'Project';
-
-  useEffect(() => {
-    if (controlsOpenSignal > 0) {
-      setControlsOpen(true);
-    }
-  }, [controlsOpenSignal]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -388,30 +372,8 @@ function MobileLayout({
         {/* Right: editor utilities */}
         <div className="flex items-center gap-1.5 shrink-0">
           <ThemeSwitcher theme={theme} setTheme={setTheme} />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-[12px] gap-1.5 rounded-md"
-            onClick={() => setControlsOpen(true)}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            Edit
-          </Button>
         </div>
       </div>
-
-      {/* Controls Drawer (bottom sheet) */}
-      <Drawer open={controlsOpen} onOpenChange={setControlsOpen}>
-        <DrawerContent className="max-h-[85vh]">
-          <DrawerHeader className="sr-only">
-            <DrawerTitle>Palette Controls</DrawerTitle>
-            <DrawerDescription>Adjust palette hue, chroma, and lightness settings</DrawerDescription>
-          </DrawerHeader>
-          <div className="overflow-y-auto flex-1">
-            {controlsNode(() => setControlsOpen(false))}
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       {/* ─── Tabbed content ─── */}
       <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex-1 overflow-hidden flex flex-col">
@@ -457,6 +419,7 @@ function MobileLayout({
             hideToolbar
             viewMode={mobileViewMode}
             onViewModeChange={setMobileViewMode}
+            controlsNode={controlsNode()}
           />
         </TabsContent>
         <TabsContent value="accessibility" className="flex-1 overflow-auto mt-0 px-3 pt-3 pb-6">
@@ -517,12 +480,7 @@ export function EditPalettePage() {
     handleCreateCollection,
   } = usePaletteContext();
   const [pendingCollectionAction, setPendingCollectionAction] = useState<PendingCollectionAction | null>(null);
-  const [mobileControlsOpenSignal, setMobileControlsOpenSignal] = useState(0);
   const expectedDeletedPaletteIdRef = useRef<string | null>(null);
-
-  const openMobileControls = useCallback(() => {
-    setMobileControlsOpenSignal((value) => value + 1);
-  }, []);
 
   // Set document title: "PaletteName — CollectionName — Colorbound"
   const titleParts = [config.name];
@@ -681,12 +639,9 @@ export function EditPalettePage() {
   const handleSaveDraftPalette = useCallback(() => {
     if (!activeCollection) return;
     const result = handleAddToCollection();
-    if (!result.ok) {
-      openMobileControls();
-      return;
-    }
+    if (!result.ok) return;
     navigateBypassingDirtyGuard(buildCollectionSavedEditorPath(activeCollection.slug, result.paletteId), { replace: true });
-  }, [activeCollection, handleAddToCollection, navigateBypassingDirtyGuard, openMobileControls]);
+  }, [activeCollection, handleAddToCollection, navigateBypassingDirtyGuard]);
 
   const handleCreateNewPalette = useCallback(() => {
     if (!activeCollection) return;
@@ -775,10 +730,7 @@ export function EditPalettePage() {
               const result = isEditingSavedPalette
                 ? handleUpdateInCollection()
                 : handleAddToCollection();
-              if (!result.ok) {
-                openMobileControls();
-                return;
-              }
+              if (!result.ok) return;
               blocker.proceed?.();
             }}
           >
@@ -823,7 +775,6 @@ export function EditPalettePage() {
         onSelectPalette={handleSelectPalette}
         onNewPalette={handleCreateNewPalette}
         onNavigateToCollection={handleNavigateToCollection}
-        controlsOpenSignal={mobileControlsOpenSignal}
       />
     </>
   );
