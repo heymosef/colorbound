@@ -26,8 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Eye, Contrast, Download } from 'lucide-react';
 import { PaletteControls } from './palette-controls';
 import { PaletteWorkspace } from './palette-workspace';
-import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
-import { AlgorithmToggle } from './contrast-indicator';
+import type { ViewMode } from './palette-view-mode-toggle';
 import { usePaletteContext } from '../lib/palette-context';
 import { useBreakpoint } from '../lib/use-breakpoint';
 import { PaletteSwitcher } from './palette-switcher';
@@ -325,7 +324,7 @@ function MobileLayout({
   const [mobileTab, setMobileTab] = useState('preview');
 
   const { theme, setTheme } = useThemeContext();
-  const { contrastAlgorithm, setContrastAlgorithm, collections, activeCollection, handleCreateCollection } = usePaletteContext();
+  const { collections, activeCollection, handleCreateCollection } = usePaletteContext();
 
   const navigate = useNavigate();
   const collectionName = activeCollection?.name ?? 'Project';
@@ -394,16 +393,6 @@ function MobileLayout({
           </TabsList>
         </div>
 
-        {/* View mode toggle — only shown on Preview tab */}
-        {mobileTab === 'preview' && (
-          <div className="px-3 pt-2 shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <ViewModeToggle value={mobileViewMode} onChange={setMobileViewMode} />
-              <AlgorithmToggle value={contrastAlgorithm} onChange={setContrastAlgorithm} />
-            </div>
-          </div>
-        )}
-
         <TabsContent value="preview" className="flex-1 overflow-hidden mt-0">
           <PaletteWorkspace
             palette={currentPalette}
@@ -416,7 +405,6 @@ function MobileLayout({
             onDuplicate={onDuplicate}
             onDelete={onDelete}
             onCollectionAction={onCollectionAction}
-            hideToolbar
             viewMode={mobileViewMode}
             onViewModeChange={setMobileViewMode}
             controlsNode={controlsNode()}
