@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Eye, Plus, ChevronLeft, ChevronRight, ArrowUp, Copy } from 'lucide-react';
+import { Eye, Plus, ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { rgbToHex, relativeLuminance } from '../lib/color-utils';
 
@@ -8,11 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
-import { Switch } from './ui/switch';
 import { Checkbox } from './ui/checkbox';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Textarea } from './ui/textarea';
-import { PopoverSelect } from './popover-select';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
 
 interface UIPreviewProps {
@@ -347,177 +345,6 @@ function ChatCard({ palette }: UIPreviewProps) {
   );
 }
 
-/* ─── 7. REPORT AN ISSUE ─── */
-function ReportIssueCard({ palette }: UIPreviewProps) {
-  const [area, setArea] = useState('billing');
-  const [severity, setSeverity] = useState('severity2');
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[15px]">Report an issue</CardTitle>
-        <CardDescription className="text-[13px]">What area are you having problems with?</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-[12px]">Area</Label>
-            <PopoverSelect
-              value={area}
-              onValueChange={setArea}
-              items={[
-                { value: 'billing', label: 'Billing' },
-                { value: 'account', label: 'Account' },
-                { value: 'team', label: 'Team' },
-              ]}
-              triggerClassName="h-8 text-[12px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[12px]">Security Level</Label>
-            <PopoverSelect
-              value={severity}
-              onValueChange={setSeverity}
-              items={[
-                { value: 'severity1', label: 'Severity 1' },
-                { value: 'severity2', label: 'Severity 2' },
-                { value: 'severity3', label: 'Severity 3' },
-              ]}
-              triggerClassName="h-8 text-[12px]"
-            />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-[12px]">Subject</Label>
-          <Input placeholder="I need help with..." className="h-8 text-[13px]" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-[12px]">Description</Label>
-          <Textarea placeholder="Please include all information relevant to your issue." className="text-[12px] min-h-[72px]" />
-        </div>
-      </CardContent>
-      <CardFooter className="justify-between">
-        <Button variant="ghost" size="sm" className="text-[12px]">Cancel</Button>
-        <Button size="sm" className="text-[12px]">Submit</Button>
-      </CardFooter>
-    </Card>
-  );
-}
-
-/* ─── 8. SHARE DOCUMENT ─── */
-function ShareDocumentCard({ palette }: UIPreviewProps) {
-  const { c } = usePaletteColors(palette);
-  const people = [
-    { name: 'Olivia Martin', email: 'm@example.com', initials: 'OM' },
-    { name: 'Isabella Nguyen', email: 'b@example.com', initials: 'IN' },
-    { name: 'Sofia Davis', email: 'p@example.com', initials: 'SD' },
-    { name: 'Ethan Thompson', email: 'e@example.com', initials: 'ET' },
-  ];
-
-  const roleItems = [
-    { value: 'can-edit', label: 'Can edit' },
-    { value: 'can-view', label: 'Can view' },
-  ];
-
-  // Track each person's role independently
-  const [roles, setRoles] = useState<Record<string, string>>(
-    Object.fromEntries(people.map(p => [p.email, 'can-edit']))
-  );
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[15px]">Share this document</CardTitle>
-        <CardDescription className="text-[13px]">Anyone with the link can view this document.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Input
-            value="http://example.com/link/to/document"
-            readOnly
-            className="h-8 text-[13px] flex-1"
-          />
-          <Button variant="outline" size="sm" className="text-[11px] h-8 shrink-0 gap-1">
-            <Copy className="w-3 h-3" />
-            Copy link
-          </Button>
-        </div>
-        <Separator aria-label="People with access section divider" />
-        <div>
-          <p className="text-[12px] mb-3">People with access</p>
-          <div className="space-y-3">
-            {people.map(p => (
-              <div key={p.email} className="flex items-center gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback className="text-[10px]" style={{ backgroundColor: c[100], color: c[700] }}>
-                    {p.initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] truncate">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{p.email}</p>
-                </div>
-                <PopoverSelect
-                  value={roles[p.email] ?? 'can-edit'}
-                  onValueChange={(v) => setRoles(prev => ({ ...prev, [p.email]: v }))}
-                  items={roleItems}
-                  triggerClassName="w-[90px] h-7 text-[10px]"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── 9. COOKIE SETTINGS ─── */
-function CookieSettingsCard({ palette }: UIPreviewProps) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[15px]">Cookie Settings</CardTitle>
-        <CardDescription className="text-[13px]">Manage your cookie settings here.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-[13px]">Strictly Necessary</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              These cookies are essential in order to use the website and use its features.
-            </p>
-          </div>
-          <Switch defaultChecked />
-        </div>
-        <Separator aria-label="Functional cookies section divider" />
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-[13px]">Functional Cookies</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              These cookies allow the website to provide personalized functionality.
-            </p>
-          </div>
-          <Switch />
-        </div>
-        <Separator aria-label="Performance cookies section divider" />
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-[13px]">Performance Cookies</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              These cookies help to improve the performance of the website.
-            </p>
-          </div>
-          <Switch />
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button variant="outline" size="sm" className="w-full text-[12px]">Save preferences</Button>
-      </CardFooter>
-    </Card>
-  );
-}
-
 /* ─── 10. SLEEP REPORT ─── */
 function SleepReportCard({ palette }: UIPreviewProps) {
   const { c } = usePaletteColors(palette);
@@ -743,11 +570,8 @@ export function UIPreview({ palette }: UIPreviewProps) {
           <div className="columns-1 @[560px]:columns-2 @[1120px]:columns-3 gap-4">
             <div className="break-inside-avoid mb-4"><SubscriptionsCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><CalendarCard palette={palette} /></div>
-            <div className="break-inside-avoid mb-4"><CookieSettingsCard palette={palette} /></div>
-            <div className="break-inside-avoid mb-4"><ShareDocumentCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><SleepReportCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><ChatCard palette={palette} /></div>
-            <div className="break-inside-avoid mb-4"><ReportIssueCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><UpgradeSubscriptionCard palette={palette} /></div>
             <div className="break-inside-avoid mb-4"><TrafficChannelsCard palette={palette} /></div>
           </div>

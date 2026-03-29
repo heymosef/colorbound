@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Moon, Sun, Sliders } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { UIPreview } from './ui-preview';
@@ -222,15 +222,14 @@ export function PaletteWorkspace({
           <TabsList className="h-8">
             {controlsNode && (
               <TabsTrigger value="controls" className="text-[12px] h-6">
-                <Sliders className="w-3 h-3 mr-1" />
-                Palette Controls
+                Palette controls
               </TabsTrigger>
             )}
             <TabsTrigger value="preview" className="text-[12px] h-6">
-              UI Preview
+              UI preview
             </TabsTrigger>
             <TabsTrigger value="values" className="text-[12px] h-6">
-              Token Values
+              Token values
             </TabsTrigger>
           </TabsList>
 

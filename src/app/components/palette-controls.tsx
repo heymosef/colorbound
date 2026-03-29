@@ -306,11 +306,11 @@ export function PaletteControls({
 
   return (
     <Card className="h-full border-0 rounded-none shadow-none bg-card">
-      <CardContent className="px-4 pt-4 pb-4 space-y-5">
+      <CardContent className="px-0 pt-4 pb-4 space-y-5">
         {/* Panel title */}
         <div className="flex items-center justify-between">
           <p className="text-[11px] text-muted-foreground tracking-wide uppercase">
-            Palette Controls
+            Palette controls
           </p>
           <GamutBadge gamut={midpointGamut} />
         </div>

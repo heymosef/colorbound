@@ -108,7 +108,7 @@ describe('Palette workspace collection actions', () => {
 
     renderWorkspace({ palette });
 
-    const valuesTab = screen.getByRole('tab', { name: 'Token Values' });
+    const valuesTab = screen.getByRole('tab', { name: 'Token values' });
     fireEvent.click(valuesTab);
     fireEvent.keyDown(valuesTab, { key: 'Enter' });
 
