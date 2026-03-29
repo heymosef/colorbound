@@ -5,6 +5,18 @@
       <meta charset="UTF-8" />
       <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://us.i.posthog.com https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com; img-src 'self' data: blob:;" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <!-- SVG favicon (dark/light aware) -->
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <!-- PNG favicon fallback (light mode) -->
+      <link rel="icon" type="image/png" sizes="48x48" href="/colorbound-favicon-light-mode-48.png" media="(prefers-color-scheme: light)" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/colorbound-favicon-light-mode-32.png" media="(prefers-color-scheme: light)" />
+      <link rel="icon" type="image/png" sizes="16x16" href="/colorbound-favicon-light-mode-16.png" media="(prefers-color-scheme: light)" />
+      <!-- PNG favicon fallback (dark mode) -->
+      <link rel="icon" type="image/png" sizes="48x48" href="/colorbound-favicon-dark-mode-48.png" media="(prefers-color-scheme: dark)" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/colorbound-favicon-dark-mode-32.png" media="(prefers-color-scheme: dark)" />
+      <link rel="icon" type="image/png" sizes="16x16" href="/colorbound-favicon-dark-mode-16.png" media="(prefers-color-scheme: dark)" />
+      <!-- Apple touch icon -->
+      <link rel="apple-touch-icon" href="/colorbound-apple-touch-icon.png" />
       <title>Colorbound — Generate OKLCH color palettes</title>
     <meta name="description" content="Create perceptually uniform OKLCH color palettes for design systems, preview ramps, check accessibility, and export tokens to CSS, Tailwind, JSON, DTCG, and Figma." />
     <meta name="theme-color" content="#09090b" />

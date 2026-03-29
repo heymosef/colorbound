@@ -20,7 +20,7 @@
  */
 
 import React, { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useParams, useBlocker, useLocation } from 'react-router';
+import { useNavigate, useParams, useBlocker, useLocation, Link } from 'react-router';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Eye, Contrast, Download } from 'lucide-react';
@@ -333,8 +333,16 @@ function MobileLayout({
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* ─── Mobile Top Bar: Collection switcher | Palette menu | Edit ─── */}
       <div className="px-3 py-2.5 border-b border-border bg-card flex items-center justify-between gap-2 shrink-0">
-        {/* Left: CollectionSwitcher (icon-only) + PaletteSwitcher */}
+        {/* Left: Home link + CollectionSwitcher (icon-only) + PaletteSwitcher */}
         <div className="min-w-0 flex-1 flex items-center gap-1 text-muted-foreground">
+          <Link
+            to="/"
+            className="flex items-center shrink-0 rounded-md h-8 px-1.5 hover:bg-accent transition-colors outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            aria-label="Colorbound — go home"
+          >
+            <img src="/colorbound-symbol.svg" alt="Colorbound" className="h-3.5 w-3.5 dark:invert" />
+          </Link>
+          <span className="text-muted-foreground/30 select-none text-[13px]" aria-hidden="true">/</span>
           <CollectionSwitcher
             collections={collections}
             activeCollectionId={activeCollection?.id ?? null}

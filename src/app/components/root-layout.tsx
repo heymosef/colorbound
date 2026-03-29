@@ -8,7 +8,7 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
 } from './ui/breadcrumb';
-import { Sun, Moon, Monitor, ChevronDown, Plus, Check, LayoutGrid, CopyPlus } from 'lucide-react';
+import { Sun, Moon, Monitor, ChevronDown, Plus, Check, LayoutGrid, Folders } from 'lucide-react';
 import { usePaletteContext } from '../lib/palette-context';
 import { PaletteSwitcher } from './palette-switcher';
 import { useBreakpoint } from '../lib/use-breakpoint';
@@ -36,7 +36,37 @@ export function useThemeContext() {
   return useContext(ThemeContext);
 }
 
-function applyTheme(theme: AppTheme) {
+function updateFavicon(resolvedTheme: 'light' | 'dark') {
+  try {
+    document.querySelectorAll('link[rel="icon"]').forEach(el => el.remove());
+    const head = document.head;
+    [48, 32, 16].forEach(size => {
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
+      link.setAttribute('sizes', `${size}x${size}`);
+      link.href = `/colorbound-favicon-${resolvedTheme}-mode-${size}.png`;
+      head.appendChild(link);
+    });
+  } catch {
+    // DOM not available
+  }
+}
+
+function restoreSvgFavicon() {
+  try {
+    document.querySelectorAll('link[rel="icon"]').forEach(el => el.remove());
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/svg+xml';
+    link.href = '/favicon.svg';
+    document.head.appendChild(link);
+  } catch {
+    // DOM not available
+  }
+}
+
+function applyTheme(theme: AppTheme, updateFavicons = false) {
   try {
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -54,12 +84,22 @@ function applyTheme(theme: AppTheme) {
         root.classList.remove('dark');
       }
     }
+    if (updateFavicons) {
+      if (theme === 'dark') {
+        updateFavicon('dark');
+      } else if (theme === 'light') {
+        updateFavicon('light');
+      } else {
+        restoreSvgFavicon();
+      }
+    }
   } catch {
     // matchMedia or classList not available
   }
 }
 
 function useTheme() {
+  const isInitialMount = useRef(true);
   const [theme, setTheme] = useState<AppTheme>(() => {
     try {
       const saved = localStorage.getItem('app-theme') as AppTheme | null;
@@ -70,7 +110,8 @@ function useTheme() {
   });
 
   useEffect(() => {
-    applyTheme(theme);
+    applyTheme(theme, !isInitialMount.current);
+    isInitialMount.current = false;
     try {
       localStorage.setItem('app-theme', theme);
     } catch {
@@ -265,7 +306,7 @@ export function CollectionSwitcher({
                   setOpen(false);
                 }}
               >
-                <CopyPlus className="w-3.5 h-3.5" />
+                <Folders className="w-3.5 h-3.5" />
                 Duplicate project
               </button>
             </div>
@@ -511,7 +552,6 @@ export function RootLayout() {
   // MobileLayout in EditPalettePage provides its own top bar
   // (Collection switcher + Palette menu + Edit).
   const isEditPage = isEditorRoute(location.pathname);
-  const isHomePage = location.pathname === '/';
   const hideHeader = breakpoint === 'mobile' && isEditPage;
   const usesDocumentScrollLayout = isEditPage && breakpoint !== 'mobile';
 
@@ -534,18 +574,8 @@ export function RootLayout() {
                 className="flex items-center gap-2 shrink-0 rounded-md h-8 px-2 hover:bg-accent transition-colors outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 aria-label="Colorbound — go home"
               >
-                <div
-                  className="w-6 h-6 rounded-md bg-foreground flex items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" className="text-background" />
-                    <rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor" className="text-background" opacity="0.7" />
-                    <rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor" className="text-background" opacity="0.5" />
-                    <rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor" className="text-background" opacity="0.3" />
-                  </svg>
-                </div>
-                <span className={`text-[13px] font-medium ${isHomePage ? 'block' : 'hidden sm:block'}`}>Colorbound</span>
+                <img src="/colorbound-logo-sm.svg" alt="Colorbound" className="hidden sm:block h-3.5 dark:invert" />
+                <img src="/colorbound-symbol.svg" alt="Colorbound" className="block sm:hidden h-3.5 w-3.5 dark:invert" />
               </Link>
               <HeaderBreadcrumb />
             </div>

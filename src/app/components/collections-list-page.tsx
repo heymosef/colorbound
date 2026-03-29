@@ -23,8 +23,8 @@ import {
   Trash2,
   Check,
   ArrowUpDown,
-  Layers,
-  CopyPlus,
+  LayoutGrid,
+  Folders,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -112,7 +112,7 @@ function CollectionOptionsMenu({
             Rename
           </PopoverMenuItem>
           <PopoverMenuItem onClick={() => { setMenuOpen(false); onDuplicate(); }}>
-            <CopyPlus className="w-3.5 h-3.5" />
+            <Folders className="w-3.5 h-3.5" />
             Duplicate
           </PopoverMenuItem>
           <Separator className="my-1" />
@@ -398,7 +398,7 @@ export function CollectionsListPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Layers className="w-5 h-5 text-muted-foreground" />
+              <LayoutGrid className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <h2 className="text-[18px]">Projects</h2>
