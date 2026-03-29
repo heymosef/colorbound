@@ -7,6 +7,7 @@ let initialized = false;
 
 export function initPostHog() {
   if (initialized || !POSTHOG_KEY) return;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
     capture_pageview: false,
