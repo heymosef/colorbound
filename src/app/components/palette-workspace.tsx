@@ -10,16 +10,15 @@
 
 import React, { useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Sliders } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
 import { getVisiblePaletteTokens } from '../lib/palette-density';
 import { UIPreview } from './ui-preview';
-import { ContrastRow, AlgorithmToggle } from './contrast-indicator';
+import { ContrastRow } from './contrast-indicator';
 import { useSupportsP3, getTokenDisplayColor } from '../lib/use-supports-p3';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from './ui/table';
-import { usePaletteContext } from '../lib/palette-context';
 import { track } from '../lib/analytics';
 import { ViewModeToggle, type ViewMode } from './palette-view-mode-toggle';
 import { CopyableTokenSwatch } from './copyable-token-swatch';
@@ -36,13 +35,13 @@ interface PaletteWorkspaceProps {
   onDuplicate?: (name: string) => { ok: boolean; message?: string };
   onDelete?: () => void;
   onCollectionAction?: (mode: 'move' | 'copy', palette: Palette) => void;
-  /** Mobile: hide the built-in toolbar (handled externally by EditPalettePage) */
-  hideToolbar?: boolean;
   /** Controlled view mode (for mobile, where toggle lives outside the workspace) */
   viewMode?: ViewMode;
   onViewModeChange?: (v: ViewMode) => void;
   /** When true, fills the available region and manages its own scrolling. */
   fillHeight?: boolean;
+  /** Mobile: render palette controls as an additional inner tab */
+  controlsNode?: React.ReactNode;
 }
 
 function PaletteRow({
@@ -52,16 +51,16 @@ function PaletteRow({
   palette: Palette;
   label?: string;
 }) {
-  const isDarkMode = label === 'Dark Palette';
+  const isDarkMode = label === 'Dark-mode optimized palette';
   const visibleTokens = getVisiblePaletteTokens(palette);
   return (
     <div className="space-y-1.5">
       {label && (
         <div className="flex items-center gap-2">
-          {label === 'Light Palette' ? (
-            <Sun className="w-3.5 h-3.5 text-muted-foreground" />
-          ) : (
+          {isDarkMode ? (
             <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+          ) : (
+            <Sun className="w-3.5 h-3.5 text-muted-foreground" />
           )}
           <p className="text-[12px] text-muted-foreground">{label}</p>
         </div>
@@ -106,16 +105,15 @@ export function PaletteWorkspace({
   onDuplicate,
   onDelete,
   onCollectionAction,
-  hideToolbar = false,
   viewMode: controlledViewMode,
   onViewModeChange,
   fillHeight = true,
+  controlsNode,
 }: PaletteWorkspaceProps) {
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>('light');
 
   const viewMode = controlledViewMode ?? internalViewMode;
   const setViewMode = onViewModeChange ?? setInternalViewMode;
-  const { contrastAlgorithm, setContrastAlgorithm } = usePaletteContext();
   const supportsP3 = useSupportsP3();
 
   if (!palette) {
@@ -140,20 +138,6 @@ export function PaletteWorkspace({
 
   return (
     <div className={`flex flex-col ${fillHeight ? 'h-full overflow-auto' : ''}`}>
-      {/* ─── Desktop/Tablet Toolbar ─── */}
-      {!hideToolbar && (
-        <div className="px-3 sm:px-5 py-3 border-b border-border bg-card sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <AlgorithmToggle value={contrastAlgorithm} onChange={setContrastAlgorithm} />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className={`p-3 sm:p-5 space-y-6 ${fillHeight ? 'flex-1' : ''}`}>
         {previewLimited && (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -164,14 +148,21 @@ export function PaletteWorkspace({
         {/* Palette swatches */}
         {viewMode === 'both' ? (
           <div className="space-y-5">
-            <PaletteRow palette={palette} label="Light Palette" />
-            {darkPalette && <PaletteRow palette={darkPalette} label="Dark Palette" />}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] text-muted-foreground">Light and dark palettes</p>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+            <PaletteRow palette={palette} label="Light-mode optimized palette" />
+            {darkPalette && <PaletteRow palette={darkPalette} label="Dark-mode optimized palette" />}
           </div>
         ) : viewMode === 'dark' ? (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Moon className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-[12px] text-muted-foreground">Dark-mode optimized palette</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[12px] text-muted-foreground">Dark-mode optimized palette</p>
+              </div>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
             {darkPalette && (
               <div className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 snap-x snap-mandatory">
@@ -195,9 +186,12 @@ export function PaletteWorkspace({
           </div>
         ) : (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Sun className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-[12px] text-muted-foreground">Light-mode optimized palette</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sun className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[12px] text-muted-foreground">Light-mode optimized palette</p>
+              </div>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
             <div className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 snap-x snap-mandatory">
               <div className="space-y-1.5 min-w-max">
@@ -220,11 +214,18 @@ export function PaletteWorkspace({
         )}
 
         {/* Token Table */}
-        <Tabs defaultValue="preview" className="w-full" onValueChange={(v) => {
+        <Tabs defaultValue={controlsNode ? "controls" : "preview"} className="w-full" onValueChange={(v) => {
           if (v === 'values') track('token_values_tab_viewed');
           if (v === 'preview') track('ui_preview_viewed');
+          if (v === 'controls') track('mobile_controls_tab_viewed');
         }}>
           <TabsList className="h-8">
+            {controlsNode && (
+              <TabsTrigger value="controls" className="text-[12px] h-6">
+                <Sliders className="w-3 h-3 mr-1" />
+                Palette Controls
+              </TabsTrigger>
+            )}
             <TabsTrigger value="preview" className="text-[12px] h-6">
               UI Preview
             </TabsTrigger>
@@ -232,6 +233,12 @@ export function PaletteWorkspace({
               Token Values
             </TabsTrigger>
           </TabsList>
+
+          {controlsNode && (
+            <TabsContent value="controls" className="mt-0 overflow-y-auto">
+              {controlsNode}
+            </TabsContent>
+          )}
 
           <TabsContent value="preview" className="mt-4">
             <UIPreview palette={activePalette} />

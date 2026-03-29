@@ -40,7 +40,6 @@ vi.mock('./copyable-token-swatch', () => ({
 
 vi.mock('./contrast-indicator', () => ({
   ContrastRow: () => <div>Contrast row</div>,
-  AlgorithmToggle: () => <div>Algorithm toggle</div>,
 }));
 
 vi.mock('./ui-preview', () => ({
@@ -86,11 +85,11 @@ describe('Palette workspace collection actions', () => {
     };
   });
 
-  it('keeps the workspace toolbar focused on view controls instead of palette identity', () => {
+  it('keeps the workspace focused on view controls instead of palette identity', () => {
     renderWorkspace();
 
-    expect(screen.getByText('Algorithm toggle')).toBeInTheDocument();
     expect(screen.getByText('View mode toggle')).toBeInTheDocument();
+    expect(screen.queryByText('Algorithm toggle')).not.toBeInTheDocument();
     expect(screen.queryByText('Ocean')).not.toBeInTheDocument();
   });
 

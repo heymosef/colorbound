@@ -481,10 +481,11 @@ export function ContrastPairSelector({ palette, inlineMode }: { palette: Palette
   useEffect(() => {
     const visibleSteps = visibleTokens.map((t) => String(t.step));
     if (visibleSteps.length === 0) return;
-    if (!visibleSteps.includes(fgStep)) {
+    const validValues = [...visibleSteps, ...EXTRA_STOPS.map((e) => e.value)];
+    if (!validValues.includes(fgStep)) {
       setFgStep(visibleSteps[visibleSteps.length - 1]);
     }
-    if (!visibleSteps.includes(bgStep)) {
+    if (!validValues.includes(bgStep)) {
       setBgStep(visibleSteps[0]);
     }
   }, [visibleTokens]); // eslint-disable-line react-hooks/exhaustive-deps

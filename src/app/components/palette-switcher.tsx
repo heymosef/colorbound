@@ -16,12 +16,12 @@ import {
   ChevronDown,
   Check,
   Plus,
-  Layers,
+  Rows3,
   Search,
   CopyPlus,
   Share2,
   FolderOutput,
-  FolderInput,
+  FolderGit2,
   Trash2,
 } from 'lucide-react';
 import type { Palette } from '../lib/color-utils';
@@ -337,7 +337,7 @@ export function PaletteSwitcher({
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground cursor-pointer focus-visible:bg-accent"
               onClick={handleViewAll}
             >
-              <Layers className="w-3.5 h-3.5" />
+              <Rows3 className="w-3.5 h-3.5" />
               View all palettes
             </button>
           </div>
@@ -366,13 +366,13 @@ export function PaletteSwitcher({
                       onClick={() => handlePaletteAction(() => onCollectionAction?.('move', currentPalette))}
                     >
                       <FolderOutput className="w-3.5 h-3.5" />
-                      Move to project…
+                      Move to project
                     </PopoverMenuItem>
                     <PopoverMenuItem
                       onClick={() => handlePaletteAction(() => onCollectionAction?.('copy', currentPalette))}
                     >
-                      <FolderInput className="w-3.5 h-3.5" />
-                      Duplicate to project…
+                      <FolderGit2 className="w-3.5 h-3.5" />
+                      Duplicate to project
                     </PopoverMenuItem>
                   </>
                 )}
